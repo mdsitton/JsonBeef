@@ -29,7 +29,9 @@ merge_into() { # results-file script-args...
 	MERGE_CHILD=1 bash "$0" "$@" | tee "$tmp"
 	status=${PIPESTATUS[0]}
 	if [ "$status" -eq 0 ]; then
-		mv "$tmp" "$RESULTS_FILE"
+		# Copied over, not moved: the results file keeps its mode (mktemp's file is private)
+		cat "$tmp" > "$RESULTS_FILE"
+		rm -f "$tmp"
 	else
 		rm -f "$tmp"
 		echo "not saved: the run failed ($status)" >&2
