@@ -25,8 +25,11 @@ namespace JsonTester;
 /// -mutate SEED (PreserveStyle, random edits, the preserving writer's output must read back into the
 /// edited document; prints that output).
 /// Metadata: -preserve (JsonMetadataMode.PreserveStyle).
-/// Dialect: -comments, -trailing-commas, -jsonc (both), -nonfinite (NaN, Infinity, -Infinity), -ijson
-/// (RFC 7493), -utf8=error|replace, -surrogates=error|replace|wtf8.
+/// Dialect: -comments, -trailing-commas, -jsonc (both), -json5, -nonfinite (NaN, Infinity, -Infinity),
+/// -ijson (RFC 7493), -utf8=error|replace, -surrogates=error|replace|wtf8.
+/// Sequences (JsonSequenceReader): -lines (JSON Lines; -skip-empty skips empty lines), -concatenated,
+/// -rs (RFC 7464): one canonical line per value, each error on stderr as `record N: line:column: Kind:
+/// message`, exit status 1 if there was any; with -stream N too.
 /// Options: -no-bom, -max-depth N, -dup=keep|last|first|error, -collect (JsonReadConfig.CollectErrors:
 /// every error is printed, the first one first, and the exit status is 1 if there was any); for the
 /// batch modes -every K and -limit N.
@@ -65,6 +68,9 @@ class Program
 		Output output = .Canonical;
 		String pointer = null;
 		int mutateSeed = 0;
+		// A JsonSequenceMode, or -1 for one document
+		int sequence = -1;
+		bool skipEmpty = false;
 		String path = null;
 		for (int i < args.Count)
 		{
@@ -127,6 +133,14 @@ class Program
 				config.AllowNonFiniteNumbers = true;
 			else if (arg == "-ijson")
 				config.IJson = true;
+			else if (arg == "-lines")
+				sequence = (int)JsonSequenceMode.Lines;
+			else if (arg == "-concatenated")
+				sequence = (int)JsonSequenceMode.Concatenated;
+			else if (arg == "-rs")
+				sequence = (int)JsonSequenceMode.RecordSeparated;
+			else if (arg == "-skip-empty")
+				skipEmpty = true;
 			else if (arg == "-json5")
 			{
 				config.Dialect = .Json5;
@@ -205,6 +219,42 @@ class Program
 		StringView text = .((char8*)input.Ptr, input.Count);
 
 		let result = scope String();
+		if (sequence >= 0)
+		{
+			// A sequence: one canonical line per value; each error as `record N: line:column: Kind: message`
+			let reader = scope JsonSequenceReader((JsonSequenceMode)sequence);
+			reader.SkipEmptyLines = skipEmpty;
+			if (stream != null)
+				reader.Reset(stream, config);
+			else
+				reader.Reset(text, config);
+			bool anyError = false;
+			while (true)
+			{
+				switch (reader.Next())
+				{
+				case .Ok(let more):
+					if (!more)
+					{
+						Console.Out.Write(result);
+						Console.Out.Flush();
+						return anyError ? 1 : 0;
+					}
+					let value = scope String();
+					if (Canonical.WriteValue(reader.Reader, value) case .Err(let valueError))
+					{
+						PrintRecordError(reader.Index, reader.Locate(valueError));
+						anyError = true;
+						continue;
+					}
+					result.Append(value);
+					result.Append('\n');
+				case .Err(let error):
+					PrintRecordError(reader.Index, error);
+					anyError = true;
+				}
+			}
+		}
 		if (output == .Select)
 		{
 			// On demand: the reader's Find, the value printed from its tokens, the rest checked
@@ -346,6 +396,12 @@ class Program
 		Console.Out.Write(text);
 		Console.Out.Flush();
 		return 0;
+	}
+
+	/// `record N: line:column: Kind: message` on stderr (the sequence modes).
+	static void PrintRecordError(int index, JsonParseError error)
+	{
+		Console.Error.WriteLine(scope $"record {index}: {error.mLine}:{error.mColumn}: {error.mKind}: {error.mMessage}");
 	}
 
 	/// `line:column: Kind: message` on stderr; exit status 1.

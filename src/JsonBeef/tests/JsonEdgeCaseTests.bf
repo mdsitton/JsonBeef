@@ -1355,6 +1355,119 @@ static class JsonEdgeCaseTests
 		Json5Rejects("/* comment only */", .UnexpectedEndOfInput);
 	}
 
+	// Sequences (JsonSequenceReader)
+
+	/// The values of a sequence as compact JSON, one per line, and each error as `!N:line:column`
+	/// (N the record), from memory and through 1-byte stream reads (which must agree).
+	static String Sequence(StringView text, JsonSequenceMode mode, String output, bool skipEmpty = false)
+	{
+		for (int chunk < 2)
+		{
+			let reader = scope JsonSequenceReader(mode);
+			reader.SkipEmptyLines = skipEmpty;
+			let stream = scope JsonTestStream(text, 1);
+			if (chunk == 0)
+				reader.Reset(text);
+			else
+			{
+				var config = JsonReadConfig();
+				config.StreamBufferBytes = 16;
+				reader.Reset(stream, config);
+			}
+			let own = scope String();
+			let doc = scope JsonDocument();
+			while (true)
+			{
+				switch (reader.Next())
+				{
+				case .Ok(let more):
+					if (!more)
+						break;
+					// (Concatenated values are checked as they are read: an error can come here)
+					if (reader.ReadDocument(doc) case .Err(let valueError))
+					{
+						let located = reader.Locate(valueError);
+						own.AppendF("!{}:{}:{}\n", reader.Index, located.mLine, located.mColumn);
+						continue;
+					}
+					doc.Write(own);
+					own.Append('\n');
+					continue;
+				case .Err(let error):
+					own.AppendF("!{}:{}:{}\n", reader.Index, error.mLine, error.mColumn);
+					continue;
+				}
+				break;
+			}
+			if (chunk == 0)
+				output.Append(own);
+			else
+				Test.Assert(own == output, scope $"the stream read gives `{own}`, memory `{output}`");
+		}
+		return output;
+	}
+
+	[Test]
+	public static void E146_LinesTwoValues()
+	{
+		Test.Assert(Sequence("{\"a\":1}\n{\"a\":2}\n", .Lines, scope .()) == "{\"a\":1}\n{\"a\":2}\n");
+	}
+
+	[Test]
+	public static void E147_LinesBlankLine()
+	{
+		Test.Assert(Sequence("1\n\n2", .Lines, scope .()) == "1\n!2:2:1\n2\n");
+		Test.Assert(Sequence("1\n\n \t\n2", .Lines, scope .(), true) == "1\n2\n");
+	}
+
+	[Test]
+	public static void E148_LinesOneValuePerLine()
+	{
+		// The line gives an error, not its first value; the next line is read
+		Test.Assert(Sequence("1 2\n3", .Lines, scope .()) == "!1:1:3\n3\n");
+		// A value spanning lines is two broken lines
+		Test.Assert(Sequence("{\"a\":\n1}", .Lines, scope .()) == "!1:1:6\n!2:2:2\n");
+	}
+
+	[Test]
+	public static void E149_LinesCrLfWithoutFinalNewline()
+	{
+		Test.Assert(Sequence("{\"a\":1}\r\n{\"a\":2}", .Lines, scope .()) == "{\"a\":1}\n{\"a\":2}\n");
+	}
+
+	[Test]
+	public static void E150_RecordSeparated()
+	{
+		Test.Assert(Sequence("\x1E1\n\x1E2\n", .RecordSeparated, scope .()) == "1\n2\n");
+		// Consecutive separators are not empty elements
+		Test.Assert(Sequence("\x1E\x1E\x1E[1]\n\x1E", .RecordSeparated, scope .()) == "[1]\n");
+	}
+
+	[Test]
+	public static void E151_RecordSeparatedTruncatedNumber()
+	{
+		Test.Assert(Sequence("\x1E123\x1E4\n", .RecordSeparated, scope .()) == "!1:1:5\n4\n");
+		// A string, array or object is delimited: no whitespace needed
+		Test.Assert(Sequence("\x1E\"a\"\x1E[1]\x1E", .RecordSeparated, scope .()) == "\"a\"\n[1]\n");
+	}
+
+	[Test]
+	public static void E152_RecordSeparatedGoesOn()
+	{
+		Test.Assert(Sequence("\x1E{\"a\":\x1E2\n", .RecordSeparated, scope .()) == "!1:1:7\n2\n");
+	}
+
+	[Test]
+	public static void E153_Concatenated()
+	{
+		Test.Assert(Sequence("{}{}[]", .Concatenated, scope .()) == "{}\n{}\n[]\n");
+		Test.Assert(Sequence("12", .Concatenated, scope .()) == "12\n");
+		Test.Assert(Sequence(" 1 2\n\"a\"null ", .Concatenated, scope .()) == "1\n2\n\"a\"\nnull\n");
+		Test.Assert(Sequence("", .Concatenated, scope .()) == "");
+		// The first error ends the sequence
+		Test.Assert(Sequence("[1] [2,] [3]", .Concatenated, scope .()) == "[1]\n!2:1:8\n");
+	}
+
 	// Writer
 
 	/// The compact output of `text` read into a document.

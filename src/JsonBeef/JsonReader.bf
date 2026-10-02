@@ -368,6 +368,16 @@ public class JsonReader
 		return .Err(mStream.mError);
 	}
 
+	/// Concatenated values (JsonSequenceReader): after Reset, values may follow one another and an
+	/// input without any is an empty sequence.
+	internal void AllowMultipleValues()
+	{
+		if (mStreaming)
+			mStream.mMultipleValues = true;
+		else
+			mBytes.mMultipleValues = true;
+	}
+
 	/// The current token's integer payload (Number: Integer or UInteger).
 	internal int64 IntegerPayload => mStreaming ? mStream.mInteger : mBytes.mInteger;
 

@@ -11,8 +11,9 @@ the suites in [test-suites.md](test-suites.md). Code conventions and Beef gotcha
   formatting (`JsonNumber`); a **document** built on the reader (`JsonDocument` with `JsonNode`
   handles, lookups, JSON Pointer, mutation, positions, PreserveStyle); **writers**: the streaming
   `JsonWriter` (compact or indented) and the document's `Write`, also in RFC 8785 canonical form;
-  JSONC and JSON5; and **typed mapping** (`[JsonObject]`, `JsonSerializer`) bound straight from the
-  reader. Sequences and the rest follow `plan.md` §6.
+  JSONC and JSON5; **sequences** (JSON Lines, concatenated, RFC 7464); and **typed mapping**
+  (`[JsonObject]`, `JsonSerializer`) bound straight from the reader. Push streaming and Patch follow
+  `plan.md` §6.
 - **Strict and complete.** Every token is validated when it is read: UTF-8, the grammar, escapes,
   surrogate pairs, the number grammar. Nothing is skipped for speed. The first error stops the read
   with a located `JsonParseError` (kind, message, line, column in code points, byte offset, length,
@@ -38,6 +39,7 @@ the suites in [test-suites.md](test-suites.md). Code conventions and Beef gotcha
 | `JsonReader.bf` | `JsonToken`; `JsonReader` (public: tokens, depth, offsets, strings, number conversions, `SkipValue`, `ReadRaw`, `Find`), dispatching to one core per cursor type |
 | `JsonReaderCore.bf` | `JsonFailure`; `JsonReaderCore<TCursor>`: the state machine, the container bit stack, literals, numbers, strings and escapes, whitespace, the window helpers, `Fail`; on demand: `SkipValue` and its fast loop, `ReadRaw`, `PeekMember` |
 | `JsonReaderCore.Json5.bf`, `JsonIdentifierTables.bf` | JSON5's whitespace, strings, member names and numbers; the generated identifier ranges |
+| `JsonSequenceReader.bf` | `JsonSequenceMode`; `JsonSequenceReader`: JSON Lines, concatenated and RFC 7464 sequences |
 | `JsonCursor.bf` | `IJsonCursor`, `JsonLineCounter`, `JsonInputStart` (UTF-16/32 detection, the BOM), `JsonByteCursor` (in memory) |
 | `JsonStreamCursor.bf` | `JsonBufferedStreamCursor` (a `Stream` through a bounded buffer) and its `JsonStreamState` |
 | `JsonNumber.bf` | `JsonNumberKind`, `JsonFloatFormat`; `JsonNumber`: double/float parsing (Clinger, then corlib's fast_float), int64/uint64 parsing, grammar check and classification, shortest round-trip output of doubles and floats in the plain and ECMAScript layouts |
@@ -61,8 +63,9 @@ writers), `JsonCollectTests`, `JsonPreserveTests`, `JsonObjectTests` and `JsonOn
 `JsonTestUtil` (the trace helpers and a trickling test stream). The CLI is `JsonTester/src/`
 (`Program.bf`, `Canonical.bf`, `Numbers.bf`, `TrickleStream.bf`, `Bench.bf`, `Fuzz.bf`, `Mutate.bf`);
 the scripts are `test-json-suite.sh`, `test-json-corpus.sh`, `test-json-numbers.sh`,
-`test-json-fuzz.sh`, `test-roundtrip.sh` and `test-leaks.sh`, and `tests/tools/json-canonical.py` is
-the independent oracle of the canonical form.
+`test-json-fuzz.sh`, `test-roundtrip.sh`, `test-json-lines.sh` and `test-leaks.sh`, and
+`tests/tools/json-canonical.py` (with `json5-canonical.py` for JSON5) is the independent oracle of the
+canonical form.
 
 ## 3. Reading
 
@@ -152,6 +155,28 @@ compares every nst case and json5-tests file read with `-json5` (document, token
 with `tests/tools/json5-canonical.py`, an independent JSON5 reader that agrees with json5 2.2.3 on the
 suites but where JavaScript cannot (duplicate names, ill-formed UTF-8); the acceptance lists are
 json5 2.2.3's (36 nst `n_` cases, 83 json5-tests files).
+
+### Sequences
+
+`JsonSequenceReader` (spec-reference §12.3, §12.4) reads many values from one input, in three modes:
+
+- **Lines** (JSON Lines, NDJSON) and **RecordSeparated** (RFC 7464) split the input into records first
+  (at LF, or at the record separator 0x1E), from memory or from a stream through a buffer that holds
+  one record. Each record is checked whole with a reader over it (its value skipped, which checks it;
+  exactly one value; for RFC 7464 a top-level number or literal must be followed by whitespace, §2.4)
+  before Next hands out a reader at its first token, so a record gives a value or an error, never
+  both, and the next call goes on with the next record. Errors are moved from the record to the whole
+  input (`Locate` does it for the caller's own reads). Empty lines are errors unless SkipEmptyLines;
+  consecutive separators are not elements; a byte order mark only at the very start (AllowBom).
+- **Concatenated** values use one reader with a hidden multiple-values mode: at depth 0 after a value,
+  where the reader would report "a document holds one value" (on its out-of-line error path, so
+  single documents pay nothing), the next value starts; an input with none is an empty sequence.
+  Values are read as they come, and the first error ends the sequence.
+
+`ReadDocument` reads the current value into a document from its source text (ReadRaw). JsonTester's
+`-lines`, `-concatenated` and `-rs` print one canonical line per value and each error as
+`record N: line:column: ...`; `test-json-lines.sh` compares them with the oracle's `-lines` and
+`-concatenated` on the ndjson corpora, every nst case and generated inputs, from memory and streams.
 
 ### Non-finite numbers, replacement, I-JSON
 

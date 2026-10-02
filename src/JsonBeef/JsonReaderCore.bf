@@ -68,6 +68,9 @@ internal class JsonReaderCore<TCursor> where TCursor : IJsonCursor
 	JsonReadConfig mConfig;
 	/// mConfig.Dialect is Json5 (JsonReaderCore.Json5.bf).
 	bool mJson5;
+	/// Concatenated values (JsonSequenceReader): after a value at depth 0 another may follow, and an
+	/// input without any is not an error. Reset clears it.
+	internal bool mMultipleValues;
 
 	/// The open containers: bit d is set when the container at depth d (0-based) is an object.
 	uint64[] mBits ~ delete _;
@@ -140,6 +143,7 @@ internal class JsonReaderCore<TCursor> where TCursor : IJsonCursor
 			mConfig.InvalidSurrogates = .Error;
 		}
 		mJson5 = mConfig.Dialect == .Json5;
+		mMultipleValues = false;
 		mData = null;
 		mBase = 0;
 		mPos = 0;
@@ -526,6 +530,22 @@ internal class JsonReaderCore<TCursor> where TCursor : IJsonCursor
 				return .Err(.());
 			}
 			mState = .Value;
+			if (mMultipleValues)
+			{
+				// Concatenated values: none at all is an empty sequence
+				SkipSpace();
+				while (SkipJson5Space())
+				{
+				}
+				if (!Avail(mPos))
+				{
+					mState = .End;
+					mToken = .EndOfDocument;
+					mTokenStart = mPos;
+					mTokenEnd = mPos;
+					return .Ok(.EndOfDocument);
+				}
+			}
 			return ReadValue(false);
 		case .Value:
 			return ReadValue(true);
@@ -612,7 +632,15 @@ internal class JsonReaderCore<TCursor> where TCursor : IJsonCursor
 		if (SkipJson5Space())
 			return ReadAfterValue();
 		if (mDepth == 0)
+		{
+			// Concatenated values (JsonSequenceReader): the next one starts here
+			if (mMultipleValues)
+			{
+				mState = .Value;
+				return ReadValue(false);
+			}
 			return .Err(Unexpected(.InvalidStructure, "the end of the input after the JSON value (a document holds one value)"));
+		}
 		return .Err(Unexpected(.InvalidStructure, InObject ? "`,` or `}` after a member's value" : "`,` or `]` after an array element"));
 	}
 

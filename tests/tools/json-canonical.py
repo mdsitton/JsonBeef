@@ -8,6 +8,12 @@ Usage:
                                     canonical form, or OUTDIR/<id>.rej with the reason
   json-canonical.py -pointer P FILE print the canonical form of the value at JSON Pointer P (RFC 6901;
                                     a duplicated name resolves to the last member), exit 1 if none
+  json-canonical.py -lines FILE     JSON Lines: one canonical line per line of FILE (LF or CRLF; a final
+                                    newline optional); a line that is empty or not one value is
+                                    reported on stderr as `record N` and skipped; exit 1 if any was
+  json-canonical.py -concatenated FILE
+                                    concatenated values (whitespace between them optional): one
+                                    canonical line each; the first error ends it (exit 1)
 
 Options, before the other arguments: -utf8=replace (ill-formed UTF-8 in strings becomes one U+FFFD
 per maximal subpart, as Python's decoder does; outside strings it still fails the parse),
@@ -227,6 +233,57 @@ def main():
                 with open(os.path.join(outdir, case_id + ".rej"), "w") as f:
                     f.write(str(e) + "\n")
         return 0
+    if len(sys.argv) == 3 and sys.argv[1] in ("-lines", "-concatenated"):
+        with open(sys.argv[2], "rb") as f:
+            data = f.read()
+        failed = False
+        out = []
+        if sys.argv[1] == "-lines":
+            lines = data.split(b"\n")
+            if lines and lines[-1] == b"":
+                lines.pop()
+            for index, line in enumerate(lines, 1):
+                if line.endswith(b"\r"):
+                    line = line[:-1]
+                try:
+                    if line.strip(b" \t") == b"":
+                        raise NotJson("empty line")
+                    # A byte order mark only at the start of the input
+                    if index > 1 and line.startswith(b"\xef\xbb\xbf"):
+                        raise NotJson("byte order mark")
+                    out.append(canonical(parse(line)))
+                except NotJson as e:
+                    print(f"record {index}: {e}", file=sys.stderr)
+                    failed = True
+        else:
+            if data.startswith(b"\xef\xbb\xbf"):
+                data = data[3:]
+            # Values are read as they come: an ill-formed byte (kept as a lone surrogate) fails the
+            # value it is in, not the ones before it
+            text = data.decode("utf-8", errors="surrogateescape")
+            decoder = json.JSONDecoder(parse_int=lambda s: Number(s, True), parse_float=lambda s: Number(s, False),
+                                       parse_constant=reject_constant, object_pairs_hook=Object)
+            pos = 0
+            index = 0
+            while True:
+                while pos < len(text) and text[pos] in " \t\r\n":
+                    pos += 1
+                if pos >= len(text):
+                    break
+                index += 1
+                try:
+                    value, end = decoder.raw_decode(text, pos)
+                    # A number or literal runs to the end of its word: `12` is one value
+                    if end < len(text) and isinstance(value, (Number, bool, type(None))) and (text[end].isalnum() or text[end] in "._+-"):
+                        raise ValueError("number or literal followed by more of it")
+                    out.append(canonical(value))
+                    pos = end
+                except (ValueError, NotJson, RecursionError) as e:
+                    print(f"record {index}: {e}", file=sys.stderr)
+                    failed = True
+                    break
+        sys.stdout.buffer.write("".join(line + "\n" for line in out).encode("utf-8"))
+        return 1 if failed else 0
     if len(sys.argv) == 4 and sys.argv[1] == "-pointer":
         with open(sys.argv[3], "rb") as f:
             value = parse(f.read())
