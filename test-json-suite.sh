@@ -27,7 +27,8 @@
 # pairs and UTF-8 sequences); rewrite and rewrite-pretty write the document compact or indented, read
 # that back and print it (the writer must keep everything; exit 3 if its output is rejected); collect
 # and stream-collect read with JsonReadConfig.CollectErrors from memory and from 1-byte stream reads
-# (the first error must still be the golden one, and recovery must finish).
+# (the first error must still be the golden one, and recovery must finish); preserve reads with
+# JsonMetadataMode.PreserveStyle (test-roundtrip.sh checks that it writes back byte for byte).
 #
 # The extension modes of EXTENSIONS (default "comments jsonc") run once each: every y_ case stays
 # accepted, and exactly the cases listed in tests/nst/accept-<mode>.txt and tests/json5/accept-<mode>.txt
@@ -46,7 +47,7 @@
 
 BIN="${BIN:-./build/Debug_Linux64/JsonTester/JsonTester}"
 SUITES="${SUITES:-tests/suites}"
-MODES="${MODES:-document events stream1 stream16 rewrite rewrite-pretty collect stream-collect}"
+MODES="${MODES:-document events stream1 stream16 rewrite rewrite-pretty collect stream-collect preserve}"
 EXPECTED="tests/expected-failures.txt"
 SKIP="tests/suites-skip.txt"
 LOGFILE="test-json-suite.log"
@@ -169,6 +170,7 @@ for mode in $MODES; do
 	rewrite-pretty) flag="-rewrite-pretty" ;;
 	collect) flag="-collect" ;;
 	stream-collect) flag="-collect -stream 1" ;;
+	preserve) flag="-preserve" ;;
 	*) echo "ERROR: unknown mode $mode"; exit 1 ;;
 	esac
 

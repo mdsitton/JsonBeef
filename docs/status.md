@@ -1,19 +1,20 @@
 # JsonBeef status
 
-Last reviewed: 2026-10-02 (phase 4 done).
+Last reviewed: 2026-10-02 (phase 5 done).
 
 ## Verification baseline
 
 | Check | Expected result |
 |-------|-----------------|
-| `beefbuild -test` (Debug checks) | 184/184 pass |
-| `beefbuild -test -config=TestRelease` (Release settings) | 184/184 pass |
-| `bash ./test-json-suite.sh` (Debug `JsonTester`; run `beefbuild` first) | In each of the document, events, stream1, stream16, rewrite, rewrite-pretty, collect and stream-collect modes: nst 107/107 accepted (95 `y_` + 12 `i_`) and 211/211 rejected (188 `n_` + 23 `i_`); nst transform 16/16 accepted with the committed outputs, 6/6 rejected; JSON_checker 5/5 and 31/31; simdjson jsonchecker 33/33 and 75/75; adversarial 1457/1457 rejected without a crash; nativejson 27/27; json5-tests (strict) 25/25 and 89/89. Accepted cases match the oracle's canonical form byte for byte; rejected ones their golden message (`tests/errors/`). Then nativejson written back by the compact writer 27/27 byte for byte, and RFC 8785 vectors 6/6 |
+| `beefbuild -test` (Debug checks) | 214/214 pass |
+| `beefbuild -test -config=TestRelease` (Release settings) | 214/214 pass |
+| `bash ./test-json-suite.sh` (Debug `JsonTester`; run `beefbuild` first) | In each of the document, events, stream1, stream16, rewrite, rewrite-pretty, collect, stream-collect and preserve modes: nst 107/107 accepted (95 `y_` + 12 `i_`) and 211/211 rejected (188 `n_` + 23 `i_`); nst transform 16/16 accepted with the committed outputs, 6/6 rejected; JSON_checker 5/5 and 31/31; simdjson jsonchecker 33/33 and 75/75; adversarial 1457/1457 rejected without a crash; nativejson 27/27; json5-tests (strict) 25/25 and 89/89. Accepted cases match the oracle's canonical form byte for byte; rejected ones their golden message (`tests/errors/`). Then the JSONC modes: with `-comments` every `y_` case accepted and exactly the 3 listed `n_` cases and 36 json5-tests files, with `-jsonc` 6 and 38 (`tests/nst/accept-*.txt`, `tests/json5/accept-*.txt`); nativejson written back by the compact writer 27/27 byte for byte, and RFC 8785 vectors 6/6 |
+| `bash ./test-roundtrip.sh` (and with the Release `BIN`) | 224 accepted inputs (the suites' strict ones, the 38 JSONC-accepted json5-tests files with `-jsonc`, the 14 corpus files): PreserveStyle writes each back byte for byte from memory and from a 16-byte stream, and 3 seeds of random edits each (672 runs) read back into the edited document. Run with `SEEDS=10` (2,240 runs) during phase 5 |
 | `BIN=./build/Release_Linux64/JsonTester/JsonTester bash ./test-json-suite.sh` (run `beefbuild -config=Release` first) | Same as Debug |
 | `bash ./test-json-corpus.sh` (and with the Release `BIN`) | The 14 simdjson-data jsonexamples files: canonical form in 6 modes equal to the oracle's, compact writer a fixed point; twitter/twitterescaped strings equal; mesh/mesh.pretty RFC 8785 output equal; 27 JSON Pointer lookups agree with the oracle |
 | `bash ./test-json-numbers.sh` (and with the Release `BIN`) | fxx: 1,414,285 lines, 0 mismatches (1,414,116 numbers bit-exact in f64 and f32, 169 non-JSON strings rejected, 30,700 overflows); es6: 100,000 lines, 0 mismatches (writes and reads) |
 | `bash ./test-leaks.sh` | No leaks (LeakSanitizer over the TestRelease `[Test]`s) |
-| `beefbuild-win -test`, `beefbuild-win -test -config=TestRelease` (`~/development/beef-proton`) | 184/184 pass |
+| `beefbuild-win -test`, `beefbuild-win -test -config=TestRelease` (`~/development/beef-proton`) | 214/214 pass |
 | `tests/fetch-suites.sh` | Pinned suites in `tests/suites/` (`docs/test-suites.md`) |
 | `bash ./test-json-fuzz.sh` (and with the Release `BIN`) | The stream sweep: every suite input through streams fed 1 to 31 bytes per read (16,895 runs) reads as from memory; then 2 seeds × 50 rounds of every suite input (57,200 runs) and 3 rounds of the 14 real-world files: fast build, reader and 1-byte stream agree on every mutation, and with CollectErrors memory and stream give the same errors and recovered document. Run with `SEEDS=3 ROUNDS=200` (343,000 runs, Release) at the end of phase 4: 0 disagreements |
 | `bench/compare/run.sh` | The existing implementations and JsonBeef's `JsonBeef` (DOM) and `JsonBeef JsonReader` (streaming) columns, four tracks; refuses to run above load average 2. JsonBeef's check lines equal the reference on all 16 inputs in both tracks (`./build.sh beef`). No timed run yet (P3T): there is no `results.md`, so the first timed run is the full one, then `ONLY='JsonBeef.*'` |
@@ -53,7 +54,10 @@ mantissas are past Clinger's fast path; plan §9 item 6 keeps fast_float).
 | Errors and limits: located errors in document order (memory and streams alike), `JsonDiagnostic`, `MaxNodes`/`MaxMembers`, the `Untrusted` preset | Done (phase 4) |
 | Positions (`JsonMetadataMode.Positions`: value and member-name ranges, lazy line/column) | Done (phase 4) |
 | Collect-errors (reader recovery, `JsonDocument.Errors`) | Done (phase 4) |
-| Mutation of documents | Phase 5 |
+| JSONC (`Comments`, `TrailingCommas`, the `Jsonc` and `Strict` presets) | Done (phase 5) |
+| Mutation (setters, Add, Insert, Remove, Rename, CreateRoot) | Done (phase 5) |
+| PreserveStyle (byte-exact writes, edits regenerated in their surroundings' style) | Done (phase 5) |
+| `[JsonObject]`, on-demand (`SkipValue`, `ReadRaw`, reader `Find`) | Phase 6 |
 | Speed, benchmark columns | Phase 3 |
 | Positions sidecar, collect-errors | Phase 4 |
 | JSONC, PreserveStyle, mutation | Phase 5 |
@@ -66,6 +70,6 @@ mantissas are past Clinger's fast path; plan §9 item 6 keeps fast_float).
 |----|------|------|
 | P3T | Phase 3's timed run: on a quiet machine (load average under 2), `bash bench/compare/run.sh > results.md` (the first, full run), then `./plot.py`; compare JsonBeef with yyjson/sonic-rs (DOM) and jiter (streaming); decide from it whether the 32-byte record, a closer stream path or a flat read-only document (plan §9 open item 3) are worth doing. Never commit figures taken under load | M |
 | P3S | The stream event pass costs 1.3–1.5× the memory one in instructions (XmlBeef got its to 1.1–1.3×): the reader's `Grow` checks in scans | S |
-| P5 | Phase 5: JSONC (comments, trailing commas), PreserveStyle, mutation (`plan.md` §6) | L |
+| P6 | Phase 6: `[JsonObject]` (typed binding from the reader and from nodes) and on-demand; the typed and on-demand benchmark tracks (`plan.md` §6) | L |
 | T | TomlTester's BJSON dependency could move to JsonBeef now that the document and writer exist (`plan.md` §9 open item 2): a separate step in TomlBeef, when the author asks | S |
 | Q | Open questions (`plan.md` §9): the proposals are in use (floats keep `.0`, JCS separate; TomlTester moves later; a flat document only if phase 3 asks for one) | — |

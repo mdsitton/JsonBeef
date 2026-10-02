@@ -24,7 +24,12 @@ public enum JsonMetadataMode : uint8
 	None,
 	/// @brief Where each value and member name came from (`JsonNode.TryGetSourceRange`,
 	/// `TryGetNameRange`), for diagnostics such as "port at config.json:12:5".
-	Positions
+	Positions,
+	/// @brief Positions, plus the source text around and of every value (whitespace, comments, the
+	/// commas, numbers and strings as written), so `JsonDocument.Write(output)` gives the document back
+	/// as it was read, byte for byte, and regenerates only what was changed: for configuration files
+	/// edited by programs (with JsonReadConfig.Jsonc, comments and trailing commas survive).
+	PreserveStyle
 }
 
 /// @brief Settings for reading JSON: the dialect, the source name for errors, and resource limits for

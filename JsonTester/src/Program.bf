@@ -19,7 +19,10 @@ namespace JsonTester;
 /// exit 3 if the writer's output is rejected), -rewrite-pretty (the same, indented), -compact and
 /// -pretty (print the writer's output as is), -jcs (RFC 8785), -pointer P (the canonical form of the
 /// value at JSON Pointer P; a pointer error exits 1), -strings (every member name and string in order,
-/// one per line).
+/// one per line), -echo (the document as Write(output) gives it: with -preserve, as it was read),
+/// -mutate SEED (PreserveStyle, random edits, the preserving writer's output must read back into the
+/// edited document; prints that output).
+/// Metadata: -preserve (JsonMetadataMode.PreserveStyle).
 /// Dialect: -comments, -trailing-commas, -jsonc (both).
 /// Options: -no-bom, -max-depth N, -dup=keep|last|first|error, -collect (JsonReadConfig.CollectErrors:
 /// every error is printed, the first one first, and the exit status is 1 if there was any); for the
@@ -36,7 +39,9 @@ class Program
 		Pretty,
 		Jcs,
 		Pointer,
-		Strings
+		Strings,
+		Echo,
+		Mutate
 	}
 
 	public static int Main(String[] args)
@@ -55,6 +60,7 @@ class Program
 		bool events = false;
 		Output output = .Canonical;
 		String pointer = null;
+		int mutateSeed = 0;
 		String path = null;
 		for (int i < args.Count)
 		{
@@ -80,6 +86,16 @@ class Program
 				output = .Jcs;
 			else if (arg == "-strings")
 				output = .Strings;
+			else if (arg == "-preserve")
+				config.MetadataMode = .PreserveStyle;
+			else if (arg == "-echo")
+				output = .Echo;
+			else if (arg == "-mutate" && i + 1 < args.Count && int.Parse(args[i + 1]) case .Ok(let seed))
+			{
+				output = .Mutate;
+				mutateSeed = seed;
+				i++;
+			}
 			else if (arg == "-pointer" && i + 1 < args.Count)
 			{
 				output = .Pointer;
@@ -167,6 +183,16 @@ class Program
 			return Print(result);
 		}
 
+		if (output == .Mutate)
+		{
+			if (stream != null)
+				return Usage("-mutate reads from memory");
+			int status = Mutate.Run(text, config, mutateSeed, result);
+			if (status != 0)
+				return status;
+			return Print(result);
+		}
+
 		let doc = scope JsonDocument();
 		let read = stream != null ? doc.Read(stream, config) : doc.Read(text, config);
 		if (!doc.Errors.IsEmpty)
@@ -219,6 +245,14 @@ class Program
 			}
 		case .Strings:
 			Canonical.WriteStrings(doc.Root, result);
+		case .Echo:
+			// The document written back with Write(output): with -preserve, as it was read
+			if (doc.Write(result) case .Err(let writeError))
+			{
+				Console.Error.WriteLine($"write error: {writeError.mKind}: {writeError.mMessage}");
+				return 1;
+			}
+		case .Mutate:
 		}
 		return Print(result);
 	}

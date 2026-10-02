@@ -43,6 +43,8 @@ the suites in [test-suites.md](test-suites.md). Code conventions and Beef gotcha
 | `JsonDiagnostic.bf` | `JsonDiagnostic`: an error that owns its text |
 | `JsonDocument.Positions.bf` | `JsonSourceRange`, `JsonRangeRecord`; the line index, `TryGetSourceRange`/`TryGetNameRange` |
 | `JsonDocument.Fast.bf` | The fast build for memory input (phase 3) |
+| `JsonDocument.Mutation.bf` | `IsValidText`, `CreateRoot`, the table operations behind editing; the mutation API on `JsonNode` (setters, Add, Insert, Remove, Rename) |
+| `JsonDocument.Style.bf` | PreserveStyle: `JsonNodeStyle`, capture, layout detection, change marks, the preserving writer |
 
 Tests are in `src/JsonBeef/tests/`: `JsonEdgeCaseTests` (spec-reference §16, one test per edge case,
 numbered as there; each input is read from memory and through 1-byte stream reads, which must agree),
@@ -95,6 +97,19 @@ The value after the root is checked by the call that returns `EndOfDocument`; co
 choice). Messages name what was expected and what was found (a character by its code point and name
 when it is invisible: `U+000C (form feed)`), and common mistakes get their own wording (a trailing
 comma, `'` strings, `+1`, `.5`, `NaN`, `True`, leading zeros, a number running into letters).
+
+### JSONC
+
+`JsonReadConfig.Comments` lets `//` (to the end of its line) and `/* */` (not nested) stand wherever
+whitespace may; `TrailingCommas` accepts one comma before `]` or `}` (`[,]`, `[1,,]` and `{,}` stay
+errors); `JsonReadConfig.Jsonc` sets both, as VS Code's settings and tsconfig.json mean "JSON with
+comments". The whitespace fast path lets `/` through to the slow one, which skips comments (`SkipComment`,
+out of line; UTF-8 checked inside); a malformed comment is left where it starts, and the error describer
+reports it (`CommentError`: `UnterminatedComment`, an ill-formed UTF-8 sequence, or a lone `/`). In
+strict JSON a `/` says that comments are not JSON. The fast build does not take comments or trailing
+commas: it falls back to the reader at the first one. The suite checks that each mode accepts exactly
+the nst `n_` cases and json5-tests files jsonc-parser does (`tests/nst/accept-*.txt`,
+`tests/json5/accept-*.txt`).
 
 ### Collect-errors
 
@@ -266,6 +281,54 @@ preset sets every limit and rejects duplicate names.
 `JsonNode.Find` (and `At`) evaluate RFC 6901 pointers: tokens decoded `~1` before `~0`, array indexes
 `0` or a nonzero digit and digits (`01`, `-1`, `1e0` are `InvalidIndex`; `-` and past-the-end are
 `NotFound`), names resolved like lookups (the last duplicate). Errors carry the failing token's offset.
+
+### Mutation
+
+`JsonNode`'s setters (`SetNull`, `SetBool`, `SetString`, `SetNumber` for int64, uint64 and double,
+`SetNumberText` for an exact spelling, `SetArray`, `SetObject`) change a value in place and return the
+node for chaining; a container that becomes something else loses its children. `Add()` and
+`Add(name)` append to an array or object, `Set(name)` finds the last member of a name or adds one,
+`InsertBefore`/`InsertAfter` place a sibling, `Remove` takes a value and its subtree out (their handles
+become invalid: the subtree is marked removed iteratively), `RemoveMember(name)` removes every member
+of a name, `Rename` renames a member, and `JsonDocument.CreateRoot` replaces the whole content. Text
+set in code must be well-formed UTF-8 (`JsonDocument.IsValidText`) and doubles finite; anything else
+is a programming error (fatal), as in XmlBeef. New text goes to the string table; every change to an
+object's members drops its lookup index. Removed records keep their slots until the document is
+cleared or read again.
+
+### PreserveStyle
+
+`JsonMetadataMode.PreserveStyle` keeps the source (a stream is read whole first) and, per node, where
+its pieces are (`JsonNodeStyle`, byte offsets, `JsonDocument.Style.bf`): the leading trivia from the
+separator before it, the name and the colon part, the value, the trivia before its comma, the comma,
+and the comma's line tail; per container also the trivia before its closing bracket and where its first
+child started. The reader's builder records the tokens (`CaptureValue`, `CaptureEnd`); `FinishStyle`
+then finds the commas between them. The line tail after a value (after its comma, or for the last child
+after the value itself) takes the comments on the rest of its line and the blanks before the line
+break, so an end-of-line comment belongs to the member before it, while blanks before a token on the
+same line belong to that token (`[1, 2]`). It also detects the layout of new values: the indentation
+unit, the text between a name and its value, the line break (LF, CRLF or CR), and whether the document
+is written on several lines.
+
+`Write(output)` on such a document is the preserving writer (`WritePreserving`, iterative): an
+unchanged subtree is its source text, so an unchanged document is written back byte for byte (BOM,
+comments, trailing commas, number and string spellings). Changes are marked (`ValueDirty`,
+`NameDirty`, `ChildrenDirty`, and `SubtreeDirty` up the ancestors): a changed container is written
+piece by piece, its unchanged children still as their source. A changed scalar is regenerated in its
+place, a renamed member keeps its value's spelling; commas follow the children that remain: a member
+that becomes the last loses its comma (its end-of-line comment stays), one that stops being last gains
+one (before its comment), and a container written with a trailing comma keeps one. A new value takes
+the line break and indentation of a sibling (or, in a container on one line, the blanks a sibling
+followed a comma with), a first child the layout the container's first child had; with no sibling to
+follow, its own line one indentation unit in, when the document (or the empty container, `[\n]`) is on
+several lines. `test-roundtrip.sh` checks every accepted suite input and corpus file byte for byte
+(from memory and a stream) and random edits of each (`JsonTester -mutate`), whose output must read back
+into the edited document; `JsonPreserveTests` pin the exact output of edits, including ports of
+jsonc-parser's `edit.test.ts` cases whose semantics JsonBeef shares. Deliberate differences: removing an
+array's only element keeps its lines (`[\n]`), a trailing comma stays when the last element is removed,
+and a container on one line stays on one line when it grows.
+
+`Write(output, options)` writes any document plainly (strict JSON: comments are not kept).
 
 ## 5. Writing
 

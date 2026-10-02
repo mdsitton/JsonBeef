@@ -161,6 +161,7 @@ public class JsonDocument
 		mRanges.Clear();
 		mLineStarts.Clear();
 		mErrors.Clear();
+		ClearStyle();
 		mGeneration++;
 	}
 
@@ -274,7 +275,10 @@ public class JsonDocument
 			mRoot = 0;
 		}
 		mReader.Reset(owned, readerConfig);
-		return EndRead(Build(mReader, mReader.mBytes, true, config));
+		let result = Build(mReader, mReader.mBytes, true, config);
+		if (config.MetadataMode == .PreserveStyle && result case .Ok)
+			FinishStyle();
+		return EndRead(result);
 	}
 
 	/// @brief Replace the document's content with the JSON text read from a stream, using ReadConfig.
@@ -293,6 +297,26 @@ public class JsonDocument
 	/// @return .Ok, or the first error (IoError if reading fails); the document is then empty.
 	public Result<void, JsonParseError> Read(Stream stream, JsonReadConfig config)
 	{
+		if (config.MetadataMode == .PreserveStyle)
+		{
+			// The document keeps the whole source anyway: read it all, then as memory input
+			let bytes = scope List<uint8>();
+			uint8[4096] chunk = ?;
+			while (true)
+			{
+				switch (stream.TryRead(.(&chunk, chunk.Count)))
+				{
+				case .Ok(let read):
+					if (read <= 0)
+						return Read(StringView((char8*)bytes.Ptr, bytes.Count), config);
+					bytes.AddRange(Span<uint8>(&chunk, read));
+					if (config.MaxInputBytes > 0 && bytes.Count > config.MaxInputBytes)
+						return FailRead(.ResourceLimitExceeded, scope $"The input exceeds MaxInputBytes ({config.MaxInputBytes})", config);
+				case .Err:
+					return FailRead(.IoError, "Reading the input failed", config);
+				}
+			}
+		}
 		let readerConfig = BeginRead(config);
 		mReader.Reset(stream, readerConfig);
 		return EndRead(Build(mReader, mReader.mStream, false, config));
@@ -393,7 +417,8 @@ public class JsonDocument
 		bool hasName = false;
 		bool discard = false;
 		let duplicates = config.DuplicateNames;
-		bool positions = config.MetadataMode == .Positions;
+		bool positions = config.MetadataMode != .None;
+		bool preserve = config.MetadataMode == .PreserveStyle;
 		// Positions: the pending name's range, and the line and column of what a stream read locates
 		int64 nameOffset = 0;
 		int32 nameLength = 0;
@@ -458,6 +483,8 @@ public class JsonDocument
 			case .EndObject, .EndArray:
 				if (positions)
 					mRanges[parent].mLength = (int32)(core.mTokenEnd - mRanges[parent].mOffset);
+				if (preserve)
+					CaptureEnd(parent, core.mTokenStart, core.mTokenEnd);
 				parent = mNodes[parent].mParent;
 				parentIsObject = parent != 0 && mNodes[parent].mKind == .Object;
 				hasName = false;
@@ -516,6 +543,12 @@ public class JsonDocument
 					range.mColumn = (int32)column;
 				}
 				mRanges.Add(range);
+			}
+			if (preserve)
+			{
+				bool named = parentIsObject && hasName;
+				CaptureValue(id, named ? (int)nameOffset : core.mTokenStart, named ? (int)(nameOffset + nameLength) : -1,
+					core.mTokenStart, core.mTokenEnd);
 			}
 			if (parent == 0)
 				mRoot = id;

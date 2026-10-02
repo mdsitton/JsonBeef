@@ -260,7 +260,13 @@ Windows tests, committed (`AGENTS.md`).
    passes in collect and stream-collect modes with the golden first errors; streams fed 1 to 31 bytes
    per read read every suite input as memory does; 343,000 fuzzed mutations agree across the fast
    build, the reader, 1-byte streams and collect-errors.*
-5. **JSONC and PreserveStyle, mutation.** Byte-exact round trips of every accepted suite input and of
+5. **JSONC and PreserveStyle, mutation.** *Done (2026-10-02): `Comments` and `TrailingCommas`
+   (separately, and the `Jsonc` preset) accept exactly what jsonc-parser does in nst and json5-tests;
+   the mutation API on `JsonNode`; PreserveStyle writes all 224 accepted inputs (the 38 JSONC samples
+   included) back byte for byte from memory and from streams, and random edits of each read back into
+   the edited document, with comments, commas, indentation and line breaks kept around them
+   (`test-roundtrip.sh`, `JsonPreserveTests` with ported jsonc-parser edit cases).*
+   Byte-exact round trips of every accepted suite input and of
    JSONC samples; edits keep neighbors.
 6. **`[JsonObject]` and on-demand.** Typed binding from the reader and nodes; the typed and on-demand
    benchmark tracks.

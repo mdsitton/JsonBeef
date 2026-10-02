@@ -7,14 +7,28 @@ namespace JsonBeef;
 
 extension JsonDocument
 {
-	/// @brief Write the document as JSON: compact by default, indented with `options.Indented`, RFC 8785
-	/// canonical with `options.Canonical`. Members are written in document order (duplicates included),
-	/// big integers and numbers beyond a double's range as their text, other numbers exactly (integers)
-	/// or as their shortest round-trip digits (doubles). The walk is iterative: depth costs no stack.
+	/// @brief Write the document: a document read with JsonMetadataMode.PreserveStyle as it was read
+	/// (byte for byte when unchanged; comments, layout and number and string spellings kept, changes
+	/// regenerated in their surroundings' style), any other compact.
+	/// @param output The string to append to.
+	/// @return .Ok, or the first error (an empty document).
+	public Result<void, JsonWriteError> Write(String output)
+	{
+		if (mPreserve)
+			return WritePreserving(output);
+		return Write(output, JsonWriteOptions());
+	}
+
+	/// @brief Write the document as JSON in a given layout: compact by default, indented with
+	/// `options.Indented`, RFC 8785 canonical with `options.Canonical` (a PreserveStyle document too:
+	/// its comments and spellings are not kept). Members are written in document order (duplicates
+	/// included), big integers and numbers beyond a double's range as their text, other numbers exactly
+	/// (integers) or as their shortest round-trip digits (doubles). The walk is iterative: depth costs no
+	/// stack.
 	/// @param output The string to append to.
 	/// @param options Layout, escaping and number options.
 	/// @return .Ok, or the first error (an empty document, a canonical-mode violation).
-	public Result<void, JsonWriteError> Write(String output, JsonWriteOptions options = .())
+	public Result<void, JsonWriteError> Write(String output, JsonWriteOptions options)
 	{
 		let writer = scope JsonWriter(output, options);
 		if (mRoot == 0)
@@ -43,11 +57,24 @@ extension JsonDocument
 		return writer.Finish();
 	}
 
-	/// @brief Write the document to a file (UTF-8, no BOM).
+	/// @brief Write the document to a file (UTF-8; a PreserveStyle document as Write(output) gives it,
+	/// its BOM included if it had one).
+	/// @param path The file's path.
+	/// @return .Ok, or the first error (I/O errors as InvalidStructure with the message).
+	public Result<void, JsonWriteError> WriteFile(StringView path)
+	{
+		let output = scope String();
+		Try!(Write(output));
+		if (File.WriteAllText(path, output) case .Err)
+			return .Err(JsonWriteError(.InvalidStructure, scope $"Cannot write the file {path}"));
+		return .Ok;
+	}
+
+	/// @brief Write the document to a file (UTF-8, no BOM) in a given layout.
 	/// @param path The file's path.
 	/// @param options Layout, escaping and number options.
 	/// @return .Ok, or the first error (I/O errors as InvalidStructure with the message).
-	public Result<void, JsonWriteError> WriteFile(StringView path, JsonWriteOptions options = .())
+	public Result<void, JsonWriteError> WriteFile(StringView path, JsonWriteOptions options)
 	{
 		let output = scope String();
 		Try!(Write(output, options));
