@@ -1,8 +1,8 @@
 #!/bin/bash
 # Instructions per input byte (user space) of the Release JsonTester's passes, per bench/compare input:
-# a measure that, unlike time, does not depend on the machine's load, for comparing changes when a quiet
-# machine is not available (XmlBeef's bench/instructions.sh). It is not speed: memory traffic and
-# branch misses are not in it. Timed figures come from bench/compare/run.sh on a quiet machine.
+# a measure that, unlike time, does not depend on the machine's load, for comparing small changes that
+# timing noise would hide (XmlBeef's bench/instructions.sh). It is not speed: memory traffic and
+# branch misses are not in it. Timed figures come from bench/compare/run.sh.
 # Usage: bash bench/instructions.sh [input names...]      (beefbuild -config=Release first)
 #   MODES="events document" limits the columns (default: events document stream write; also typed and
 #   query, [JsonObject] binding and on-demand reading, from bench/compare's Beef harness, built with

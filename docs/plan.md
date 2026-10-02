@@ -307,7 +307,7 @@ the benchmark inputs as large-input checks (checksums must match the reference).
 tests/fetch-suites.sh
 cd bench/compare
 ./fetch.sh && ./build.sh && ./gen-inputs.py
-./run.sh                                 # refuses to run above load average 2 (FORCE=1 overrides)
+./run.sh > results.md                    # repeats each cell until it settles; `~` marks one that did not
 ONLY='JsonBeef.*' ./run.sh               # later: remeasure only JsonBeef, merged into results.md
 ```
 

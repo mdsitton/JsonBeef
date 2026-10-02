@@ -1,7 +1,7 @@
 # JsonBeef status
 
-Last reviewed: 2026-10-02 (phases 1–7 done; the timed benchmark run, P3T, waits for a quiet
-machine).
+Last reviewed: 2026-10-02 (phases 1–7 done; the timed benchmark run, P3T, under way with run.sh's
+settling repeats in place of the quiet-machine rule).
 
 ## Verification baseline
 
@@ -19,7 +19,7 @@ machine).
 | `tests/fetch-suites.sh` | Pinned suites in `tests/suites/` (`docs/test-suites.md`) |
 | `bash ./test-json-lines.sh` (and with the Release `BIN`) | JsonSequenceReader against the oracle's `-lines` and `-concatenated`, from memory and from 7-byte stream reads: amazon_cellphones.ndjson (793 records), simdjson-data's three jsonchecker .ndjson files, 8 generated inputs (CRLF, empty lines, a BOM, ill-formed UTF-8, touching values) and every nst parsing case, both ways: 1,320 runs, 0 differences |
 | `bash ./test-json-fuzz.sh` (and with the Release `BIN`) | The stream sweep: every suite input through streams fed 1 to 31 bytes per read (16,895 runs) reads as from memory; then 2 seeds × 50 rounds of every suite input (57,200 runs) and 3 rounds of the 14 real-world files: fast build, reader, 1-byte stream and a push reader fed 1 byte at a time agree on every mutation, with CollectErrors memory and stream give the same errors and recovered document, SkipValue (the fast loop from memory, the token loop from a stream; the whole value and the first one inside it) gives the reader's outcome, and with `InvalidUtf8.Replace` and `InvalidSurrogates.Wtf8`, and as JSON5 (with SkipValue there too), a document from memory, one from 1-byte streams and the reader's tokens agree; each document read, copied into another with SetValue, prints the same, is ValueEquals to it and passes a JSON Patch testing and replacing it with the original. Run with `SEEDS=3 ROUNDS=200` (343,326 runs, Release) at the end of phase 6: 0 disagreements |
-| `bench/compare/run.sh` | The existing implementations and JsonBeef's columns in all four tracks: `JsonBeef` (DOM), `JsonBeef JsonReader` (streaming), `JsonBeef [JsonObject]` (typed), `JsonBeef JsonReader` (on-demand query); refuses to run above load average 2. JsonBeef's check lines equal the reference on all 16 inputs in the DOM and streaming tracks and on twitter, citm_catalog and canada in the typed and query tracks (`./build.sh beef`). No timed run yet (P3T): there is no `results.md`, so the first timed run is the full one, then `ONLY='JsonBeef.*'` |
+| `bench/compare/run.sh` | The existing implementations and JsonBeef's columns in all four tracks: `JsonBeef` (DOM), `JsonBeef JsonReader` (streaming), `JsonBeef [JsonObject]` (typed), `JsonBeef JsonReader` (on-demand query). No quiet machine is assumed: each process samples until converged, and each cell runs processes until 3 of them agree within ±10% (at most 9; a cell that never settles is marked `~`). JsonBeef's check lines equal the reference on all 16 inputs in the DOM and streaming tracks and on twitter, citm_catalog and canada in the typed and query tracks (`./build.sh beef`). No timed run yet (P3T): there is no `results.md`, so the first timed run is the full one, then `ONLY='JsonBeef.*'` |
 | `bash bench/instructions.sh` (after `beefbuild -config=Release`; `MODES="events document typed query"` after `bench/compare/build.sh beef`) | The instruction counts below |
 
 Any change to `.bf` files must keep these green in both Debug and Release.
@@ -86,7 +86,7 @@ text): only twitter, citm_catalog and canada are in those tracks.
 
 | ID | Item | Size |
 |----|------|------|
-| P3T | Phase 3's timed run: on a quiet machine (load average under 2), `bash bench/compare/run.sh > results.md` (the first, full run), then `./plot.py`; compare JsonBeef with yyjson/sonic-rs (DOM) and jiter (streaming); decide from it whether the 32-byte record, a closer stream path or a flat read-only document (plan §9 open item 3) are worth doing. Never commit figures taken under load | M |
+| P3T | Phase 3's timed run: `bash bench/compare/run.sh > results.md` (the first, full run; rerun `~` cells with `ONLY=`), then `./plot.py`; compare JsonBeef with yyjson/sonic-rs (DOM) and jiter (streaming); decide from it whether the 32-byte record, a closer stream path or a flat read-only document (plan §9 open item 3) are worth doing | M |
 | P3S | The stream event pass costs 1.3–1.5× the memory one in instructions (XmlBeef got its to 1.1–1.3×): the reader's `Grow` checks in scans | S |
 | P6T | Typed binding's overhead over the event pass in instructions (twitter 19.9 per byte against 14.7; citm_catalog 19.0 against 13.4): the generated member matching (User's 40 fields: about 2 per byte), allocation (about 1), and the per-token calls through `JsonReader`'s memory/stream dispatch; worth looking at once the timed run says where JsonBeef stands in the typed track | M |
 | P6S | The on-demand fast loop serves memory input only; streams skip through the token loop | S |

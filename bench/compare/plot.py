@@ -127,6 +127,10 @@ def input_size(name):
     return 0
 
 
+# (track, input, implementation) of the cells run.sh marked `~` (never settled)
+UNSETTLED = set()
+
+
 def read_results(path):
     """Returns {track: (members, languages, table, timeouts)}: table[input][impl] is MB/s or None (FAIL
     or DNF); an implementation with n/a (or ?) for an input has no key in that row; timeouts[(input,
@@ -156,6 +160,9 @@ def read_results(path):
             for p, v in zip(members, cells[1:]):
                 if v in ("n/a", "?"):
                     continue
+                if v.endswith("~"):  # run.sh: the cell never settled; plotted, with a footnote
+                    v = v[:-1]
+                    UNSETTLED.add((track, name, p))
                 row[p] = float(v) if re.match(r"^[0-9.]+$", v) else None
                 if v == "DNF":
                     timeouts[(name, p)] = input_size(name) / 1048576.0 / LIMIT
@@ -222,6 +229,9 @@ def caveat(p, table, timeouts, track=""):
     if slow:
         why = f"{SLOW_REASON[p]}; " if p in SLOW_REASON else ""
         parts.append(f"did not finish {listing(slow)} within {LIMIT:.0f} s ({why}counted at that bound)")
+    noisy = [INPUT_LABELS.get(i, i) for (t, i, q) in sorted(UNSETTLED) if q == p and (not track or t == track)]
+    if noisy:
+        parts.append(f"did not settle on {listing(noisy)} (noisy figures)")
     note = NOTE.get(f"{track}:{p}", NOTE.get(p))  # "Track:name" keys apply to one track only
     if note:
         parts.append(note)

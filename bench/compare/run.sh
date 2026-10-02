@@ -18,8 +18,13 @@
 #   2. Sample: time single operations until at least N samples (default 5) were taken and at least
 #      60% of them lie within ±10% of their median ("converged"), or 10 s of measuring or 1000
 #      samples have passed ("capped"). Report the median sample.
-#   3. Repeat: run each cell REPEATS times (default 3) in fresh processes and take the median, since
-#      memory layout, hash seeds and CPU clocks differ between processes.
+#   3. Repeat until settled: run each cell in fresh processes (memory layout, hash seeds and CPU clocks
+#      differ between processes) until REPEATS of them (default 3) converged in step 2 and lie within
+#      ±10% of the converged runs' median MB/s, or MAX_RUNS processes (default 9) have run. Report the
+#      median of the runs in that ±10% band. A cell that never settled reports the median of its
+#      converged runs (of all runs if none converged) marked `~`: noise, not a measurement to trust.
+#   No quiet machine is assumed: the sampling and the repeats absorb ordinary background load, and the
+#   load average at the start and the end and the number of `~` cells are printed with the results.
 # Warm steady state only: cold start (process start-up, JIT warm-up, first-parse costs) is out of scope.
 # One operation parses the input once; a batch input (.ndjson) is split into lines before timing and
 # one operation parses every line as its own document. Every harness first prints a check line
@@ -37,8 +42,6 @@
 # for example ONLY='yyjson|simdjson.*' ./run.sh, only the matching implementations are measured and
 # results.md (or the file RESULTS names) is updated in place; inputs not named keep their saved rows. JsonBeef's own columns
 # (all four tracks) go in the same way: ONLY='JsonBeef.*'.
-# Benchmarks need a quiet machine: run.sh refuses to start when the 1-minute load average is above 2
-# (FORCE=1 runs anyway, for smoke tests; the output then says the figures are not comparable).
 set -uo pipefail
 C="$(cd "$(dirname "$0")" && pwd)"
 B="$C/bin"
@@ -46,15 +49,14 @@ PY="$C/python/.venv/bin/python"
 source "$C/merge.sh"
 
 load=$(cut -d' ' -f1 /proc/loadavg)
-loaded=$(awk -v l="$load" 'BEGIN { print (l > 2) ? 1 : 0 }')
-if [ -z "${FORCE:-}" ] && [ -z "${MERGE_CHILD:-}" ] && [ "$loaded" = 1 ]; then
-	echo "Load average is $load: close other work and rerun (or FORCE=1 to measure anyway)" >&2
-	exit 1
-fi
 merge_into "${RESULTS:-$C/results.md}" "$@"
 N="${1:-5}"
 shift || true
 REPEATS="${REPEATS:-3}"
+MAX_RUNS="${MAX_RUNS:-9}"
+if [ "$MAX_RUNS" -lt "$REPEATS" ]; then MAX_RUNS=$REPEATS; fi
+# Cells that never settled (step 3), counted as the tables are printed
+unsettled=0
 LIMIT="${LIMIT:-60}"
 TRACKS="${TRACKS:-dom typed stream query}"
 
@@ -207,11 +209,42 @@ median() {
 	sort -g | awk '{a[NR] = $1} END {print (NR % 2) ? a[(NR + 1) / 2] : (a[NR / 2] + a[NR / 2 + 1]) / 2}'
 }
 
-# One cell: "<MB/s> <ms/op> <peak RSS KiB>", each the median over REPEATS runs, or FAIL / DNF / n/a
+# Step 3's verdict on the runs so far, given one "<MB/s> <converged 0|1>" line per run: "settled" and
+# the (1-based) runs in the ±10% band around the converged runs' median when at least `need` converged
+# runs lie in it; otherwise "unsettled" and the runs to report (the converged ones, or all of them)
+settle() { # need
+	awk -v need="$1" '
+		{ v[NR] = $1; c[NR] = $2 }
+		END {
+			n = 0
+			for (i = 1; i <= NR; i++) if (c[i]) s[++n] = v[i]
+			if (n == 0) {
+				for (i = 1; i <= NR; i++) list = list " " i
+				print "unsettled" list
+				exit
+			}
+			for (i = 2; i <= n; i++) {
+				x = s[i]
+				for (j = i - 1; j >= 1 && s[j] > x; j--) s[j + 1] = s[j]
+				s[j + 1] = x
+			}
+			m = (n % 2) ? s[(n + 1) / 2] : (s[n / 2] + s[n / 2 + 1]) / 2
+			k = 0
+			for (i = 1; i <= NR; i++) {
+				if (!c[i]) continue
+				converged = converged " " i
+				if (v[i] >= m * 0.9 && v[i] <= m * 1.1) { k++; band = band " " i }
+			}
+			print (k >= need) ? "settled" band : "unsettled" converged
+		}'
+}
+
+# One cell: "<MB/s> <ms/op> <peak RSS KiB> [~]", each the median over the runs step 3 keeps (`~`: the
+# cell never settled), or FAIL / DNF / n/a
 cell() { # reference-line path command...
-	local ref="$1" path="$2" mbps=() ms=() rss=() out status
+	local ref="$1" path="$2" mbps=() ms=() rss=() converged=() out status verdict i
 	shift 2
-	for ((r = 0; r < REPEATS; r++)); do
+	for ((r = 0; r < MAX_RUNS; r++)); do
 		out=$("$B/maxrss" timeout "$LIMIT" "$@" "$path" "$N" 2>&1)
 		status=$?
 		if [ $status -eq 124 ]; then echo DNF; return; fi
@@ -220,8 +253,20 @@ cell() { # reference-line path command...
 		mbps+=("$(grep -oE '[0-9.]+ MB/s' <<< "$out" | head -1 | awk '{print $1}')")
 		ms+=("$(grep -oE '[0-9.]+ ms/op' <<< "$out" | head -1 | awk '{print $1}')")
 		rss+=("$(grep -oE '^maxrss: [0-9]+' <<< "$out" | tail -1 | awk '{print $2}')")
+		if grep -q ', converged)' <<< "$out"; then converged+=(1); else converged+=(0); fi
+		if [ $((r + 1)) -ge "$REPEATS" ]; then
+			verdict=$(for ((i = 0; i <= r; i++)); do echo "${mbps[i]} ${converged[i]}"; done | settle "$REPEATS")
+			if [[ "$verdict" == settled* ]]; then break; fi
+		fi
 	done
-	echo "$(printf '%s\n' "${mbps[@]}" | median) $(printf '%s\n' "${ms[@]}" | median) $(printf '%s\n' "${rss[@]}" | median)"
+	local kept_mbps=() kept_ms=() kept_rss=() mark=""
+	for i in ${verdict#* }; do
+		kept_mbps+=("${mbps[i - 1]}")
+		kept_ms+=("${ms[i - 1]}")
+		kept_rss+=("${rss[i - 1]}")
+	done
+	if [[ "$verdict" == unsettled* ]]; then mark="~"; fi
+	echo "$(printf '%s\n' "${kept_mbps[@]}" | median) $(printf '%s\n' "${kept_ms[@]}" | median) $(printf '%s\n' "${kept_rss[@]}" | median) $mark"
 }
 
 # Documents in an input (lines of a batch)
@@ -285,11 +330,14 @@ track_tables() { # track title implementations...
 					line+=" $v |"
 					continue
 				fi
-				read -r mbps ms rss <<< "$v"
+				read -r mbps ms rss mark <<< "$v"
 				case $kind in
-				speed) line+=" $mbps |" ;;
+				speed)
+					line+=" $(awk -v v="$mbps" 'BEGIN { printf "%.1f", v }')$mark |"
+					if [ -n "$mark" ]; then unsettled=$((unsettled + 1)); fi
+					;;
 				rss) line+=" $(awk -v k="$rss" 'BEGIN { printf "%.1f", k / 1024 }') |" ;;
-				perdoc) line+=" $(awk -v ms="$ms" -v d="$docs" 'BEGIN { printf "%.0f", ms * 1e6 / d }') |" ;;
+				perdoc) line+=" $(awk -v ms="$ms" -v d="$docs" 'BEGIN { printf "%.0f", ms * 1e6 / d }')$mark |" ;;
 				esac
 			done
 			echo "$line"
@@ -386,20 +434,18 @@ if [ -n "${ONLY:-}" ]; then
 	saved_preamble
 	echo
 	echo "Partial rerun on $(date +%F) (ONLY='$ONLY', inputs: $(echo $requested); tracks: $TRACKS; load average $load at"
-	echo "the start; N=$N, REPEATS=$REPEATS, LIMIT=$LIMIT s)."
+	echo "the start; N=$N, REPEATS=$REPEATS, MAX_RUNS=$MAX_RUNS, LIMIT=$LIMIT s)."
 else
 	echo "# JSON implementations compared"
 	echo
 	echo "Produced by run.sh on $(date +%F) ($cpu, Linux x86-64, single thread; load average $load at the start;"
-	echo "N=$N samples minimum, REPEATS=$REPEATS processes per cell, LIMIT=$LIMIT s). Pinned versions in fetch.sh and"
+	echo "N=$N samples minimum, REPEATS=$REPEATS settled processes per cell out of at most MAX_RUNS=$MAX_RUNS,"
+	echo "LIMIT=$LIMIT s). Pinned versions in fetch.sh and"
 	echo "the harness manifests; inputs from gen-inputs.py; check lines from reference.py. MB/s of input, higher is"
 	echo "better; peak RSS of the whole process (bin/maxrss); ns per document for the batch inputs. FAIL = rejected"
 	echo "valid input, crashed, or a check line that differs from reference.py's; DNF = past the time limit; n/a ="
-	echo "the implementation has no such mode. Warm steady state only (cold start is out of scope)."
-	if [ "$loaded" = 1 ]; then
-		echo
-		echo "**Measured on a loaded machine (load average $load, FORCE=1): these figures are not comparable.**"
-	fi
+	echo "the implementation has no such mode; \`~\` = the cell never settled (run.sh's step 3): noise, not a figure to"
+	echo "trust. Warm steady state only (cold start is out of scope)."
 fi
 echo
 for track in $TRACKS; do
@@ -426,5 +472,7 @@ for track in $TRACKS; do
 		;;
 	esac
 done
+echo "Load average $(cut -d' ' -f1 /proc/loadavg) at the end; $unsettled measured cells never settled (\`~\`)."
+echo
 notes
 exit 0
