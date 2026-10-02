@@ -20,7 +20,9 @@ namespace JsonTester;
 /// -pretty (print the writer's output as is), -jcs (RFC 8785), -pointer P (the canonical form of the
 /// value at JSON Pointer P; a pointer error exits 1), -strings (every member name and string in order,
 /// one per line).
-/// Options: -no-bom, -max-depth N, -dup=keep|last|first|error; for the batch modes -every K and -limit N.
+/// Options: -no-bom, -max-depth N, -dup=keep|last|first|error, -collect (JsonReadConfig.CollectErrors:
+/// every error is printed, the first one first, and the exit status is 1 if there was any); for the
+/// batch modes -every K and -limit N.
 /// Usage errors exit 2.
 class Program
 {
@@ -44,6 +46,8 @@ class Program
 			return Bench.Run(args);
 		if (args.Count > 0 && args[0] == "-fuzz")
 			return Fuzz.Run(args);
+		if (args.Count > 0 && args[0] == "-stream-sweep")
+			return Fuzz.Sweep(args);
 
 		var config = JsonReadConfig();
 		int streamBuffer = 0;
@@ -82,6 +86,8 @@ class Program
 			}
 			else if (arg == "-no-bom")
 				config.AllowBom = false;
+			else if (arg == "-collect")
+				config.CollectErrors = true;
 			else if (arg == "-max-depth" && i + 1 < args.Count && int.Parse(args[i + 1]) case .Ok(let depth))
 			{
 				config.MaxDepth = depth;
@@ -139,14 +145,27 @@ class Program
 				reader.Reset(stream, config);
 			else
 				reader.Reset(text, config);
-			if (Canonical.Write(reader, result) case .Err(let readerError))
+			let errors = scope String();
+			if (Canonical.Write(reader, result, config.CollectErrors ? errors : null) case .Err(let readerError))
 				return PrintError(readerError);
+			if (!errors.IsEmpty)
+			{
+				Console.Error.Write(errors);
+				return 1;
+			}
 			result.Append('\n');
 			return Print(result);
 		}
 
 		let doc = scope JsonDocument();
 		let read = stream != null ? doc.Read(stream, config) : doc.Read(text, config);
+		if (!doc.Errors.IsEmpty)
+		{
+			// Collect-errors: every error, the first one first
+			for (let error in doc.Errors)
+				PrintError(error);
+			return 1;
+		}
 		if (read case .Err(let readError))
 			return PrintError(readError);
 

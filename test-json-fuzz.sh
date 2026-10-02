@@ -2,8 +2,11 @@
 # Differential fuzzing through JsonTester -fuzz: every suite input and real-world file, mutated at
 # random (bytes replaced, inserted, deleted, duplicated), is read three ways: the document's fast build
 # from memory, JsonReader's tokens from memory, and a document built through 1-byte stream reads. All
-# three must give the same canonical form, or the same error (kind, line, column, offset). A
-# disagreement is a bug in one of the paths (the fast build duplicates the reader's checks).
+# three must give the same canonical form, or the same error (kind, line, column, offset). Then with
+# CollectErrors, from memory and from 1-byte stream reads: the same errors (the first one the error
+# above) and the same document recovered around them. A disagreement is a bug in one of the paths
+# (the fast build duplicates the reader's checks). First, JsonTester -stream-sweep reads every suite
+# input through streams fed 1 to 31 bytes per read (yajl's pattern): each must read as from memory.
 # Usage: bash ./test-json-fuzz.sh            (Debug binary; SEEDS=3 ROUNDS=200 for a longer run)
 #        BIN=./build/Release_Linux64/JsonTester/JsonTester bash ./test-json-fuzz.sh
 
@@ -22,6 +25,9 @@ if [ ! -d "$SUITES/JSONTestSuite/test_parsing" ]; then
 fi
 
 failed=0
+# Streams fed 1 to 31 bytes per read must read every suite input as memory does
+"$BIN" -stream-sweep "$SUITES"/JSONTestSuite/test_parsing/*.json "$SUITES"/JSON_checker/*.json \
+	"$SUITES"/simdjson-data/jsonchecker/*.json "$SUITES"/json5-tests/*/*.json* || failed=1
 for seed in $(seq 1 "$SEEDS"); do
 	"$BIN" -fuzz "$seed" "$ROUNDS" "$SUITES"/JSONTestSuite/test_parsing/*.json "$SUITES"/JSON_checker/*.json \
 		"$SUITES"/simdjson-data/jsonchecker/*.json "$SUITES"/nativejson/data/roundtrip/*.json \

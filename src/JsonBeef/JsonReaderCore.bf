@@ -44,6 +44,9 @@ internal class JsonReaderCore<TCursor> where TCursor : IJsonCursor
 		Colon,
 		/// After a value: `,` or the container's end, or at depth 0 the end of the input.
 		AfterValue,
+		/// Collect-errors: End tokens of containers recovery closes (mPendingCloses; with mClosingAtEnd
+		/// every open one, then the end of the document), then AfterValue.
+		Closing,
 		End,
 		Failed
 	}
@@ -92,6 +95,20 @@ internal class JsonReaderCore<TCursor> where TCursor : IJsonCursor
 	internal int32 mFloatExponent;
 	internal bool mFloatExact;
 
+	// Collect-errors (JsonReadConfig.CollectErrors)
+	int mErrorCount;
+	/// Where the last error was: an error at or before it moves the resynchronization a byte on, so
+	/// recovery always progresses.
+	int mLastErrorOffset;
+	/// The string being read (its opening quote; -1 when none) and whether it is a member name: an
+	/// error inside one is resynchronized at its closing quote.
+	int mStringStart;
+	bool mStringIsName;
+	/// End tokens still to report for containers recovery closes (State.Closing).
+	int mPendingCloses;
+	/// The input ended at an error: every open container gets its End token, then EndOfDocument.
+	bool mClosingAtEnd;
+
 	public this()
 	{
 		mBits = new uint64[16];
@@ -119,6 +136,12 @@ internal class JsonReaderCore<TCursor> where TCursor : IJsonCursor
 		mEscaped = false;
 		mNumberKind = .Integer;
 		mInteger = 0;
+		mErrorCount = 0;
+		mLastErrorOffset = -1;
+		mStringStart = -1;
+		mStringIsName = false;
+		mPendingCloses = 0;
+		mClosingAtEnd = false;
 	}
 
 	/// The next token; on failure the error is in mError. (JsonReader.Next makes the public Result, so
@@ -130,7 +153,7 @@ internal class JsonReaderCore<TCursor> where TCursor : IJsonCursor
 			return .Err(.());
 		let result = ReadNext();
 		if (result case .Err)
-			mState = .Failed;
+			AfterError();
 		return result;
 	}
 
@@ -187,6 +210,8 @@ internal class JsonReaderCore<TCursor> where TCursor : IJsonCursor
 			return ReadValue(false);
 		case .AfterValue:
 			return ReadAfterValue();
+		case .Closing:
+			return ReadClosing();
 		case .End:
 			return .Ok(.EndOfDocument);
 		case .Failed:
@@ -609,6 +634,8 @@ internal class JsonReaderCore<TCursor> where TCursor : IJsonCursor
 	{
 		int start = mPos;
 		Retain(start);
+		mStringStart = start;
+		mStringIsName = isName;
 		int p = Try!(ScanStringText(start, start + 1));
 		char8 c = mData[p];
 		if (c == '"')
@@ -633,6 +660,7 @@ internal class JsonReaderCore<TCursor> where TCursor : IJsonCursor
 		mTokenEnd = p + 1;
 		mPos = p + 1;
 		mState = isName ? .Colon : .AfterValue;
+		mStringStart = -1;
 		return .Ok(mToken);
 	}
 
@@ -981,6 +1009,266 @@ internal class JsonReaderCore<TCursor> where TCursor : IJsonCursor
 		message.Append(", found ");
 		JsonChar.AppendCharDescription(message, mData, mPos, mEnd, let length);
 		return Fail(kind, message, mPos, length);
+	}
+
+	// Collect-errors
+
+	/// After an error: stop, or with CollectErrors resynchronize so the next call goes on. Recovery
+	/// makes no error of its own (the pending one's message is in the per-thread buffer) and always
+	/// moves on: an error at or before the last one's offset resynchronizes a byte further.
+	void AfterError()
+	{
+		bool fatal = mInputFailed || mState == .Start || mError.mKind == .ResourceLimitExceeded ||
+			mError.mKind == .IoError || mError.mKind == .UnsupportedEncoding;
+		if (!mConfig.CollectErrors || fatal || (mConfig.MaxErrors > 0 && ++mErrorCount >= mConfig.MaxErrors))
+		{
+			mState = .Failed;
+			return;
+		}
+		Recover();
+	}
+
+	void Recover()
+	{
+		int anchor = (int)mError.mOffset;
+		if (anchor <= mLastErrorOffset)
+			anchor = mLastErrorOffset + 1;
+		mLastErrorOffset = anchor;
+		mPos = Math.Max(anchor, mBase);
+		if (mStringStart >= 0)
+		{
+			// Inside a string: past its closing quote (or to the line's end, for a string not closed
+			// there); a broken name takes its member with it
+			bool isName = mStringIsName;
+			mStringStart = -1;
+			mPos = SkipStringBody(mPos);
+			if (isName)
+				SkipMemberRest();
+			else
+				mState = .AfterValue;
+			CloseIfAtEnd();
+			return;
+		}
+		if (!Avail(mPos))
+		{
+			mClosingAtEnd = true;
+			mState = .Closing;
+			return;
+		}
+		char8 c = mData[mPos];
+		switch (mState)
+		{
+		case .Value, .ArrayStart:
+			if (mDepth == 0)
+			{
+				// Something that is not a value where the document's should be: skipped
+				mPos = c == ',' || c == ']' || c == '}' || c == ':' ? mPos + 1 : SkipTokenRun(mPos);
+				SkipSpace();
+				if (!Avail(mPos))
+					mState = .End;
+			}
+			else if (c == ',' || c == ']' || c == '}')
+			{
+				// A missing value: the comma or bracket is read as what follows a value
+				mState = .AfterValue;
+			}
+			else if (c == ':')
+				mPos++;
+			else
+			{
+				mPos = SkipTokenRun(mPos);
+				mState = .AfterValue;
+			}
+		case .ObjectStart, .Name:
+			if (c == '}')
+				mState = .AfterValue;
+			else if (c == ']')
+				CloseTo(c);
+			else if (c == ',')
+				mPos++;
+			else
+				SkipMemberRest();
+		case .Colon:
+			if (c == ',' || c == '}')
+			{
+				// A name without a value: the member is dropped (JsonDocument does)
+				mState = .AfterValue;
+			}
+			else if (c == ']')
+				CloseTo(c);
+			else if (CanStartValue(c))
+				mState = .Value;
+			else
+				mPos = SkipTokenRun(mPos);
+		case .AfterValue:
+			if (mDepth == 0)
+			{
+				// Content after the document's value: the read ends
+				mClosingAtEnd = true;
+				mState = .Closing;
+			}
+			else if (c == ']' || c == '}')
+				CloseTo(c);
+			else if (InObject ? c == '"' : CanStartValue(c))
+			{
+				// A missing comma
+				mState = InObject ? .Name : .Value;
+			}
+			else
+				mPos = c == ',' || c == ':' || c == '[' || c == '{' ? mPos + 1 : SkipTokenRun(mPos);
+		default:
+			mState = .Failed;
+		}
+		CloseIfAtEnd();
+	}
+
+	/// At the end of the input after recovery: close what is open.
+	void CloseIfAtEnd()
+	{
+		if (mState == .Failed || mState == .End)
+			return;
+		SkipSpace();
+		if (!Avail(mPos))
+		{
+			mClosingAtEnd = true;
+			mState = .Closing;
+		}
+	}
+
+	/// A closing bracket that is not the innermost container's: the containers inside the one it closes
+	/// end there (their End tokens first), or it is skipped when no open container is of its kind.
+	void CloseTo(char8 closer)
+	{
+		bool wantObject = closer == '}';
+		for (int d = mDepth - 1; d >= 0; d--)
+		{
+			if (((mBits[d >> 6] >> (d & 63)) & 1) != 0 == wantObject)
+			{
+				mPendingCloses = mDepth - 1 - d;
+				mState = mPendingCloses > 0 ? .Closing : .AfterValue;
+				return;
+			}
+		}
+		mPos++;
+		mState = .AfterValue;
+	}
+
+	/// State.Closing: the End token of a container recovery closes (an empty token where the reader is),
+	/// or at the end of the input, when everything is closed, the end of the document.
+	Result<JsonToken, JsonFailure> ReadClosing()
+	{
+		if (mPendingCloses == 0 && !(mClosingAtEnd && mDepth > 0))
+		{
+			if (mClosingAtEnd)
+			{
+				mState = .End;
+				mToken = .EndOfDocument;
+				mTokenStart = mPos;
+				mTokenEnd = mPos;
+				return .Ok(.EndOfDocument);
+			}
+			mState = .AfterValue;
+			return ReadAfterValue();
+		}
+		if (mPendingCloses > 0)
+			mPendingCloses--;
+		bool isObject = InObject;
+		mDepth--;
+		mToken = isObject ? .EndObject : .EndArray;
+		mTokenStart = mPos;
+		mTokenEnd = mPos;
+		return .Ok(mToken);
+	}
+
+	/// Whether `c` can start a value.
+	static bool CanStartValue(char8 c)
+	{
+		return c == '"' || c == '-' || JsonChar.IsDigit(c) || c == '[' || c == '{' || c == 't' || c == 'f' || c == 'n';
+	}
+
+	/// Past a run of anything but whitespace, `"` and structural characters (a broken literal or number,
+	/// garbage), at least one byte.
+	int SkipTokenRun(int p)
+	{
+		int q = p;
+		while (Avail(q))
+		{
+			char8 c = mData[q];
+			if (JsonChar.IsSpace(c) || c == ',' || c == ':' || c == '[' || c == ']' || c == '{' || c == '}' || c == '"')
+				break;
+			q++;
+		}
+		return q > p ? q : Math.Min(p + 1, Avail(p) ? p + 1 : p);
+	}
+
+	/// From inside a string, past its closing quote; a raw line break or the end of the input ends it
+	/// there (a string not closed on its line).
+	int SkipStringBody(int p)
+	{
+		var p;
+		while (Avail(p))
+		{
+			char8 c = mData[p];
+			if (c == '\\')
+				p += 2;
+			else if (c == '"')
+				return p + 1;
+			else if (c == '\n' || c == '\r')
+				return p;
+			else
+				p++;
+		}
+		return Math.Min(p, mEnd);
+	}
+
+	/// Past one value of any kind, brackets balanced and strings skipped whole.
+	int SkipBalanced(int p)
+	{
+		if (!Avail(p))
+			return p;
+		char8 c = mData[p];
+		if (c == '"')
+			return SkipStringBody(p + 1);
+		if (c != '[' && c != '{')
+			return SkipTokenRun(p);
+		int depth = 0;
+		var p;
+		while (Avail(p))
+		{
+			c = mData[p];
+			if (c == '"')
+			{
+				p = SkipStringBody(p + 1);
+				continue;
+			}
+			if (c == '[' || c == '{')
+				depth++;
+			else if (c == ']' || c == '}')
+			{
+				depth--;
+				if (depth == 0)
+					return p + 1;
+			}
+			p++;
+		}
+		return p;
+	}
+
+	/// The rest of a broken member (from its name or what stands for it): the name, and with a `:`
+	/// after it the value too; then what follows a value.
+	void SkipMemberRest()
+	{
+		if (Avail(mPos) && mData[mPos] != ':')
+			mPos = SkipBalanced(mPos);
+		SkipSpace();
+		if (Avail(mPos) && mData[mPos] == ':')
+		{
+			mPos++;
+			SkipSpace();
+			if (Avail(mPos) && mData[mPos] != ',' && mData[mPos] != '}' && mData[mPos] != ']')
+				mPos = SkipBalanced(mPos);
+		}
+		mState = .AfterValue;
 	}
 
 	// Values of the current token

@@ -25,7 +25,9 @@
 # stream1 builds the document from a Stream fed in 1-byte reads, stream16 reads events from 16-byte
 # reads (both through a 16-byte buffer, so refills land inside numbers, literals, escapes, surrogate
 # pairs and UTF-8 sequences); rewrite and rewrite-pretty write the document compact or indented, read
-# that back and print it (the writer must keep everything; exit 3 if its output is rejected).
+# that back and print it (the writer must keep everything; exit 3 if its output is rejected); collect
+# and stream-collect read with JsonReadConfig.CollectErrors from memory and from 1-byte stream reads
+# (the first error must still be the golden one, and recovery must finish).
 #
 # Two more checks run once: every nativejson round-trip file written by the compact writer must equal
 # the file byte for byte (JsonFloatFormat.Plain keeps `0.0`, `-0.0`, `1.7976931348623157e308`), and
@@ -40,7 +42,7 @@
 
 BIN="${BIN:-./build/Debug_Linux64/JsonTester/JsonTester}"
 SUITES="${SUITES:-tests/suites}"
-MODES="${MODES:-document events stream1 stream16 rewrite rewrite-pretty}"
+MODES="${MODES:-document events stream1 stream16 rewrite rewrite-pretty collect stream-collect}"
 EXPECTED="tests/expected-failures.txt"
 SKIP="tests/suites-skip.txt"
 LOGFILE="test-json-suite.log"
@@ -161,6 +163,8 @@ for mode in $MODES; do
 	stream16) flag="-events -stream 16" ;;
 	rewrite) flag="-rewrite" ;;
 	rewrite-pretty) flag="-rewrite-pretty" ;;
+	collect) flag="-collect" ;;
+	stream-collect) flag="-collect -stream 1" ;;
 	*) echo "ERROR: unknown mode $mode"; exit 1 ;;
 	esac
 

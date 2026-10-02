@@ -10,20 +10,35 @@ namespace JsonTester;
 static class Canonical
 {
 	/// Reads the whole document from `reader` and appends its canonical form (without the final newline).
-	public static Result<void, JsonParseError> Write(JsonReader reader, String output)
+	/// With `errors` (a reader with CollectErrors), each error is appended to it as a line
+	/// `line:column: Kind: message` and the read goes on until the reader stops.
+	public static Result<void, JsonParseError> Write(JsonReader reader, String output, String errors = null)
 	{
 		// Whether the open container already has an element (a comma goes before the next)
 		let hasElement = scope List<bool>();
 		bool afterName = false;
 		while (true)
 		{
-			let token = Try!(reader.Next());
+			JsonToken token;
+			switch (reader.Next())
+			{
+			case .Ok(let next):
+				token = next;
+			case .Err(let error):
+				if (errors == null)
+					return .Err(error);
+				errors.AppendF("{}:{}: {}: {}\n", error.mLine, error.mColumn, error.mKind, error.mMessage);
+				if (reader.IsStopped)
+					return .Ok;
+				continue;
+			}
 			if (token == .EndOfDocument)
 				return .Ok;
 			if (token == .EndObject || token == .EndArray)
 			{
 				output.Append(token == .EndObject ? '}' : ']');
 				hasElement.PopBack();
+				afterName = false;
 				continue;
 			}
 			if (afterName)

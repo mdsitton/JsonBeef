@@ -251,7 +251,15 @@ Windows tests, committed (`AGENTS.md`).
    the 32-byte record's measurement and the comparison with the §2.3 targets, waits for a quiet one.*
    Join the four benchmark tracks (`JsonBeef` columns), profile, fast paths; measure the
    `u8x16` scan and the 32-byte record. Targets from §2.3.
-4. **Errors, positions, limits, streams, collect-errors.**
+4. **Errors, positions, limits, streams, collect-errors.** *Done (2026-10-02): errors located in
+   document order and identical from memory and streams (UTF-8 is checked in the string scan since
+   phase 3); `JsonDiagnostic`; `MaxNodes` and `MaxMembers` for documents and an `Untrusted` preset;
+   `JsonMetadataMode.Positions` with value and name ranges (line and column from a lazy line index for
+   memory input, located while reading for streams); collect-errors with reader recovery (balanced
+   tokens, synthetic End tokens, the end closing every container) and `JsonDocument.Errors`. The suite
+   passes in collect and stream-collect modes with the golden first errors; streams fed 1 to 31 bytes
+   per read read every suite input as memory does; 343,000 fuzzed mutations agree across the fast
+   build, the reader, 1-byte streams and collect-errors.*
 5. **JSONC and PreserveStyle, mutation.** Byte-exact round trips of every accepted suite input and of
    JSONC samples; edits keep neighbors.
 6. **`[JsonObject]` and on-demand.** Typed binding from the reader and nodes; the typed and on-demand

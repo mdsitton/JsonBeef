@@ -243,6 +243,14 @@ public class JsonReader
 		output.Append(StringValue);
 	}
 
+	/// The line and column of `offset` (at or after the current token's start for a stream).
+	internal bool Locate(int offset, out int line, out int column)
+	{
+		if (mStreaming)
+			return mStream.mCursor.Locate(offset, out line, out column);
+		return mBytes.mCursor.Locate(offset, out line, out column);
+	}
+
 	/// An error at `offset` of the input, located (for errors found outside the reader: duplicates,
 	/// conversions).
 	internal JsonParseError MakeError(JsonErrorKind kind, StringView message, int offset, int length)

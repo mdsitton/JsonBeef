@@ -39,7 +39,10 @@ the suites in [test-suites.md](test-suites.md). Code conventions and Beef gotcha
 | `JsonStreamCursor.bf` | `JsonBufferedStreamCursor` (a `Stream` through a bounded buffer) and its `JsonStreamState` |
 | `JsonNumber.bf` | `JsonNumberKind`, `JsonFloatFormat`; `JsonNumber`: double/float parsing (Clinger, then corlib's fast_float), int64/uint64 parsing, classification, shortest round-trip output in the plain and ECMAScript layouts |
 | `JsonChar.bf` | Byte classes, SWAR word tests, UTF-8 validation (`FindInvalid`), decode/encode, line and column, character descriptions for messages |
-| `JsonError.bf`, `JsonReadConfig.bf` | `JsonErrorKind`, `JsonParseError` (KdlBeef's model); `JsonReadConfig` (dialect, limits, stream buffer) |
+| `JsonError.bf`, `JsonReadConfig.bf` | `JsonErrorKind`, `JsonParseError` (KdlBeef's model); `JsonReadConfig` (dialect, metadata, collect-errors, limits, stream buffer), `JsonMetadataMode`, `JsonDuplicateNames` |
+| `JsonDiagnostic.bf` | `JsonDiagnostic`: an error that owns its text |
+| `JsonDocument.Positions.bf` | `JsonSourceRange`, `JsonRangeRecord`; the line index, `TryGetSourceRange`/`TryGetNameRange` |
+| `JsonDocument.Fast.bf` | The fast build for memory input (phase 3) |
 
 Tests are in `src/JsonBeef/tests/`: `JsonEdgeCaseTests` (spec-reference §16, one test per edge case,
 numbered as there; each input is read from memory and through 1-byte stream reads, which must agree),
@@ -92,6 +95,37 @@ The value after the root is checked by the call that returns `EndOfDocument`; co
 choice). Messages name what was expected and what was found (a character by its code point and name
 when it is invisible: `U+000C (form feed)`), and common mistakes get their own wording (a trailing
 comma, `'` strings, `+1`, `.5`, `NaN`, `True`, leading zeros, a number running into letters).
+
+### Collect-errors
+
+With `JsonReadConfig.CollectErrors` an error does not stop the read: `NextToken` returns it and calls
+`Recover` (in `AfterError`), which puts the reader where the next call can go on; recovery never fails
+and never makes an error itself (the pending one's message is in the per-thread buffer). It is
+anchored at the error's offset (a stream's position may have moved past it inside the broken token),
+and an error at or before the last one's offset resynchronizes a byte further, so recovery always
+progresses. By what was expected:
+
+- **inside a string** (`mStringStart`): past its closing quote, or to a raw line break (a string not
+  closed on its line); a broken member name takes its member (`:` and value) with it;
+- **a value**: a `,` or closing bracket where a value should be is read as what follows a value (a
+  missing value: `[1,,2]`, a trailing comma); anything else, a broken literal or number or garbage, is
+  skipped to the next whitespace, `"` or structural character;
+- **a member name**: `}` closes (a trailing comma), `,` is skipped, anything else skips the member;
+- **`:`**: assumed when a value follows; at `,` or `}` the name is left without a value;
+- **`,` or a closing bracket**: assumed when a value (or in an object a name) follows; a closing
+  bracket of the wrong kind closes the containers inside the one it matches, with empty End tokens
+  first (`State.Closing`, `mPendingCloses`), or is skipped when nothing open matches;
+- **the end of the input** anywhere: every open container gets its End token, then the end of the
+  document (`mClosingAtEnd`); content after the document's value ends the read.
+
+So tokens stay balanced: every Start gets its End. A member name may be followed by the next name or
+the object's end when its value was broken; JsonDocument drops such a name. UTF-16/32 input, I/O
+errors, resource limits and `MaxErrors` (default 100) still stop the read. `JsonDocument` keeps what it
+read and the errors (`Errors`, their text copied into its arena) and returns the first; `JsonDiagnostic`
+keeps an error with its own copy of the text. The suite runs in two more modes with it (`collect`,
+`stream-collect`: the first error must be the golden one), and `test-json-fuzz.sh` requires the same
+errors and the same recovered document from memory and from 1-byte stream reads. The normal path pays
+one store per string (`mStringStart`).
 
 ### Tokens
 
@@ -211,6 +245,21 @@ through splitmix64) so colliding names cannot be prepared in advance; a name map
 The other policies act while building: `Error` fails at the second name (located at it), `LastWins`
 unlinks the earlier member, `FirstWins` reads the later value and leaves it unlinked (`Removed`);
 past 16 members the index answers the duplicate checks and is kept up to date as members are appended.
+
+### Positions and limits
+
+With `JsonMetadataMode.Positions` the builder records a `JsonRangeRecord` per node ID (the value's
+offset and length, its member name's, and for a stream the line and column, located as it reads: a
+stream keeps no source), in a side table that stays empty otherwise. From memory the document keeps
+its copy of the source anyway, so line and column are computed only when asked
+(`JsonNode.TryGetSourceRange`, `TryGetNameRange`), from an index of line starts built on first use
+(LF, CR and CRLF; a leading BOM takes no column; an offset on a CRLF's LF is on its line). Arrays and
+objects span their brackets; strings and names their quotes. Positions and collect-errors read with
+the reader's builder (the fast build serves the plain mode only).
+
+`JsonDocument` adds two limits to the reader's: `MaxNodes` (values, against memory amplification such
+as `[[],[],…]`) and `MaxMembers` (per object), each a located `ResourceLimitExceeded`. The `Untrusted`
+preset sets every limit and rejects duplicate names.
 
 ### JSON Pointer
 

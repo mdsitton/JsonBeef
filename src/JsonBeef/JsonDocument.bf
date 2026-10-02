@@ -99,6 +99,8 @@ public class JsonDocument
 	/// Member indexes of large objects, by object ID.
 	internal Dictionary<uint32, JsonMemberIndex> mIndexes ~ DeleteDictionaryAndValues!(_);
 	String mSourceName ~ delete _;
+	/// The errors of the last read with CollectErrors (their text in the arena).
+	List<JsonParseError> mErrors ~ delete _;
 	/// The reader behind Read, kept for its buffers.
 	JsonReader mReader ~ delete _;
 
@@ -110,8 +112,23 @@ public class JsonDocument
 		mStrings = new .();
 		mIndexes = new .();
 		mSourceName = new .();
+		mErrors = new .();
 		mNodes.Add(default);
 		mGeneration = 1;
+	}
+
+	/// @brief The errors of the last read with JsonReadConfig.CollectErrors, in order (empty otherwise,
+	/// or when it read without error); Read returns the first. Their text belongs to the document (valid
+	/// until it is cleared or read again; JsonDiagnostic copies one).
+	public Span<JsonParseError> Errors => mErrors;
+
+	/// Keeps an error of a read with CollectErrors, its text copied into the arena.
+	void AddError(JsonParseError error)
+	{
+		var error;
+		error.mMessage = mText.Copy(error.mMessage);
+		error.mSource = mText.Copy(error.mSource);
+		mErrors.Add(error);
 	}
 
 	/// @brief The document's value; an invalid handle when the document is empty.
@@ -141,6 +158,9 @@ public class JsonDocument
 		mSourceLength = 0;
 		mRoot = 0;
 		mSourceName.Clear();
+		mRanges.Clear();
+		mLineStarts.Clear();
+		mErrors.Clear();
 		mGeneration++;
 	}
 
@@ -243,7 +263,8 @@ public class JsonDocument
 		mSourceLength = owned.Length;
 		mNodes.Reserve(owned.Length / 8 + 16);
 		// The fast build first (JsonDocument.Fast.bf); at any problem, the reader reads again and reports it
-		if (config.DuplicateNames == .KeepAll && (config.MaxInputBytes <= 0 || owned.Length <= config.MaxInputBytes))
+		if (config.DuplicateNames == .KeepAll && config.MetadataMode == .None && !config.CollectErrors &&
+			(config.MaxInputBytes <= 0 || owned.Length <= config.MaxInputBytes))
 		{
 			if (JsonInputStart.Check(owned.Ptr, owned.Length, config.AllowBom) case .Ok(let start) && FastBuild(owned.Ptr, start, owned.Length, config))
 				return .Ok;
@@ -350,7 +371,8 @@ public class JsonDocument
 	{
 		// Nothing may keep viewing the caller's input or stream
 		mReader.Reset(StringView());
-		if (result case .Err)
+		// Collect-errors keeps what was read
+		if (result case .Err && mErrors.IsEmpty)
 		{
 			let sourceName = scope String(mSourceName);
 			Clear();
@@ -368,8 +390,17 @@ public class JsonDocument
 		bool parentIsObject = false;
 		uint64 name = 0;
 		bool nameInTable = false;
+		bool hasName = false;
 		bool discard = false;
 		let duplicates = config.DuplicateNames;
+		bool positions = config.MetadataMode == .Positions;
+		// Positions: the pending name's range, and the line and column of what a stream read locates
+		int64 nameOffset = 0;
+		int32 nameLength = 0;
+		int nameLine = 0;
+		int nameColumn = 0;
+		if (positions)
+			mRanges.Add(.());
 		while (true)
 		{
 			JsonToken token;
@@ -378,12 +409,29 @@ public class JsonDocument
 			case .Ok(let next):
 				token = next;
 			case .Err:
-				return .Err(core.mError);
+				if (!config.CollectErrors)
+					return .Err(core.mError);
+				// Kept with its text; the read goes on unless the error stopped it
+				AddError(core.mError);
+				if (core.IsStopped)
+					return .Err(mErrors[0]);
+				continue;
 			}
 			switch (token)
 			{
 			case .PropertyName:
+				if (config.MaxMembers > 0 && mNodes[parent].Count >= config.MaxMembers)
+					return .Err(reader.MakeError(.ResourceLimitExceeded, scope $"The object has more than MaxMembers ({config.MaxMembers}) members", core.mTokenStart, core.mTokenEnd - core.mTokenStart));
+				// (With CollectErrors a name whose value was broken is followed by the next name: dropped)
+				hasName = true;
 				name = TextRef(core, viewSource, out nameInTable);
+				if (positions)
+				{
+					nameOffset = core.mTokenStart;
+					nameLength = (int32)(core.mTokenEnd - core.mTokenStart);
+					if (!viewSource)
+						reader.Locate(core.mTokenStart, out nameLine, out nameColumn);
+				}
 				if (duplicates != .KeepAll)
 				{
 					uint32 existing = FindMember(parent, core.mValue);
@@ -408,13 +456,21 @@ public class JsonDocument
 				}
 				continue;
 			case .EndObject, .EndArray:
+				if (positions)
+					mRanges[parent].mLength = (int32)(core.mTokenEnd - mRanges[parent].mOffset);
 				parent = mNodes[parent].mParent;
 				parentIsObject = parent != 0 && mNodes[parent].mKind == .Object;
+				hasName = false;
+				discard = false;
 				continue;
 			case .EndOfDocument:
+				if (!mErrors.IsEmpty)
+					return .Err(mErrors[0]);
 				return .Ok;
 			default:
 			}
+			if (config.MaxNodes > 0 && mNodes.Count > config.MaxNodes)
+				return .Err(reader.MakeError(.ResourceLimitExceeded, scope $"The document has more than MaxNodes ({config.MaxNodes}) values", core.mTokenStart, core.mTokenEnd - core.mTokenStart));
 			uint32 id = (uint32)mNodes.Count;
 			ref JsonNodeRecord node = ref mNodes.AddDefault();
 			node.mParent = parent;
@@ -440,15 +496,38 @@ public class JsonDocument
 				node.mKind = .Null;
 			default:
 			}
+			if (positions)
+			{
+				JsonRangeRecord range = .();
+				range.mOffset = core.mTokenStart;
+				range.mLength = (int32)(core.mTokenEnd - core.mTokenStart);
+				range.mNameLength = -1;
+				if (parentIsObject && hasName)
+				{
+					range.mNameOffset = nameOffset;
+					range.mNameLength = nameLength;
+					range.mNameLine = (int32)nameLine;
+					range.mNameColumn = (int32)nameColumn;
+				}
+				if (!viewSource)
+				{
+					reader.Locate(core.mTokenStart, var line, var column);
+					range.mLine = (int32)line;
+					range.mColumn = (int32)column;
+				}
+				mRanges.Add(range);
+			}
 			if (parent == 0)
 				mRoot = id;
 			else
 			{
 				if (parentIsObject)
 				{
-					node.mName = name;
-					if (nameInTable)
+					// (A value in an object always follows its name, but after recovery: then it has none)
+					node.mName = hasName ? name : 0;
+					if (nameInTable && hasName)
 						node.mFlags |= .NameInTable;
+					hasName = false;
 				}
 				if (discard)
 				{

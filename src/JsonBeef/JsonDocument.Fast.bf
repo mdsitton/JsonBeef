@@ -23,6 +23,9 @@ extension JsonDocument
 		const int cAfterValue = 1;
 		const int cName = 2;
 		int maxDepth = config.MaxDepth;
+		// Past these, the reader's builder reports the limit
+		int maxNodes = config.MaxNodes > 0 ? config.MaxNodes + 1 : int.MaxValue;
+		int maxMembers = config.MaxMembers > 0 ? config.MaxMembers : int.MaxValue;
 		int p = start;
 		int state = cValue;
 		uint32 parent = 0;
@@ -42,7 +45,7 @@ extension JsonDocument
 			{
 			case cValue:
 				p = SkipSpace(data, p, end);
-				if (p >= end)
+				if (p >= end || count >= maxNodes)
 					return false;
 				if (count == capacity)
 				{
@@ -153,7 +156,7 @@ extension JsonDocument
 				inObject = parent != 0 && nodes[parent].mKind == .Object;
 			case cName:
 				p = SkipSpace(data, p, end);
-				if (p >= end || data[p] != '"')
+				if (p >= end || data[p] != '"' || nodes[parent].Count >= maxMembers)
 					return false;
 				p = FastString(data, p, end, config.MaxStringBytes, out name, out nameInTable);
 				if (p < 0)
