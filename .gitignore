@@ -36,3 +36,5 @@ bench/compare/zig/zig-out/
 bench/compare/c/build/
 bench/compare/cpp/build/
 bench/compare/beef/build/
+# Copied from the installed Beef by bench/compare/fetch.sh (Beef's own source)
+bench/compare/beef/src/beefy/
