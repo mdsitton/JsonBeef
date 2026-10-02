@@ -1,0 +1,15 @@
+# The nst i_ cases JsonBeef accepts by default (docs/test-suites.md §1.2); every other i_ case must be
+# rejected. Numbers of any size are valid JSON (overflow is reported by GetDouble, not by the reader),
+# 500 levels are within MaxDepth = 1024, and one leading BOM is skipped.
+i_number_double_huge_neg_exp
+i_number_huge_exp
+i_number_neg_int_huge_exp
+i_number_pos_double_huge_exp
+i_number_real_neg_overflow
+i_number_real_pos_overflow
+i_number_real_underflow
+i_number_too_big_neg_int
+i_number_too_big_pos_int
+i_number_very_big_negative_int
+i_structure_500_nested_arrays
+i_structure_UTF-8_BOM_empty_object

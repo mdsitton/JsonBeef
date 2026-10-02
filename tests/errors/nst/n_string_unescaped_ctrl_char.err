@@ -1,0 +1,1 @@
+1:4: ControlCharacterInString: The control character U+0000 (NUL) must be escaped in a string

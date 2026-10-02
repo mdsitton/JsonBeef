@@ -1,0 +1,1 @@
+1:29: InvalidEscape: Invalid escape: `\` followed by `x` (JSON's escapes are `\"` `\\` `\/` `\b` `\f` `\n` `\r` `\t` and `\uXXXX`)

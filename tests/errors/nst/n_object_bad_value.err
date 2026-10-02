@@ -1,0 +1,1 @@
+1:7: InvalidLiteral: Invalid literal `truth` (JSON's literals are `true`, `false` and `null`)

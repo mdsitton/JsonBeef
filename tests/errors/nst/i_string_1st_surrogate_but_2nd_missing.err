@@ -1,0 +1,1 @@
+1:3: InvalidSurrogate: The escape `\uDADA` is a high surrogate without an escaped low surrogate (`\uDC00`-`\uDFFF`) after it (a lone surrogate is not Unicode text)

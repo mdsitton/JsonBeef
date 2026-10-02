@@ -1,0 +1,1 @@
+1:3: InvalidSurrogate: The escape `\uDd1e` is a low surrogate without a high surrogate before it (a lone surrogate is not Unicode text)

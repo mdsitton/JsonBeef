@@ -1,0 +1,1 @@
+1:3: InvalidEscape: Invalid escape: `\` followed by U+0009 (tab) (JSON's escapes are `\"` `\\` `\/` `\b` `\f` `\n` `\r` `\t` and `\uXXXX`)

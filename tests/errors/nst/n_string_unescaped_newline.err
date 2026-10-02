@@ -1,0 +1,1 @@
+1:6: ControlCharacterInString: The control character U+000A (line feed) must be escaped in a string

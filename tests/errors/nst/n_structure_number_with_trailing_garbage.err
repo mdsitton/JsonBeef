@@ -1,0 +1,1 @@
+1:2: InvalidStructure: Expected the end of the input after the JSON value (a document holds one value), found `@`

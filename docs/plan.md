@@ -220,7 +220,14 @@ whitespace, comments and trailing commas.
 Each ends with Debug and Release tests, the leak check, the suite scripts on both binaries and the
 Windows tests, committed (`AGENTS.md`).
 
-1. **Reader and suite runner.** Cursor, validation, tokenizer, number classification, `JsonReader`,
+1. **Reader and suite runner.** *Done (2026-10-02): nst 95 `y_` accepted, 188 `n_` rejected, the 35
+   `i_` as in `test-suites.md` §1.2 (12/23); transform 16/6; JSON_checker 5/31; simdjson jsonchecker
+   33/75 and 1,457/1,457 adversarial rejected; nativejson 27; json5-tests strict 25/89; every accepted
+   case equal to the oracle's canonical form and every rejected one to its golden message, from memory
+   and through 1- and 16-byte stream reads, in Debug and Release; fxx 1,414,116 numbers bit-exact in
+   f64 and f32 and es6 100,000 lines both ways. The full number corpora run in Debug too (4 s), so
+   there is no subsampling; `-stream 1` feeds 1-byte reads through the 16-byte minimum buffer.*
+   Cursor, validation, tokenizer, number classification, `JsonReader`,
    `JsonTester` printing the canonical form (`test-suites.md` §9.2), `test-json-suite.sh` and
    `test-json-numbers.sh`. Done when every suite passes at its §2.4 strength and the number corpora
    round-trip exactly.

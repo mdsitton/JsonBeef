@@ -1,0 +1,1 @@
+1:3: InvalidSurrogate: The escape `\uD800` is a high surrogate followed by `\uD800`, which is not a low surrogate (`\uDC00`-`\uDFFF`)

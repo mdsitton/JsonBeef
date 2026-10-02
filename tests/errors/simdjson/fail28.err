@@ -1,0 +1,1 @@
+1:7: InvalidEscape: Invalid escape: `\` followed by U+000A (line feed) (JSON's escapes are `\"` `\\` `\/` `\b` `\f` `\n` `\r` `\t` and `\uXXXX`)

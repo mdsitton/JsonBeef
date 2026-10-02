@@ -1,0 +1,1 @@
+1:2: InvalidNumber: `Infinity` is not a JSON number (non-finite numbers are not allowed)
