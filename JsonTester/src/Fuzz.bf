@@ -210,7 +210,18 @@ static class Fuzz
 		if (!json5Agrees)
 			Console.WriteLine($"  json5: document {i5.Substring(0, Math.Min(i5.Length, 200))} / stream {j5.Substring(0, Math.Min(j5.Length, 200))} / reader {k5.Substring(0, Math.Min(k5.Length, 200))} / skip {l5}");
 
-		if (a == b && b == c && d == e && firstAgrees && skipsAgree && lenientAgrees && json5Agrees)
+		// Push input fed a byte at a time: the reader's tokens exactly
+		let pushed = scope String();
+		if (Push.Canonical(text, 1, .(), pushed) case .Err(let pushError))
+		{
+			pushed.Clear();
+			pushed.AppendF("error {} {}:{} @{}", pushError.mKind, pushError.mLine, pushError.mColumn, pushError.mOffset);
+		}
+		bool pushAgrees = pushed == b;
+		if (!pushAgrees)
+			Console.WriteLine($"  push: {pushed.Substring(0, Math.Min(pushed.Length, 200))}");
+
+		if (a == b && b == c && d == e && firstAgrees && skipsAgree && lenientAgrees && json5Agrees && pushAgrees)
 			return true;
 		Console.WriteLine($"  document: {a.Substring(0, Math.Min(a.Length, 200))}");
 		Console.WriteLine($"  reader:   {b.Substring(0, Math.Min(b.Length, 200))}");

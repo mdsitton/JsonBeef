@@ -34,6 +34,10 @@ internal interface IJsonCursor
 
 	/// Whether the whole input is in the window from the start (memory): a stream's is not.
 	bool IsWhole { get; }
+
+	/// Push input (JsonPushReader): whether Begin or Fill ran out of what has been fed so far, input
+	/// that is not finished, since the last call; clears it. Memory and streams never run out that way.
+	bool TakeStarved() mut;
 }
 
 /// Counts lines forward through the input, and columns only when asked (XmlBeef's XmlLineCounter):
@@ -211,6 +215,9 @@ internal struct JsonByteCursor : IJsonCursor
 		[Inline]
 		get => true;
 	}
+
+	[Inline]
+	public bool TakeStarved() mut => false;
 
 	public bool Locate(int offset, out int line, out int column) mut
 	{

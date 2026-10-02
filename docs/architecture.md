@@ -7,13 +7,13 @@ the suites in [test-suites.md](test-suites.md). Code conventions and Beef gotcha
 ## 1. Overview
 
 - A JSON (RFC 8259) library for Beef. Today it has a **pull reader** (`JsonReader`) over UTF-8 bytes in
-  memory or a `Stream`, with on-demand `SkipValue`, `ReadRaw` and `Find`; number conversion and
+  memory or a `Stream`, with on-demand `SkipValue`, `ReadRaw` and `Find`, and a fed **push reader**
+  (`JsonPushReader`); number conversion and
   formatting (`JsonNumber`); a **document** built on the reader (`JsonDocument` with `JsonNode`
   handles, lookups, JSON Pointer, mutation, positions, PreserveStyle); **writers**: the streaming
   `JsonWriter` (compact or indented) and the document's `Write`, also in RFC 8785 canonical form;
   JSONC and JSON5; **sequences** (JSON Lines, concatenated, RFC 7464); and **typed mapping**
-  (`[JsonObject]`, `JsonSerializer`) bound straight from the reader. Push streaming and Patch follow
-  `plan.md` §6.
+  (`[JsonObject]`, `JsonSerializer`) bound straight from the reader. Patch follows `plan.md` §6.
 - **Strict and complete.** Every token is validated when it is read: UTF-8, the grammar, escapes,
   surrogate pairs, the number grammar. Nothing is skipped for speed. The first error stops the read
   with a located `JsonParseError` (kind, message, line, column in code points, byte offset, length,
@@ -40,6 +40,7 @@ the suites in [test-suites.md](test-suites.md). Code conventions and Beef gotcha
 | `JsonReaderCore.bf` | `JsonFailure`; `JsonReaderCore<TCursor>`: the state machine, the container bit stack, literals, numbers, strings and escapes, whitespace, the window helpers, `Fail`; on demand: `SkipValue` and its fast loop, `ReadRaw`, `PeekMember` |
 | `JsonReaderCore.Json5.bf`, `JsonIdentifierTables.bf` | JSON5's whitespace, strings, member names and numbers; the generated identifier ranges |
 | `JsonSequenceReader.bf` | `JsonSequenceMode`; `JsonSequenceReader`: JSON Lines, concatenated and RFC 7464 sequences |
+| `JsonPushReader.bf` | `JsonPushState`, `JsonPushCursor` (fed input); `JsonPushReader`: `Feed`, `Finish`, `Next` |
 | `JsonCursor.bf` | `IJsonCursor`, `JsonLineCounter`, `JsonInputStart` (UTF-16/32 detection, the BOM), `JsonByteCursor` (in memory) |
 | `JsonStreamCursor.bf` | `JsonBufferedStreamCursor` (a `Stream` through a bounded buffer) and its `JsonStreamState` |
 | `JsonNumber.bf` | `JsonNumberKind`, `JsonFloatFormat`; `JsonNumber`: double/float parsing (Clinger, then corlib's fast_float), int64/uint64 parsing, grammar check and classification, shortest round-trip output of doubles and floats in the plain and ECMAScript layouts |
@@ -59,9 +60,10 @@ the suites in [test-suites.md](test-suites.md). Code conventions and Beef gotcha
 Tests are in `src/JsonBeef/tests/`: `JsonEdgeCaseTests` (spec-reference §16, one test per edge case,
 numbered as there; each input is read from memory and through 1-byte stream reads, which must agree),
 `JsonReaderTests` (API, limits, streams, number layouts), `JsonDocumentTests` (the document, the
-writers), `JsonCollectTests`, `JsonPreserveTests`, `JsonObjectTests` and `JsonOnDemandTests`, with
-`JsonTestUtil` (the trace helpers and a trickling test stream). The CLI is `JsonTester/src/`
-(`Program.bf`, `Canonical.bf`, `Numbers.bf`, `TrickleStream.bf`, `Bench.bf`, `Fuzz.bf`, `Mutate.bf`);
+writers), `JsonCollectTests`, `JsonPreserveTests`, `JsonObjectTests`, `JsonOnDemandTests` and
+`JsonPushTests`, with `JsonTestUtil` (the trace helpers and a trickling test stream). The CLI is
+`JsonTester/src/` (`Program.bf`, `Canonical.bf`, `Numbers.bf`, `TrickleStream.bf`, `Push.bf`,
+`Bench.bf`, `Fuzz.bf`, `Mutate.bf`);
 the scripts are `test-json-suite.sh`, `test-json-corpus.sh`, `test-json-numbers.sh`,
 `test-json-fuzz.sh`, `test-roundtrip.sh`, `test-json-lines.sh` and `test-leaks.sh`, and
 `tests/tools/json-canonical.py` (with `json5-canonical.py` for JSON5) is the independent oracle of the
@@ -177,6 +179,28 @@ json5 2.2.3's (36 nst `n_` cases, 83 json5-tests files).
 `-lines`, `-concatenated` and `-rs` print one canonical line per value and each error as
 `record N: line:column: ...`; `test-json-lines.sh` compares them with the oracle's `-lines` and
 `-concatenated` on the ndjson corpora, every nst case and generated inputs, from memory and streams.
+
+### Push input
+
+`JsonPushReader` is the reader fed rather than pulling: `Feed` appends bytes, `Next` returns a token
+or `None` when it needs more, `Finish` marks the end. It runs the same core over a third cursor,
+`JsonPushCursor`, whose window is every byte fed and not yet dropped (`JsonPushState` owns the
+buffer, its absolute base offset and the line count of what was dropped). Where the core would read
+past the window, Begin and Fill note that they are starved instead of failing (unless the input is
+finished, when the window's end is the input's end), and `NextTokenPush` takes the token back: it
+snapshots everything a token can change (position, state, depth, the string start, pending closes,
+the last error offset) and restores it, so the next `Next` after a `Feed` reads the token again from
+its first byte. Tokens, values and errors are therefore those of a whole-input read, at any chunk
+size; a number at the end of what was fed waits for more input or for `Finish`, and the encoding is
+decided on the first four bytes (a BOM, UTF-16/32), so nothing is reported before them.
+
+Re-reading a token after every feed would be quadratic for a long string fed a byte at a time, so a
+token cut off inside a string waits until a `"` arrives past where the last scan stopped (`mScanFrom`)
+before trying again. Bytes before the core's `KeepFrom` (the current token, or a value being skipped
+or retained) are dropped after each token, counting their lines first; `RefreshWindow` rebases the
+core and its views after a Feed has moved the buffer. MaxInputBytes counts every byte fed;
+MaxTokenBytes bounds what one token holds back: the window given to the core ends MaxTokenBytes past
+the token's start, so a longer token reaches Fill's limit check rather than waiting forever.
 
 ### Non-finite numbers, replacement, I-JSON
 
@@ -553,7 +577,8 @@ shared stack, so it is iterative too.
 - `test-json-suite.sh` runs JSONTestSuite (parsing and transform), JSON_checker, simdjson-data's
   jsonchecker and adversarial files, nativejson's round-trip files and json5-tests (strict) through
   `JsonTester` in each mode of `MODES`: the document, the reader's tokens, a document from 1-byte stream
-  reads and tokens from 16-byte reads (through a 16-byte buffer, `TrickleStream`), and the compact and
+  reads and tokens from 16-byte reads (through a 16-byte buffer, `TrickleStream`), tokens from a
+  JsonPushReader fed 1 and 7 bytes at a time (`-push N`), and the compact and
   indented rewrites (written, read back). Accepted cases must print their canonical form exactly as the
   independent oracle (`tests/tools/json-canonical.py`, Python's `json` with hooks that keep number text
   and member order) computes it; rejected ones must print their golden first error line
@@ -572,14 +597,16 @@ shared stack, so it is iterative too.
   too: about 4 seconds, so test-suites.md §3.1's Debug subsampling is not needed.
 - `test-json-fuzz.sh` first reads every suite input through streams fed 1 to 31 bytes per read (the
   memory read's outcome every time), then mutates every input at random and requires one outcome from
-  the fast build, the reader, a 1-byte stream, collect-errors from memory and from a stream, and
+  the fast build, the reader, a 1-byte stream, a push reader fed 1 byte at a time, collect-errors from
+  memory and from a stream, and
   SkipValue (its fast loop from memory, the token loop from a stream). `test-roundtrip.sh` writes every
   accepted input back with PreserveStyle (byte for byte) and checks random edits (`-mutate`).
 - The `[Test]`s: `JsonEdgeCaseTests` (spec-reference §16), `JsonReaderTests`, `JsonDocumentTests`,
   `JsonCollectTests`, `JsonPreserveTests` (with ported jsonc-parser edit cases), `JsonObjectTests`
   (every field shape, names, errors with paths, duplicates, polymorphism, converters, allocators,
-  files, documents in place) and `JsonOnDemandTests` (SkipValue, ReadRaw, Find, from memory and
-  streams). They run in Debug and TestRelease on Linux and Windows (the Windows Debug runtime's leak
+  files, documents in place), `JsonOnDemandTests` (SkipValue, ReadRaw, Find, from memory and
+  streams) and `JsonPushTests` (every chunk size against the memory read, waiting for whole tokens,
+  limits). They run in Debug and TestRelease on Linux and Windows (the Windows Debug runtime's leak
   check at exit catches what LeakSanitizer can miss), and under LeakSanitizer (`test-leaks.sh`).
 - `bench/compare` checks every JsonBeef column's check line against `reference.py` (all four tracks),
   and `bench/instructions.sh` counts instructions per byte, which the load does not change.

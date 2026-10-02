@@ -185,6 +185,75 @@ internal class JsonReaderCore<TCursor> where TCursor : IJsonCursor
 		return result;
 	}
 
+	/// Push input: the next token if the bytes fed so far hold all of it, else (`starved`) nothing: the
+	/// reader goes back to before the token, as if it had not started, to read it again once more is
+	/// fed or the input is finished. So a token is read only whole, with the same result as from memory.
+	/// The token is then None: what the previous one held may already be overwritten.
+	public Result<JsonToken, JsonFailure> NextTokenPush(out bool starved)
+	{
+		starved = false;
+		if (mState == .Failed)
+			return .Err(.());
+		// Everything a token can change before it turns out to be cut off
+		int pos = mPos;
+		State state = mState;
+		int depth = mDepth;
+		int stringStart = mStringStart;
+		bool stringIsName = mStringIsName;
+		int pendingCloses = mPendingCloses;
+		bool closingAtEnd = mClosingAtEnd;
+		int lastErrorOffset = mLastErrorOffset;
+		mCursor.TakeStarved();
+		let result = ReadNext();
+		if (mCursor.TakeStarved())
+		{
+			// (Cut off inside a string: only a `"` fed later can end it)
+			mStarvedInString = mStringStart >= 0;
+			// No token: the previous one's values may be gone (its decoded text, its number's parts)
+			mPos = pos;
+			mState = state;
+			mDepth = depth;
+			mToken = .None;
+			mTokenStart = pos;
+			mTokenEnd = pos;
+			mValue = default;
+			mRaw = default;
+			mEscaped = false;
+			mStringStart = stringStart;
+			mStringIsName = stringIsName;
+			mPendingCloses = pendingCloses;
+			mClosingAtEnd = closingAtEnd;
+			mLastErrorOffset = lastErrorOffset;
+			mInputFailed = false;
+			starved = true;
+			return .Ok(.None);
+		}
+		if (result case .Err)
+			AfterError();
+		return result;
+	}
+
+	/// Push input: the last NextTokenPush ran out inside a string.
+	public bool mStarvedInString;
+
+	/// Push input: where the bytes the reader still needs start (the current token, or what is being
+	/// read). Bytes before it may be dropped.
+	public int KeepFrom => Math.Min(Math.Min(mRetain, mHold), mPos);
+
+	/// Push input: takes in the window as it is after a Feed (moved, longer, or finished), moving the
+	/// token's views with it.
+	public void RefreshWindow()
+	{
+		if (mData == null)
+			return;
+		char8* oldData = mData;
+		int oldBase = mBase;
+		int oldEnd = mEnd;
+		mCursor.Fill(ref mData, ref mBase, ref mEnd, KeepFrom, mPos, 0);
+		if (mData != oldData)
+			RebaseViews(oldData, oldBase, oldEnd);
+	}
+
 	/// Whether the read has stopped at an error.
 	public bool IsStopped => mState == .Failed;
 

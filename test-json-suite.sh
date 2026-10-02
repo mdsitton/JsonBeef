@@ -20,11 +20,13 @@
 # same in every mode; UPDATE_GOLDEN=1 writes them from the first mode's output: review the diff).
 # Adversarial cases need no golden message. Any other exit status (a crash) or a timeout is a failure.
 #
-# Every case runs in each of MODES (default "document events stream1 stream16 rewrite rewrite-pretty"):
+# Every case runs in each of MODES (default "document events stream1 stream16 push1 push7 rewrite
+# rewrite-pretty collect stream-collect preserve"):
 # document builds a JsonDocument and prints from it; events prints straight from JsonReader's tokens;
 # stream1 builds the document from a Stream fed in 1-byte reads, stream16 reads events from 16-byte
 # reads (both through a 16-byte buffer, so refills land inside numbers, literals, escapes, surrogate
-# pairs and UTF-8 sequences); rewrite and rewrite-pretty write the document compact or indented, read
+# pairs and UTF-8 sequences); push1 and push7 feed a JsonPushReader 1 or 7 bytes at a time (a token cut
+# off waits for the rest); rewrite and rewrite-pretty write the document compact or indented, read
 # that back and print it (the writer must keep everything; exit 3 if its output is rejected); collect
 # and stream-collect read with JsonReadConfig.CollectErrors from memory and from 1-byte stream reads
 # (the first error must still be the golden one, and recovery must finish); preserve reads with
@@ -49,7 +51,7 @@
 
 BIN="${BIN:-./build/Debug_Linux64/JsonTester/JsonTester}"
 SUITES="${SUITES:-tests/suites}"
-MODES="${MODES:-document events stream1 stream16 rewrite rewrite-pretty collect stream-collect preserve}"
+MODES="${MODES:-document events stream1 stream16 push1 push7 rewrite rewrite-pretty collect stream-collect preserve}"
 EXPECTED="tests/expected-failures.txt"
 SKIP="tests/suites-skip.txt"
 LOGFILE="test-json-suite.log"
@@ -172,6 +174,8 @@ for mode in $MODES; do
 	rewrite-pretty) flag="-rewrite-pretty" ;;
 	collect) flag="-collect" ;;
 	stream-collect) flag="-collect -stream 1" ;;
+	push1) flag="-push 1" ;;
+	push7) flag="-push 7" ;;
 	preserve) flag="-preserve" ;;
 	*) echo "ERROR: unknown mode $mode"; exit 1 ;;
 	esac

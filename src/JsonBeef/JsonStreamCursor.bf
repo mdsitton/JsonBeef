@@ -243,6 +243,9 @@ internal struct JsonBufferedStreamCursor : IJsonCursor
 		get => false;
 	}
 
+	[Inline]
+	public bool TakeStarved() mut => false;
+
 	public bool Locate(int offset, out int line, out int column) mut
 	{
 		line = 0;

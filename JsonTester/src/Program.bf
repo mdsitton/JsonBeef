@@ -14,7 +14,8 @@ namespace JsonTester;
 ///
 /// Reading modes: -document (the default: build a JsonDocument, print from it), -events (print straight
 /// from JsonReader's tokens), -stream N (read the file as a Stream in reads of N bytes, through an
-/// N-byte buffer or the reader's minimum of 16; with either mode).
+/// N-byte buffer or the reader's minimum of 16; with either mode), -push N (feed a JsonPushReader N
+/// bytes at a time and print from its tokens).
 /// Output modes (from the document): -rewrite (write compact, read that back, print its canonical form;
 /// exit 3 if the writer's output is rejected), -rewrite-pretty (the same, indented), -compact and
 /// -pretty (print the writer's output as is), -jcs (RFC 8785), -pointer P (the canonical form of the
@@ -70,6 +71,8 @@ class Program
 		int mutateSeed = 0;
 		// A JsonSequenceMode, or -1 for one document
 		int sequence = -1;
+		// -push N: fed to a JsonPushReader N bytes at a time (0: not)
+		int pushChunk = 0;
 		bool skipEmpty = false;
 		String path = null;
 		for (int i < args.Count)
@@ -77,6 +80,11 @@ class Program
 			let arg = args[i];
 			if (arg == "-events")
 				events = true;
+			else if (arg == "-push" && i + 1 < args.Count && int.Parse(args[i + 1]) case .Ok(let size))
+			{
+				pushChunk = Math.Max(size, 1);
+				i++;
+			}
 			else if (arg == "-document" || arg == "-canonical")
 				events = false;
 			else if (arg == "-stream" && i + 1 < args.Count && int.Parse(args[i + 1]) case .Ok(let size))
@@ -254,6 +262,15 @@ class Program
 					anyError = true;
 				}
 			}
+		}
+		if (pushChunk > 0)
+		{
+			if (output != .Canonical || stream != null)
+				return Usage("-push prints the canonical form, from the file read into memory");
+			if (Push.Canonical(text, pushChunk, config, result) case .Err(let pushError))
+				return PrintError(pushError);
+			result.Append('\n');
+			return Print(result);
 		}
 		if (output == .Select)
 		{

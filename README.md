@@ -5,10 +5,11 @@ fully correct by default, fast, with located errors and opt-in JSONC/JSON5/JSON 
 sibling of [TomlBeef](https://github.com/mdsitton/TomlBeef), KdlBeef and XmlBeef.
 
 **Status: in development.** Done: the pull reader (`JsonReader`, memory and streams, with on-demand
-`SkipValue`, `ReadRaw` and `Find`), which passes every conformance suite; the document (`JsonDocument`:
+`SkipValue`, `ReadRaw` and `Find`) and its fed form (`JsonPushReader`), which pass every conformance
+suite; the document (`JsonDocument`:
 lookups, JSON Pointer, mutation, positions, PreserveStyle round trips); the writers (compact, indented,
 RFC 8785); JSONC, JSON5, non-finite numbers, I-JSON and replacement modes; JSON Lines, concatenated
-and RFC 7464 sequences; collect-errors; and typed mapping. Push streaming and Patch are next
+and RFC 7464 sequences; collect-errors; and typed mapping. JSON Patch and Merge Patch are next
 (`docs/status.md`).
 
 ```beef
