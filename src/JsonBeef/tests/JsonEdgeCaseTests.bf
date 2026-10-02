@@ -274,6 +274,18 @@ static class JsonEdgeCaseTests
 	public static void E038_DuplicateNamesKept()
 	{
 		Accepts("{\"a\":1,\"a\":2}", "{ a: 1 a: 2 }");
+		let doc = scope JsonDocument();
+		Test.Assert(doc.Read("{\"a\":1,\"a\":2}") case .Ok);
+		Test.Assert(doc.Root.Count == 2 && doc.Root["a"].GetInt64() == 2);
+		var config = JsonReadConfig();
+		config.DuplicateNames = .Error;
+		Test.Assert(doc.Read("{\"a\":1,\"a\":2}", config) case .Err(let error) && error.mKind == .DuplicateName && error.mLine == 1 && error.mColumn == 8);
+		config.DuplicateNames = .FirstWins;
+		Test.Assert(doc.Read("{\"a\":1,\"a\":2}", config) case .Ok);
+		Test.Assert(doc.Root.Count == 1 && doc.Root["a"].GetInt64() == 1);
+		config.DuplicateNames = .LastWins;
+		Test.Assert(doc.Read("{\"a\":1,\"b\":0,\"a\":2}", config) case .Ok);
+		Test.Assert(doc.Root.Count == 2 && doc.Root["a"].GetInt64() == 2 && doc.Root[0].Name == "b");
 	}
 
 	[Test]
@@ -884,7 +896,58 @@ static class JsonEdgeCaseTests
 		Rejects("\"abc", .UnterminatedString, 1, 5);
 	}
 
-	// Writer number layout (the writer itself is phase 2)
+	// Writer
+
+	/// The compact output of `text` read into a document.
+	static String Written(StringView text, JsonWriteOptions options, String output)
+	{
+		let doc = scope JsonDocument();
+		Test.Assert(doc.Read(text) case .Ok, scope $"`{text}` was rejected");
+		Test.Assert(doc.Write(output, options) case .Ok, scope $"`{text}` could not be written");
+		return output;
+	}
+
+	[Test]
+	public static void E154_InfinityIsAWriteError()
+	{
+		let output = scope String();
+		let writer = scope JsonWriter(output);
+		writer.WriteStartArray();
+		writer.WriteNumber(double.PositiveInfinity);
+		writer.WriteEndArray();
+		Test.Assert(writer.Finish() case .Err(let error) && error.mKind == .NonFiniteNumber);
+		var options = JsonWriteOptions();
+		options.NonFiniteNumbers = .Null;
+		let nulls = scope String();
+		let nullWriter = scope JsonWriter(nulls, options);
+		nullWriter.WriteStartArray();
+		nullWriter.WriteNumber(double.PositiveInfinity);
+		nullWriter.WriteNumber(double.NaN);
+		nullWriter.WriteEndArray();
+		Test.Assert(nullWriter.Finish() case .Ok && nulls == "[null,null]");
+		options.NonFiniteNumbers = .Tokens;
+		let tokens = scope String();
+		let tokenWriter = scope JsonWriter(tokens, options);
+		tokenWriter.WriteStartArray();
+		tokenWriter.WriteNumber(double.NegativeInfinity);
+		tokenWriter.WriteNumber(double.NaN);
+		tokenWriter.WriteEndArray();
+		Test.Assert(tokenWriter.Finish() case .Ok && tokens == "[-Infinity,NaN]");
+	}
+
+	[Test]
+	public static void E155_ControlCharactersEscaped()
+	{
+		Test.Assert(Written("\"\\u0000\\u001f\x7F\"", .(), scope .()) == "\"\\u0000\\u001f\x7F\"");
+	}
+
+	[Test]
+	public static void E156_QuoteBackslashSlash()
+	{
+		Test.Assert(Written("\"\\\"\\\\\\/\"", .(), scope .()) == "\"\\\"\\\\/\"");
+	}
+
+	// Writer number layout
 
 	[Test]
 	public static void E157_EcmaScriptLayout()
@@ -905,6 +968,34 @@ static class JsonEdgeCaseTests
 	}
 
 	[Test]
+	public static void E159_IntegersNotThroughDouble()
+	{
+		Test.Assert(Written("9007199254740993", .(), scope .()) == "9007199254740993");
+		Test.Assert(Written("[-0, -0.0, 1.0, 1E2, 18446744073709551616, 1e400]", .(), scope .()) == "[-0,-0.0,1.0,100.0,18446744073709551616,1e400]");
+	}
+
+	[Test]
+	public static void E160_JcsMemberOrder()
+	{
+		let text = "{\"\u{20AC}\":1,\"\\r\":2,\"\u{FB33}\":3,\"1\":4,\"\u{1F600}\":5,\"\\u0080\":6,\"\u{F6}\":7}";
+		Test.Assert(Written(text, .Jcs, scope .()) == "{\"\\r\":2,\"1\":4,\"\u{80}\":6,\"\u{F6}\":7,\"\u{20AC}\":1,\"\u{1F600}\":5,\"\u{FB33}\":3}");
+		// Duplicates cannot be canonical
+		let doc = scope JsonDocument();
+		Test.Assert(doc.Read("{\"a\":1,\"a\":2}") case .Ok);
+		Test.Assert(doc.Write(scope .(), .Jcs) case .Err(let error) && error.mKind == .DuplicateName);
+	}
+
+	[Test]
+	public static void E161_JcsNumbers()
+	{
+		Test.Assert(Written("[333333333.33333329,1E30,4.50,2e-3,0.000000000000000000000000001]", .Jcs, scope .()) == "[333333333.3333333,1e+30,4.5,0.002,1e-27]");
+		Test.Assert(Written("[-0, 9007199254740993, 18446744073709551616]", .Jcs, scope .()) == "[0,9007199254740992,18446744073709552000]");
+		let doc = scope JsonDocument();
+		Test.Assert(doc.Read("[1e400]") case .Ok);
+		Test.Assert(doc.Write(scope .(), .Jcs) case .Err(let error) && error.mKind == .NumberOutOfRange);
+	}
+
+	[Test]
 	public static void E162_JcsNumberSamples()
 	{
 		(uint64 bits, StringView text)[?] samples = .(
@@ -918,5 +1009,92 @@ static class JsonEdgeCaseTests
 			let text = Format(JsonNumber.FromBits(sample.bits), .EcmaScript, scope .());
 			Test.Assert(text == sample.text, scope $"{sample.bits:X16}: `{text}`, expected `{sample.text}`");
 		}
+	}
+
+	// JSON Pointer
+
+	const String cRfc6901Document = "{\"foo\":[\"bar\",\"baz\"],\"\":0,\"a/b\":1,\"c%d\":2,\"e^f\":3,\"g|h\":4,\"i\\\\j\":5,\"k\\\"l\":6,\" \":7,\"m~n\":8}";
+
+	static JsonNode Pointed(JsonDocument doc, StringView pointer)
+	{
+		switch (doc.Root.Find(pointer))
+		{
+		case .Ok(let node):
+			return node;
+		case .Err(let error):
+			Test.FatalError(scope $"`{pointer}`: {error}");
+			return default;
+		}
+	}
+
+	static JsonPointerErrorKind PointerError(JsonDocument doc, StringView pointer)
+	{
+		switch (doc.Root.Find(pointer))
+		{
+		case .Ok:
+			Test.FatalError(scope $"`{pointer}` found a value");
+			return .NotFound;
+		case .Err(let error):
+			return error.mKind;
+		}
+	}
+
+	[Test]
+	public static void E163_Rfc6901Examples()
+	{
+		let doc = scope JsonDocument();
+		Test.Assert(doc.Read(cRfc6901Document) case .Ok);
+		Test.Assert(Pointed(doc, "") == doc.Root);
+		Test.Assert(Pointed(doc, "/foo").IsArray);
+		Test.Assert(Pointed(doc, "/foo/0").GetString() == "bar");
+		Test.Assert(Pointed(doc, "/").GetInt64(-1) == 0);
+		Test.Assert(Pointed(doc, "/a~1b").GetInt64() == 1);
+		Test.Assert(Pointed(doc, "/c%d").GetInt64() == 2);
+		Test.Assert(Pointed(doc, "/e^f").GetInt64() == 3);
+		Test.Assert(Pointed(doc, "/g|h").GetInt64() == 4);
+		Test.Assert(Pointed(doc, "/i\\j").GetInt64() == 5);
+		Test.Assert(Pointed(doc, "/k\"l").GetInt64() == 6);
+		Test.Assert(Pointed(doc, "/ ").GetInt64() == 7);
+		Test.Assert(Pointed(doc, "/m~0n").GetInt64() == 8);
+	}
+
+	[Test]
+	public static void E164_TildeOneDecodedFirst()
+	{
+		let doc = scope JsonDocument();
+		Test.Assert(doc.Read("{\"~1\":1,\"/\":2}") case .Ok);
+		Test.Assert(Pointed(doc, "/~01").GetInt64() == 1);
+	}
+
+	[Test]
+	public static void E165_ArrayIndexes()
+	{
+		let doc = scope JsonDocument();
+		Test.Assert(doc.Read(cRfc6901Document) case .Ok);
+		Test.Assert(PointerError(doc, "/foo/01") == .InvalidIndex);
+		Test.Assert(PointerError(doc, "/foo/-1") == .InvalidIndex);
+		Test.Assert(PointerError(doc, "/foo/1e0") == .InvalidIndex);
+		Test.Assert(PointerError(doc, "/foo/-") == .NotFound);
+		Test.Assert(PointerError(doc, "/foo/2") == .NotFound);
+		Test.Assert(PointerError(doc, "/foo/0/x") == .NotAContainer);
+	}
+
+	[Test]
+	public static void E166_InvalidSyntax()
+	{
+		let doc = scope JsonDocument();
+		Test.Assert(doc.Read(cRfc6901Document) case .Ok);
+		Test.Assert(PointerError(doc, "foo") == .InvalidSyntax);
+		Test.Assert(PointerError(doc, "/~2") == .InvalidSyntax);
+		Test.Assert(PointerError(doc, "/~") == .InvalidSyntax);
+		Test.Assert(!JsonPointer.IsValid("foo") && JsonPointer.IsValid("/a~0~1") && JsonPointer.IsValid(""));
+	}
+
+	[Test]
+	public static void E167_NumericTokenOnObject()
+	{
+		let doc = scope JsonDocument();
+		Test.Assert(doc.Read("{\"0\":1}") case .Ok);
+		Test.Assert(Pointed(doc, "/0").GetInt64() == 1);
 	}
 }

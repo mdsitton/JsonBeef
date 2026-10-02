@@ -231,7 +231,14 @@ Windows tests, committed (`AGENTS.md`).
    `JsonTester` printing the canonical form (`test-suites.md` §9.2), `test-json-suite.sh` and
    `test-json-numbers.sh`. Done when every suite passes at its §2.4 strength and the number corpora
    round-trip exactly.
-2. **Document and writer.** Store, nodes, members, the builder, compact/pretty/JCS writers, lookups,
+2. **Document and writer.** *Done (2026-10-02): `JsonDocument` with 40-byte records and `JsonNode`
+   handles, text as views of the document's copy of the source (decoded strings in an arena), lookups
+   with a seeded member index past 16 members, the four duplicate-name policies, JSON Pointer;
+   `JsonWriter` and `JsonDocument.Write` (compact, indented, RFC 8785). The suites pass in document,
+   stream and rewrite (compact and indented) modes; the compact writer reproduces the 27 nativejson
+   files and the RFC 8785 vectors 6/6; the corpora agree with the oracle in every mode
+   (`test-json-corpus.sh`). Mutation stays in phase 5.*
+   Store, nodes, members, the builder, compact/pretty/JCS writers, lookups,
    JSON Pointer.
 3. **Speed.** Join the four benchmark tracks (`JsonBeef` columns), profile, fast paths; measure the
    `u8x16` scan and the 32-byte record. Targets from §2.3.

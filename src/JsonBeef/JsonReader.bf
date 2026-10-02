@@ -59,10 +59,10 @@ public enum JsonToken : uint8
 /// ```
 public class JsonReader
 {
-	JsonReaderCore<JsonByteCursor> mBytes ~ delete _;
-	JsonReaderCore<JsonBufferedStreamCursor> mStream ~ delete _;
+	internal JsonReaderCore<JsonByteCursor> mBytes ~ delete _;
+	internal JsonReaderCore<JsonBufferedStreamCursor> mStream ~ delete _;
 	JsonStreamState mStreamState ~ delete _;
-	bool mStreaming;
+	internal bool mStreaming;
 
 	/// @brief Create a reader with no input; call Reset before reading.
 	public this()
@@ -243,7 +243,9 @@ public class JsonReader
 		output.Append(StringValue);
 	}
 
-	JsonParseError MakeError(JsonErrorKind kind, StringView message, int offset, int length)
+	/// An error at `offset` of the input, located (for errors found outside the reader: duplicates,
+	/// conversions).
+	internal JsonParseError MakeError(JsonErrorKind kind, StringView message, int offset, int length)
 	{
 		return mStreaming ? mStream.MakeError(kind, message, offset, length) : mBytes.MakeError(kind, message, offset, length);
 	}

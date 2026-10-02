@@ -6,6 +6,8 @@ Usage:
                                     JSON (stderr, exit 1)
   json-canonical.py -batch OUTDIR   read `id<TAB>path` lines on stdin; write OUTDIR/<id>.out with the
                                     canonical form, or OUTDIR/<id>.rej with the reason
+  json-canonical.py -pointer P FILE print the canonical form of the value at JSON Pointer P (RFC 6901;
+                                    a duplicated name resolves to the last member), exit 1 if none
 
 Strict RFC 8259 with JsonBeef's default policies: one leading UTF-8 BOM skipped, invalid UTF-8 and
 lone surrogate escapes rejected, numbers of any size accepted. Canonical form: UTF-8, no whitespace,
@@ -163,6 +165,34 @@ def convert(path):
     return canonical(parse(data)) + "\n"
 
 
+MISSING = object()
+
+
+def select(value, pointer):
+    """The value at an RFC 6901 pointer, or MISSING (JSON null is None)."""
+    if pointer == "":
+        return value
+    if not pointer.startswith("/"):
+        return MISSING
+    for token in pointer[1:].split("/"):
+        token = token.replace("~1", "/").replace("~0", "~")
+        if isinstance(value, Object):
+            found = MISSING
+            for name, member in value.pairs:
+                if name == token:
+                    found = member
+            if found is MISSING:
+                return MISSING
+            value = found
+        elif isinstance(value, list):
+            if not token.isdigit() or (len(token) > 1 and token[0] == "0") or int(token) >= len(value):
+                return MISSING
+            value = value[int(token)]
+        else:
+            return MISSING
+    return value
+
+
 def main():
     if len(sys.argv) == 3 and sys.argv[1] == "-batch":
         outdir = sys.argv[2]
@@ -178,6 +208,15 @@ def main():
             except NotJson as e:
                 with open(os.path.join(outdir, case_id + ".rej"), "w") as f:
                     f.write(str(e) + "\n")
+        return 0
+    if len(sys.argv) == 4 and sys.argv[1] == "-pointer":
+        with open(sys.argv[3], "rb") as f:
+            value = parse(f.read())
+        found = select(value, sys.argv[2])
+        if found is MISSING:
+            print("no such value", file=sys.stderr)
+            return 1
+        sys.stdout.buffer.write((canonical(found) + "\n").encode("utf-8"))
         return 0
     if len(sys.argv) != 2:
         print(__doc__, file=sys.stderr)

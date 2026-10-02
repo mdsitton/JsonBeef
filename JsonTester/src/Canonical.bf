@@ -61,6 +61,110 @@ static class Canonical
 		}
 	}
 
+	/// The canonical form of a document's value and its subtree, walked without recursion.
+	public static void Write(JsonNode top, String output)
+	{
+		JsonNode node = top;
+		while (true)
+		{
+			if (node != top && node.IsMember)
+			{
+				AppendString(output, node.Name);
+				output.Append(':');
+			}
+			switch (node.Kind)
+			{
+			case .Object, .Array:
+				output.Append(node.Kind == .Object ? '{' : '[');
+				if (node.Count > 0)
+				{
+					node = node.FirstChild;
+					continue;
+				}
+				output.Append(node.Kind == .Object ? '}' : ']');
+			case .String:
+				AppendString(output, node.GetString());
+			case .Number:
+				AppendNumber(output, node);
+			case .True:
+				output.Append("true");
+			case .False:
+				output.Append("false");
+			case .Null:
+				output.Append("null");
+			}
+			// Up to the next sibling, closing the containers left
+			while (true)
+			{
+				if (node == top)
+					return;
+				let next = node.Next;
+				if (next.IsValid)
+				{
+					output.Append(',');
+					node = next;
+					break;
+				}
+				node = node.Parent;
+				output.Append(node.Kind == .Object ? '}' : ']');
+			}
+		}
+	}
+
+	/// Every member name and string of the subtree in document order, one per line (canonically escaped).
+	public static void WriteStrings(JsonNode top, String output)
+	{
+		JsonNode node = top;
+		while (true)
+		{
+			if (node != top && node.IsMember)
+			{
+				AppendString(output, node.Name);
+				output.Append('\n');
+			}
+			if (node.IsString)
+			{
+				AppendString(output, node.GetString());
+				output.Append('\n');
+			}
+			if (node.Count > 0 && (node.IsArray || node.IsObject))
+			{
+				node = node.FirstChild;
+				continue;
+			}
+			while (true)
+			{
+				if (node == top)
+					return;
+				let next = node.Next;
+				if (next.IsValid)
+				{
+					node = next;
+					break;
+				}
+				node = node.Parent;
+			}
+		}
+	}
+
+	/// A document number in canonical form.
+	public static void AppendNumber(String output, JsonNode node)
+	{
+		switch (node.NumberKind)
+		{
+		case .Integer, .UInteger:
+			node.AppendNumber(output);
+		case .Float, .BigInteger:
+			if (node.TryGetDouble(let value))
+				JsonNumber.AppendCanonical(output, value);
+			else
+			{
+				let text = node.AppendNumber(.. scope .());
+				output.Append(text[0] == '-' ? "-Infinity" : "Infinity");
+			}
+		}
+	}
+
 	/// A string in JCS escaping (RFC 8785 §3.2.2.2): `\"`, `\\`, `\b \t \n \f \r`, other controls as
 	/// `\u00xx` in lowercase hex, everything else raw.
 	public static void AppendString(String output, StringView text)

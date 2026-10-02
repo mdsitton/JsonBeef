@@ -20,9 +20,17 @@
 # same in every mode; UPDATE_GOLDEN=1 writes them from the first mode's output: review the diff).
 # Adversarial cases need no golden message. Any other exit status (a crash) or a timeout is a failure.
 #
-# Every case runs in each of MODES (default "events stream1 stream16"): events reads with JsonReader;
-# stream1 and stream16 read the file as a Stream in 1-byte and 16-byte reads through a 16-byte buffer,
-# so refills land inside numbers, literals, escapes, surrogate pairs and UTF-8 sequences.
+# Every case runs in each of MODES (default "document events stream1 stream16 rewrite rewrite-pretty"):
+# document builds a JsonDocument and prints from it; events prints straight from JsonReader's tokens;
+# stream1 builds the document from a Stream fed in 1-byte reads, stream16 reads events from 16-byte
+# reads (both through a 16-byte buffer, so refills land inside numbers, literals, escapes, surrogate
+# pairs and UTF-8 sequences); rewrite and rewrite-pretty write the document compact or indented, read
+# that back and print it (the writer must keep everything; exit 3 if its output is rejected).
+#
+# Two more checks run once: every nativejson round-trip file written by the compact writer must equal
+# the file byte for byte (JsonFloatFormat.Plain keeps `0.0`, `-0.0`, `1.7976931348623157e308`), and
+# every RFC 8785 test vector (json-canonicalization testdata) written with -jcs must equal its output
+# file byte for byte.
 #
 # Failures are compared with tests/expected-failures.txt (`id<TAB>mode<TAB>reason`, mode `*` for all):
 # an unlisted failure fails the run, and so does a listed case that passes. tests/suites-skip.txt
@@ -32,7 +40,7 @@
 
 BIN="${BIN:-./build/Debug_Linux64/JsonTester/JsonTester}"
 SUITES="${SUITES:-tests/suites}"
-MODES="${MODES:-events stream1 stream16}"
+MODES="${MODES:-document events stream1 stream16 rewrite rewrite-pretty}"
 EXPECTED="tests/expected-failures.txt"
 SKIP="tests/suites-skip.txt"
 LOGFILE="test-json-suite.log"
@@ -147,10 +155,12 @@ failed=0
 first_mode=1
 for mode in $MODES; do
 	case "$mode" in
-	events) flag="-events" ;;
 	document) flag="" ;;
+	events) flag="-events" ;;
 	stream1) flag="-stream 1" ;;
-	stream16) flag="-stream 16" ;;
+	stream16) flag="-events -stream 16" ;;
+	rewrite) flag="-rewrite" ;;
+	rewrite-pretty) flag="-rewrite-pretty" ;;
 	*) echo "ERROR: unknown mode $mode"; exit 1 ;;
 	esac
 
@@ -275,6 +285,38 @@ for mode in $MODES; do
 	fi
 	first_mode=0
 done
+
+# The compact writer reproduces the nativejson round-trip files
+pass=0; total=0; bad=()
+for f in "$SUITES"/nativejson/data/roundtrip/*.json; do
+	total=$((total + 1))
+	if timeout 10 "$BIN" -compact "$f" 2> "$tmpdir/err" | cmp -s - "$f"; then
+		pass=$((pass + 1))
+	else
+		bad+=("$(basename "$f")")
+	fi
+done
+echo "[compact] nativejson written back byte for byte: $pass/$total"
+if [ ${#bad[@]} -gt 0 ]; then
+	echo "[compact] differ: ${bad[*]}"
+	failed=1
+fi
+
+# RFC 8785 vectors
+pass=0; total=0; bad=()
+for f in "$SUITES"/json-canonicalization/testdata/input/*.json; do
+	total=$((total + 1))
+	if timeout 10 "$BIN" -jcs "$f" 2> "$tmpdir/err" | cmp -s - "$SUITES/json-canonicalization/testdata/output/$(basename "$f")"; then
+		pass=$((pass + 1))
+	else
+		bad+=("$(basename "$f")")
+	fi
+done
+echo "[jcs] RFC 8785 vectors: $pass/$total"
+if [ ${#bad[@]} -gt 0 ]; then
+	echo "[jcs] differ: ${bad[*]}"
+	failed=1
+fi
 
 if [ $failed -ne 0 ]; then
 	echo "FAIL: see $LOGFILE"

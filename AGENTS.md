@@ -49,7 +49,7 @@ These are non-obvious Beef behaviors discovered through debugging (in TomlBeef).
 - **`~ delete _` is preferred** over manual `~this()` methods for field-level cleanup.
 - **`DeleteContainerAndDisposeItems!`, `ClearAndDeleteItems!`, `DeleteDictionaryAndKeys!`** are built-in mixins for container cleanup. Use them instead of manual loops.
 - **`defer` on a mixin requires a block wrapper**: `defer { ClearAndDeleteItems!(x); }` — NOT `defer ClearAndDeleteItems!(x);`
-- **`defer` runs in LIFO order.** For `defer SomeCall(arg)`, `arg` and `this` are evaluated immediately; for `defer { ... }`, captured variables are read when the scope exits.
+- **`defer` runs in LIFO order.** For `defer SomeCall(arg)`, `arg` and `this` are evaluated immediately; for `defer { ... }`, captured variables are read when the scope exits. So `defer File.Delete(path).IgnoreError();` deletes the file *now* (the call is the receiver of the deferred `IgnoreError`): write `defer { File.Delete(path).IgnoreError(); }`.
 - **`delete` on value types (enums, structs) is a no-op.** Types without `~this()` (which structs can't have) need explicit `.Dispose()`.
 
 ### String formatting

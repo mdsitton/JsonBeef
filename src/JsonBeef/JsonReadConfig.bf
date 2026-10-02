@@ -2,6 +2,21 @@ using System;
 
 namespace JsonBeef;
 
+/// @brief What a JsonDocument does with an object member whose name an earlier member of the same
+/// object already has (compared after unescaping, byte for byte: no normalization).
+public enum JsonDuplicateNames : uint8
+{
+	/// @brief Keep every member in document order; a lookup by name finds the last one (as JavaScript,
+	/// Python and Go do).
+	KeepAll,
+	/// @brief Keep only the last member of each name, in its own position.
+	LastWins,
+	/// @brief Keep only the first member of each name.
+	FirstWins,
+	/// @brief Reject the document at the second occurrence (I-JSON, RFC 7493 §2.3).
+	Error
+}
+
 /// @brief Settings for reading JSON: the dialect, the source name for errors, and resource limits for
 /// untrusted input. The defaults read RFC 8259 JSON exactly (with a leading byte order mark skipped)
 /// and limit only the nesting depth.
@@ -14,6 +29,8 @@ public struct JsonReadConfig
 	/// @brief Skip one leading UTF-8 byte order mark (RFC 8259 §8.1 lets parsers ignore it). Off: a BOM
 	/// is an error.
 	public bool AllowBom = true;
+	/// @brief JsonDocument: what to do with duplicate member names. JsonReader reports every member.
+	public JsonDuplicateNames DuplicateNames = .KeepAll;
 
 	/// @brief Maximum nesting depth of arrays and objects: 1 allows `[1]` but not `[[1]]`. 0 =
 	/// unlimited (the reader is iterative: depth costs one bit per level).

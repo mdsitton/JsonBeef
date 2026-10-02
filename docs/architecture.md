@@ -7,7 +7,9 @@ the suites in [test-suites.md](test-suites.md). Code conventions and Beef gotcha
 ## 1. Overview
 
 - A JSON (RFC 8259) library for Beef. Today it has a **pull reader** (`JsonReader`) over UTF-8 bytes in
-  memory or a `Stream`, and number conversion and formatting (`JsonNumber`). The document, the writers,
+  memory or a `Stream`, number conversion and formatting (`JsonNumber`), a **document** built on the
+  reader (`JsonDocument` with `JsonNode` handles, lookups, JSON Pointer), and **writers**: the streaming
+  `JsonWriter` (compact or indented) and the document's `Write`, also in RFC 8785 canonical form.
   JSONC, typed mapping and the rest follow `plan.md` §6.
 - **Strict and complete.** Every token is validated when it is read: UTF-8, the grammar, escapes,
   surrogate pairs, the number grammar. Nothing is skipped for speed. The first error stops the read
@@ -23,6 +25,14 @@ the suites in [test-suites.md](test-suites.md). Code conventions and Beef gotcha
 
 | File (`src/JsonBeef/`) | Responsibility |
 |---|---|
+| `JsonDocument.bf` | `JsonNodeRecord`, `JsonNodeFlags`; `JsonDocument`: the node table, the text (source copy, string table), `Read`/`ReadFile` and the builder over the reader's core, links, member lookup and the duplicate-name policies |
+| `JsonDocument.Write.bf` | `Write`/`WriteFile`: the iterative tree walk over `JsonWriter`, the canonical (RFC 8785) walk with UTF-16 member order |
+| `JsonNode.bf` | `JsonNodeId`, the `JsonNode` handle (kind, navigation, lookups by name and index, values), `JsonNodeList`, `JsonMember`, `JsonMemberList` |
+| `JsonMemberIndex.bf` | The seeded hash index of large objects |
+| `JsonPointer.bf` | `JsonPointer` (RFC 6901 evaluation, syntax, escaping), `JsonPointerError` |
+| `JsonWriter.bf` | `JsonWriteOptions`, `JsonNonFiniteNumbers`, `JsonWriteError`; `JsonWriter`: the streaming writer, escaping, number output |
+| `JsonValueKind.bf` | `JsonValueKind` |
+| `JsonTextArena.bf`, `JsonStack.bf` | Internal: XmlBeef's chunked byte arena (kept across reads) and growable array with inlined `Add` |
 | `JsonReader.bf` | `JsonToken`; `JsonReader` (public: tokens, depth, offsets, strings, number conversions), dispatching to one core per cursor type |
 | `JsonReaderCore.bf` | `JsonFailure`; `JsonReaderCore<TCursor>`: the state machine, the container bit stack, literals, numbers, strings and escapes, whitespace, the window helpers, `Fail` |
 | `JsonCursor.bf` | `IJsonCursor`, `JsonLineCounter`, `JsonInputStart` (UTF-16/32 detection, the BOM), `JsonByteCursor` (in memory) |
@@ -32,11 +42,12 @@ the suites in [test-suites.md](test-suites.md). Code conventions and Beef gotcha
 | `JsonError.bf`, `JsonReadConfig.bf` | `JsonErrorKind`, `JsonParseError` (KdlBeef's model); `JsonReadConfig` (dialect, limits, stream buffer) |
 
 Tests are in `src/JsonBeef/tests/`: `JsonEdgeCaseTests` (spec-reference §16, one test per edge case,
-numbered as there; each input is read from memory and through 1-byte stream reads, which must agree)
-and `JsonReaderTests` (API, limits, streams, number layouts), with `JsonTestUtil` (the trace helpers
-and a trickling test stream). The CLI is `JsonTester/src/` (`Program.bf`, `Canonical.bf`,
-`Numbers.bf`, `TrickleStream.bf`); the scripts are `test-json-suite.sh`, `test-json-numbers.sh` and
-`test-leaks.sh`, and `tests/tools/json-canonical.py` is the independent oracle of the canonical form.
+numbered as there; each input is read from memory and through 1-byte stream reads, which must agree),
+`JsonReaderTests` (API, limits, streams, number layouts) and `JsonDocumentTests` (the document, the
+writers), with `JsonTestUtil` (the trace helpers and a trickling test stream). The CLI is
+`JsonTester/src/` (`Program.bf`, `Canonical.bf`, `Numbers.bf`, `TrickleStream.bf`); the scripts are
+`test-json-suite.sh`, `test-json-corpus.sh`, `test-json-numbers.sh` and `test-leaks.sh`, and
+`tests/tools/json-canonical.py` is the independent oracle of the canonical form.
 
 ## 3. Reading
 
@@ -125,16 +136,88 @@ comma, `'` strings, `+1`, `.5`, `NaN`, `True`, leading zeros, a number running i
   30,700 overflows, the 169 non-JSON strings rejected by the reader) and the first 100,000 lines of the
   RFC 8785 number file (both directions), in Debug and Release.
 
-## 4. Testing
+## 4. Document
+
+### Values are IDs
+
+The siblings' model. A value is a `JsonNodeId` into `JsonDocument.mNodes`, a table of 40-byte
+`JsonNodeRecord`s: an 8-byte payload, an 8-byte member-name reference, the parent, first-child, next
+and previous links (0 is none; slot 0 is unused, so the root is 1), and kind, flags and number kind.
+The payload is the int64, uint64 or double bits of a number, a text reference for a string (or for a
+number kept as its text: a big integer, a float beyond a double's range), and for a container its last
+child and child count (so appending is O(1)). Records are built in preorder from the reader's tokens,
+so a container's first child is the next record until something is edited. `JsonNode` is a 16-byte
+handle (document, ID, generation): the generation changes on every `Clear` and `Read`, so a stale
+handle is invalid rather than showing other content. Lookups and navigation accept the invalid
+handle a failed lookup returns, so chains (`root["a"]["b"].GetInt64(0)`) end in the fallback.
+
+### Text
+
+A text reference is 8 bytes: an offset and a length into the document's copy of its source, or with
+the record's `ValueInTable`/`NameInTable` flag an index into the string table (`mStrings`, views into
+the arena). `Read(StringView)` copies the input once into the arena (`JsonTextArena`, chunks kept
+across reads) and reads that copy, so a string or name without escapes is a view of it; escaped ones
+are decoded by the reader and copied into the arena once. `ReadFile` reads the file straight into the
+arena (one copy). `Read(Stream)` reads through the stream cursor and copies every string (the window
+moves). Arena chunks never move, so every view the document hands out stays valid until it is cleared
+or read again. Integers below 2^53 convert to double directly; larger ones round from their decimal
+text, as the token would.
+
+### Members
+
+Members stay in document order, duplicates included by default (`JsonDuplicateNames.KeepAll`, plan §9
+item 4); a lookup scans from the last member back, so the last duplicate wins. An object with more than
+16 members gets a `JsonMemberIndex` on its first lookup: open addressing, at most half full, each slot
+the member's ID and its name's 32-bit hash, the hash seeded per process (a time and address mix
+through splitmix64) so colliding names cannot be prepared in advance; a name maps to its last member.
+The other policies act while building: `Error` fails at the second name (located at it), `LastWins`
+unlinks the earlier member, `FirstWins` reads the later value and leaves it unlinked (`Removed`);
+past 16 members the index answers the duplicate checks and is kept up to date as members are appended.
+
+### JSON Pointer
+
+`JsonNode.Find` (and `At`) evaluate RFC 6901 pointers: tokens decoded `~1` before `~0`, array indexes
+`0` or a nonzero digit and digits (`01`, `-1`, `1e0` are `InvalidIndex`; `-` and past-the-end are
+`NotFound`), names resolved like lookups (the last duplicate). Errors carry the failing token's offset.
+
+## 5. Writing
+
+`JsonWriter` appends compact or indented JSON to a String. Misuse (a value where a name is needed, a
+mismatched end, a second root) and bad data (invalid UTF-8, a malformed number text, NaN with
+`NonFiniteNumbers.Error`) are recorded as the first error, later calls write nothing, and `Finish`
+returns it, so writing code needs no checks between calls. Escaping is minimal (`"`, `\`, controls as
+`\b \t \n \f \r` or lowercase `\u00xx`, JCS's spelling), found 8 bytes at a time; options add
+`EscapeNonAscii` (surrogate pairs above U+FFFF), `EscapeHtml` (`<`, `>`, `&`) and
+`EscapeLineSeparators`. Strings are checked as UTF-8 as they are written. Indented output puts each
+element and member on its own line (`"name": value`), keeps empty containers as `[]`/`{}`, and is
+O(depth²) by nature.
+
+`JsonDocument.Write` walks the tree iteratively and drives the writer: integers exactly (`-0` as
+`-0`), doubles in the plain layout, big integers and out-of-range floats as their text. With
+`JsonWriteOptions.Canonical` (RFC 8785) each object's members are sorted by their names' UTF-16 code
+units (`CompareUtf16`: code point order except that a supplementary character's high surrogate sorts
+below U+E000), every number is written as ECMAScript writes its double (big integers rounded, `-0` as
+`0`), and duplicate names, numbers beyond a double and non-finite values are errors; output has no
+whitespace and no final newline. The canonical walk keeps each open object's sorted member list on one
+shared stack, so it is iterative too.
+
+## 6. Testing
 
 - `test-json-suite.sh` runs JSONTestSuite (parsing and transform), JSON_checker, simdjson-data's
   jsonchecker and adversarial files, nativejson's round-trip files and json5-tests (strict) through
-  `JsonTester` in each mode of `MODES` (events, and a stream read in 1-byte and 16-byte reads through a
-  16-byte buffer, `TrickleStream`). Accepted cases must print their canonical form exactly as the
+  `JsonTester` in each mode of `MODES`: the document, the reader's tokens, a document from 1-byte stream
+  reads and tokens from 16-byte reads (through a 16-byte buffer, `TrickleStream`), and the compact and
+  indented rewrites (written, read back). Accepted cases must print their canonical form exactly as the
   independent oracle (`tests/tools/json-canonical.py`, Python's `json` with hooks that keep number text
   and member order) computes it; rejected ones must print their golden first error line
   (`tests/errors/<suite>/<case>.err`) in every mode. The nst `i_` stance is `tests/nst/i-accept.txt`
-  (test-suites.md §1.2); the transform expectations are JsonBeef's own (`tests/nst/transform/`).
+  (test-suites.md §1.2); the transform expectations are JsonBeef's own (`tests/nst/transform/`). Then
+  the compact writer must reproduce the 27 nativejson files byte for byte, and `-jcs` the 6 RFC 8785
+  vectors.
+- `test-json-corpus.sh` runs the 14 real-world files the same ways, checks that the compact writer is
+  a fixed point, that twitter.json and twitterescaped.json hold the same strings, that mesh.json and
+  its sorted, pretty-printed copy give the same RFC 8785 output, and 27 JSON Pointer lookups against
+  the oracle's.
 - `test-json-numbers.sh` runs `JsonTester -fxx` (each fxx string read by `JsonReader` as a whole
   document, its acceptance checked against an independent grammar matcher, then f64 and f32 bits) and
   `-es6` (ECMAScript output of each double, and the text read back). Both run every line in Debug

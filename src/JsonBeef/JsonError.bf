@@ -33,6 +33,8 @@ public enum JsonErrorKind : uint8
 	// Structure
 	/// @brief A `,`, `:`, `]` or `}` missing, doubled or misplaced, or anything after the document's value.
 	InvalidStructure,
+	/// @brief A member name an earlier member of the object already has (JsonDuplicateNames.Error).
+	DuplicateName,
 
 	// Values
 	/// @brief A number whose value does not fit the requested type (a double beyond ±1.8e308, an
