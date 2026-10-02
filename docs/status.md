@@ -32,14 +32,19 @@ implementations that passed each input:
 
 | Track | twitter | twitterescaped | citm | canada | strings | floats | Rank, most inputs | Ahead of JsonBeef |
 |---|---:|---:|---:|---:|---:|---:|---|---|
-| DOM (`JsonBeef`) | 1,309 (2nd) | 1,024 (4th) | 1,637 (2nd) | 485 (4th) | 828 (5th) | 263 (8th) | 2nd–5th of 43–49 | simdjson DOM; yyjson and sonic-rs on most inputs |
-| Streaming (`JsonReader`) | 853 (3rd) | 684 (2nd) | 991 (5th) | 361 (4th) | 661 (2nd) | 236 (3rd) | 2nd–8th of 18–20 | simdjson On-Demand, jiter; RapidJSON SAX and serde_json on numeric inputs |
-| Typed (`[JsonObject]`) | 545 (7th) | | 731 (8th) | 258 (7th) | | | 7th–8th of 19–22 | glaze, sonic-rs, sonic, go-json, fastjson2, serde_json |
-| On-demand (`Find`) | 941 (7th) | | 1,318 (6th) | 385 (5th) | | | 5th–7th of 13–14 | simdjson On-Demand, jiter, serde_json partial, pysimdjson |
+| DOM (`JsonBeef`) | 1,318 (2nd) | 1,028 (4th) | 1,626 (2nd) | 486 (4th) | 836 (5th) | 264 (8th) | 2nd–5th of 43–49 | simdjson DOM; yyjson and sonic-rs on most inputs |
+| Streaming (`JsonReader`) | 873 (3rd) | 673 (2nd) | 1,064 (3rd) | 362 (4th) | 744 (2nd) | 224 (4th) | 2nd–8th of 18–20 | simdjson On-Demand, jiter; RapidJSON SAX and serde_json on numeric inputs |
+| Typed (`[JsonObject]`) | 541 (7th) | | 762 (8th) | 256 (7th) | | | 7th–8th of 19–22 | glaze, sonic-rs, sonic, go-json, fastjson2, serde_json |
+| On-demand (`Find`) | 1,000 (7th) | | 1,520 (3rd) | 379 (5th) | | | 3rd–7th of 13–14 | simdjson On-Demand, jiter, serde_json partial, pysimdjson |
 
-JsonBeef's columns were remeasured after the escaped-string work (`docs/architecture.md`, *Fast
-paths*): DOM strings 414 → 828 MB/s and twitterescaped 627 → 1,024, streaming strings 351 → 661 and
-twitterescaped 456 → 684, the twitter query 824 → 941; the other cells moved within ±3%. For
+JsonBeef's columns were remeasured after the escaped-string work and again after the whitespace work
+(`docs/architecture.md`, *Fast paths*). Escaped strings: DOM strings 414 → 828 MB/s and
+twitterescaped 627 → 1,024, streaming strings 351 → 661 and twitterescaped 456 → 684, the twitter
+query 824 → 941. Whitespace (the reader only; the document's fast build has its own): streaming
+citm_catalog 991 → 1,064, gsoc-2018 2,238 → 2,392, strings 661 → 744, twitter 853 → 873; the query
+on citm_catalog 1,318 → 1,520 and twitter 941 → 1,000; typed citm_catalog 731 → 762; minified
+number-heavy input 3–5% slower in the streaming column (floats 236 → 224, marine_ik 378 → 361,
+numbers 523 → 506), where the alternating comparison had shown ±2%. For
 reference, yyjson's DOM does 1,027 on twitter and 1,637 on twitterescaped; simdjson's 3,046 and
 1,947; jiter's streaming 940 and 469. The weak spots left are float-heavy files (fast_float, plan §9
 item 6), the typed track (P6T) and the on-demand query on canada (P6Q).

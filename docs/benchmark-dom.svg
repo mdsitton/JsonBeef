@@ -139,8 +139,8 @@
 <text x="546.8" y="587.0" class="small"><tspan class="value">0.33×</tspan><tspan class="note-plain" dx="8">3.0× slower</tspan></text>
 <text x="40.0" y="611.0" class="lang" text-anchor="start">Perl</text>
 <text x="112" y="611.0"><tspan class="label">JSON::XS*</tspan><tspan class="repo" dx="8">CPAN JSON::XS</tspan></text>
-<rect x="500" y="598.5" width="38.2" height="15" rx="3" class="bar"/>
-<text x="546.2" y="611.0" class="small"><tspan class="value">0.32×</tspan><tspan class="note-plain" dx="8">3.1× slower</tspan></text>
+<rect x="500" y="598.5" width="38.4" height="15" rx="3" class="bar"/>
+<text x="546.4" y="611.0" class="small"><tspan class="value">0.32×</tspan><tspan class="note-plain" dx="8">3.1× slower</tspan></text>
 <text x="40.0" y="635.0" class="lang" text-anchor="start">Rust</text>
 <text x="112" y="635.0"><tspan class="label">serde_json Value float_roundtrip</tspan><tspan class="repo" dx="8"></tspan></text>
 <rect x="500" y="622.5" width="35.6" height="15" rx="3" class="bar"/>
@@ -175,8 +175,8 @@
 <text x="534.7" y="803.0" class="small"><tspan class="value">0.23×</tspan><tspan class="note-plain" dx="8">4.4× slower</tspan></text>
 <text x="40.0" y="827.0" class="lang" text-anchor="start">Beef</text>
 <text x="112" y="827.0"><tspan class="label">StructuredData*</tspan><tspan class="repo" dx="8">Beef's Beefy2D</tspan></text>
-<rect x="500" y="814.5" width="26.0" height="15" rx="3" class="bar"/>
-<text x="534.0" y="827.0" class="small"><tspan class="value">0.22×</tspan><tspan class="note-plain" dx="8">4.5× slower</tspan></text>
+<rect x="500" y="814.5" width="26.1" height="15" rx="3" class="bar"/>
+<text x="534.1" y="827.0" class="small"><tspan class="value">0.22×</tspan><tspan class="note-plain" dx="8">4.5× slower</tspan></text>
 <text x="40.0" y="851.0" class="lang" text-anchor="start">C#</text>
 <text x="112" y="851.0"><tspan class="label">JsonNode*</tspan><tspan class="repo" dx="8">.NET 10 System.Text.Json</tspan></text>
 <rect x="500" y="838.5" width="25.8" height="15" rx="3" class="bar"/>
@@ -223,12 +223,12 @@
 <text x="521.4" y="1091.0" class="small"><tspan class="value">0.11×</tspan><tspan class="note-plain" dx="8">8.8× slower</tspan></text>
 <text x="40.0" y="1115.0" class="lang" text-anchor="start">Beef</text>
 <text x="112" y="1115.0"><tspan class="label">EinScott/json*</tspan><tspan class="repo" dx="8">EinScott/json</tspan></text>
-<rect x="500" y="1102.5" width="12.2" height="15" rx="3" class="bar"/>
-<text x="520.2" y="1115.0" class="small"><tspan class="value">0.10×</tspan><tspan class="note-plain" dx="8">9.7× slower</tspan></text>
+<rect x="500" y="1102.5" width="12.4" height="15" rx="3" class="bar"/>
+<text x="520.4" y="1115.0" class="small"><tspan class="value">0.10×</tspan><tspan class="note-plain" dx="8">9.6× slower</tspan></text>
 <text x="40.0" y="1139.0" class="lang" text-anchor="start">C</text>
 <text x="112" y="1139.0"><tspan class="label">json-c</tspan><tspan class="repo" dx="8">json-c/json-c</tspan></text>
 <rect x="500" y="1126.5" width="11.2" height="15" rx="3" class="bar"/>
-<text x="519.2" y="1139.0" class="small"><tspan class="value">0.095×</tspan><tspan class="note-plain" dx="8">10× slower</tspan></text>
+<text x="519.2" y="1139.0" class="small"><tspan class="value">0.095×</tspan><tspan class="note-plain" dx="8">11× slower</tspan></text>
 <text x="40.0" y="1163.0" class="lang" text-anchor="start">Go</text>
 <text x="112" y="1163.0"><tspan class="label">segmentio any</tspan><tspan class="repo" dx="8">segmentio/encoding</tspan></text>
 <rect x="500" y="1150.5" width="8.7" height="15" rx="3" class="bar"/>
@@ -255,8 +255,8 @@
 <text x="190.0" y="1393.5" class="label" text-anchor="end">twitter</text>
 <rect x="210" y="1366.0" width="330.0" height="12" rx="2" class="bar"/>
 <text x="547.0" y="1376.0" class="small"><tspan class="value">3046</tspan><tspan class="libname" dx="6">simdjson DOM</tspan><tspan class="note-plain" dx="6">C++</tspan></text>
-<rect x="210" y="1381.0" width="141.8" height="12" rx="2" class="bar-ours"/>
-<text x="358.8" y="1391.0" class="small"><tspan class="value ours">1309</tspan><tspan class="libname ours" dx="6">JsonBeef</tspan><tspan class="note-plain" dx="6">Beef</tspan></text>
+<rect x="210" y="1381.0" width="142.8" height="12" rx="2" class="bar-ours"/>
+<text x="359.8" y="1391.0" class="small"><tspan class="value ours">1318</tspan><tspan class="libname ours" dx="6">JsonBeef</tspan><tspan class="note-plain" dx="6">Beef</tspan></text>
 <rect x="210" y="1396.0" width="115.3" height="12" rx="2" class="bar"/>
 <text x="332.3" y="1406.0" class="small"><tspan class="value">1065</tspan><tspan class="libname" dx="6">sonic-rs Value</tspan><tspan class="note-plain" dx="6">Rust</tspan></text>
 <line x1="40" y1="1417.0" x2="880" y2="1417.0" class="rule"/>
@@ -267,14 +267,14 @@
 <text x="494.4" y="1448.0" class="small"><tspan class="value">1636</tspan><tspan class="libname" dx="6">yyjson</tspan><tspan class="note-plain" dx="6">C</tspan></text>
 <rect x="210" y="1453.0" width="223.0" height="12" rx="2" class="bar"/>
 <text x="440.0" y="1463.0" class="small"><tspan class="value">1315</tspan><tspan class="libname" dx="6">sonic-rs Value</tspan><tspan class="note-plain" dx="6">Rust</tspan></text>
-<rect x="210" y="1468.0" width="173.5" height="12" rx="2" class="bar-ours"/>
-<text x="390.5" y="1478.0" class="small"><tspan class="value ours">1024</tspan><tspan class="libname ours" dx="6">JsonBeef</tspan><tspan class="note-plain" dx="6">Beef</tspan></text>
+<rect x="210" y="1468.0" width="174.2" height="12" rx="2" class="bar-ours"/>
+<text x="391.2" y="1478.0" class="small"><tspan class="value ours">1028</tspan><tspan class="libname ours" dx="6">JsonBeef</tspan><tspan class="note-plain" dx="6">Beef</tspan></text>
 <line x1="40" y1="1489.0" x2="880" y2="1489.0" class="rule"/>
 <text x="190.0" y="1522.5" class="label" text-anchor="end">citm_catalog</text>
 <rect x="210" y="1495.0" width="330.0" height="12" rx="2" class="bar"/>
 <text x="547.0" y="1505.0" class="small"><tspan class="value">3239</tspan><tspan class="libname" dx="6">simdjson DOM</tspan><tspan class="note-plain" dx="6">C++</tspan></text>
-<rect x="210" y="1510.0" width="166.8" height="12" rx="2" class="bar-ours"/>
-<text x="383.8" y="1520.0" class="small"><tspan class="value ours">1637</tspan><tspan class="libname ours" dx="6">JsonBeef</tspan><tspan class="note-plain" dx="6">Beef</tspan></text>
+<rect x="210" y="1510.0" width="165.7" height="12" rx="2" class="bar-ours"/>
+<text x="382.7" y="1520.0" class="small"><tspan class="value ours">1626</tspan><tspan class="libname ours" dx="6">JsonBeef</tspan><tspan class="note-plain" dx="6">Beef</tspan></text>
 <rect x="210" y="1525.0" width="143.8" height="12" rx="2" class="bar"/>
 <text x="360.8" y="1535.0" class="small"><tspan class="value">1412</tspan><tspan class="libname" dx="6">sonic-rs Value</tspan><tspan class="note-plain" dx="6">Rust</tspan></text>
 <line x1="40" y1="1546.0" x2="880" y2="1546.0" class="rule"/>
@@ -285,8 +285,8 @@
 <text x="521.9" y="1577.0" class="small"><tspan class="value">928</tspan><tspan class="libname" dx="6">yyjson</tspan><tspan class="note-plain" dx="6">C</tspan></text>
 <rect x="210" y="1582.0" width="293.5" height="12" rx="2" class="bar"/>
 <text x="510.5" y="1592.0" class="small"><tspan class="value">893</tspan><tspan class="libname" dx="6">sonic-rs Value</tspan><tspan class="note-plain" dx="6">Rust</tspan></text>
-<rect x="210" y="1597.0" width="159.4" height="12" rx="2" class="bar-ours"/>
-<text x="376.4" y="1607.0" class="small"><tspan class="value ours">485</tspan><tspan class="libname ours" dx="6">JsonBeef</tspan><tspan class="note-plain" dx="6">Beef</tspan></text>
+<rect x="210" y="1597.0" width="159.8" height="12" rx="2" class="bar-ours"/>
+<text x="376.8" y="1607.0" class="small"><tspan class="value ours">486</tspan><tspan class="libname ours" dx="6">JsonBeef</tspan><tspan class="note-plain" dx="6">Beef</tspan></text>
 <line x1="40" y1="1618.0" x2="880" y2="1618.0" class="rule"/>
 <text x="190.0" y="1651.5" class="label" text-anchor="end">github_events</text>
 <rect x="210" y="1624.0" width="330.0" height="12" rx="2" class="bar"/>
@@ -299,8 +299,8 @@
 <text x="190.0" y="1708.5" class="label" text-anchor="end">gsoc-2018</text>
 <rect x="210" y="1681.0" width="330.0" height="12" rx="2" class="bar"/>
 <text x="547.0" y="1691.0" class="small"><tspan class="value">4022</tspan><tspan class="libname" dx="6">simdjson DOM</tspan><tspan class="note-plain" dx="6">C++</tspan></text>
-<rect x="210" y="1696.0" width="209.6" height="12" rx="2" class="bar-ours"/>
-<text x="426.6" y="1706.0" class="small"><tspan class="value ours">2555</tspan><tspan class="libname ours" dx="6">JsonBeef</tspan><tspan class="note-plain" dx="6">Beef</tspan></text>
+<rect x="210" y="1696.0" width="205.0" height="12" rx="2" class="bar-ours"/>
+<text x="422.0" y="1706.0" class="small"><tspan class="value ours">2499</tspan><tspan class="libname ours" dx="6">JsonBeef</tspan><tspan class="note-plain" dx="6">Beef</tspan></text>
 <rect x="210" y="1711.0" width="193.6" height="12" rx="2" class="bar"/>
 <text x="410.6" y="1721.0" class="small"><tspan class="value">2359</tspan><tspan class="libname" dx="6">sonic-rs Value</tspan><tspan class="note-plain" dx="6">Rust</tspan></text>
 <line x1="40" y1="1732.0" x2="880" y2="1732.0" class="rule"/>
@@ -311,8 +311,8 @@
 <text x="535.8" y="1763.0" class="small"><tspan class="value">886</tspan><tspan class="libname" dx="6">sonic-rs Value</tspan><tspan class="note-plain" dx="6">Rust</tspan></text>
 <rect x="210" y="1768.0" width="317.3" height="12" rx="2" class="bar"/>
 <text x="534.3" y="1778.0" class="small"><tspan class="value">882</tspan><tspan class="libname" dx="6">simdjson DOM</tspan><tspan class="note-plain" dx="6">C++</tspan></text>
-<rect x="210" y="1783.0" width="216.5" height="12" rx="2" class="bar-ours"/>
-<text x="433.5" y="1793.0" class="small"><tspan class="value ours">602</tspan><tspan class="libname ours" dx="6">JsonBeef</tspan><tspan class="note-plain" dx="6">Beef</tspan></text>
+<rect x="210" y="1783.0" width="216.8" height="12" rx="2" class="bar-ours"/>
+<text x="433.8" y="1793.0" class="small"><tspan class="value ours">602</tspan><tspan class="libname ours" dx="6">JsonBeef</tspan><tspan class="note-plain" dx="6">Beef</tspan></text>
 <line x1="40" y1="1804.0" x2="880" y2="1804.0" class="rule"/>
 <text x="190.0" y="1837.5" class="label" text-anchor="end">numbers</text>
 <rect x="210" y="1810.0" width="330.0" height="12" rx="2" class="bar"/>
@@ -329,8 +329,8 @@
 <text x="498.3" y="1892.0" class="small"><tspan class="value">975</tspan><tspan class="libname" dx="6">simdjson DOM</tspan><tspan class="note-plain" dx="6">C++</tspan></text>
 <rect x="210" y="1897.0" width="213.0" height="12" rx="2" class="bar"/>
 <text x="430.0" y="1907.0" class="small"><tspan class="value">739</tspan><tspan class="libname" dx="6">sonic-rs Value</tspan><tspan class="note-plain" dx="6">Rust</tspan></text>
-<rect x="210" y="1912.0" width="181.0" height="12" rx="2" class="bar-ours"/>
-<text x="398.0" y="1922.0" class="small"><tspan class="value ours">628</tspan><tspan class="libname ours" dx="6">JsonBeef</tspan><tspan class="note-plain" dx="6">Beef</tspan></text>
+<rect x="210" y="1912.0" width="181.8" height="12" rx="2" class="bar-ours"/>
+<text x="398.8" y="1922.0" class="small"><tspan class="value ours">630</tspan><tspan class="libname ours" dx="6">JsonBeef</tspan><tspan class="note-plain" dx="6">Beef</tspan></text>
 <line x1="40" y1="1933.0" x2="880" y2="1933.0" class="rule"/>
 <text x="190.0" y="1974.0" class="label" text-anchor="end">tiny documents</text>
 <rect x="210" y="1939.0" width="330.0" height="12" rx="2" class="bar"/>
@@ -339,8 +339,8 @@
 <text x="505.8" y="1964.0" class="small"><tspan class="value">862</tspan><tspan class="libname" dx="6">simdjson DOM</tspan><tspan class="note-plain" dx="6">C++</tspan></text>
 <rect x="210" y="1969.0" width="180.1" height="12" rx="2" class="bar"/>
 <text x="397.1" y="1979.0" class="small"><tspan class="value">537</tspan><tspan class="libname" dx="6">sonic-rs Value</tspan><tspan class="note-plain" dx="6">Rust</tspan></text>
-<rect x="210" y="1984.0" width="161.5" height="12" rx="2" class="bar-ours"/>
-<text x="378.5" y="1994.0" class="small"><tspan class="value ours">482</tspan><tspan class="libname ours" dx="6">JsonBeef</tspan><tspan class="note-plain" dx="6">Beef</tspan></text>
+<rect x="210" y="1984.0" width="163.7" height="12" rx="2" class="bar-ours"/>
+<text x="380.7" y="1994.0" class="small"><tspan class="value ours">488</tspan><tspan class="libname ours" dx="6">JsonBeef</tspan><tspan class="note-plain" dx="6">Beef</tspan></text>
 <line x1="40" y1="2005.0" x2="880" y2="2005.0" class="rule"/>
 <text x="190.0" y="2046.0" class="label" text-anchor="end">REST payloads</text>
 <rect x="210" y="2011.0" width="330.0" height="12" rx="2" class="bar"/>
@@ -349,16 +349,16 @@
 <text x="502.7" y="2036.0" class="small"><tspan class="value">1572</tspan><tspan class="libname" dx="6">yyjson</tspan><tspan class="note-plain" dx="6">C</tspan></text>
 <rect x="210" y="2041.0" width="260.9" height="12" rx="2" class="bar"/>
 <text x="477.9" y="2051.0" class="small"><tspan class="value">1436</tspan><tspan class="libname" dx="6">sonic-rs Value</tspan><tspan class="note-plain" dx="6">Rust</tspan></text>
-<rect x="210" y="2056.0" width="190.7" height="12" rx="2" class="bar-ours"/>
-<text x="407.7" y="2066.0" class="small"><tspan class="value ours">1049</tspan><tspan class="libname ours" dx="6">JsonBeef</tspan><tspan class="note-plain" dx="6">Beef</tspan></text>
+<rect x="210" y="2056.0" width="189.1" height="12" rx="2" class="bar-ours"/>
+<text x="406.1" y="2066.0" class="small"><tspan class="value ours">1040</tspan><tspan class="libname ours" dx="6">JsonBeef</tspan><tspan class="note-plain" dx="6">Beef</tspan></text>
 <line x1="40" y1="2077.0" x2="880" y2="2077.0" class="rule"/>
 <text x="190.0" y="2110.5" class="label" text-anchor="end">records array</text>
 <rect x="210" y="2083.0" width="330.0" height="12" rx="2" class="bar"/>
 <text x="547.0" y="2093.0" class="small"><tspan class="value">1390</tspan><tspan class="libname" dx="6">simdjson DOM</tspan><tspan class="note-plain" dx="6">C++</tspan></text>
 <rect x="210" y="2098.0" width="264.5" height="12" rx="2" class="bar"/>
 <text x="481.5" y="2108.0" class="small"><tspan class="value">1114</tspan><tspan class="libname" dx="6">yyjson</tspan><tspan class="note-plain" dx="6">C</tspan></text>
-<rect x="210" y="2113.0" width="173.6" height="12" rx="2" class="bar-ours"/>
-<text x="390.6" y="2123.0" class="small"><tspan class="value ours">731</tspan><tspan class="libname ours" dx="6">JsonBeef</tspan><tspan class="note-plain" dx="6">Beef</tspan></text>
+<rect x="210" y="2113.0" width="172.9" height="12" rx="2" class="bar-ours"/>
+<text x="389.9" y="2123.0" class="small"><tspan class="value ours">728</tspan><tspan class="libname ours" dx="6">JsonBeef</tspan><tspan class="note-plain" dx="6">Beef</tspan></text>
 <line x1="40" y1="2134.0" x2="880" y2="2134.0" class="rule"/>
 <text x="190.0" y="2175.0" class="label" text-anchor="end">strings, Unicode</text>
 <rect x="210" y="2140.0" width="330.0" height="12" rx="2" class="bar"/>
@@ -367,8 +367,8 @@
 <text x="417.6" y="2165.0" class="small"><tspan class="value">1064</tspan><tspan class="libname" dx="6">sonic-rs Value</tspan><tspan class="note-plain" dx="6">Rust</tspan></text>
 <rect x="210" y="2170.0" width="178.2" height="12" rx="2" class="bar"/>
 <text x="395.2" y="2180.0" class="small"><tspan class="value">945</tspan><tspan class="libname" dx="6">yyjson</tspan><tspan class="note-plain" dx="6">C</tspan></text>
-<rect x="210" y="2185.0" width="156.2" height="12" rx="2" class="bar-ours"/>
-<text x="373.2" y="2195.0" class="small"><tspan class="value ours">828</tspan><tspan class="libname ours" dx="6">JsonBeef</tspan><tspan class="note-plain" dx="6">Beef</tspan></text>
+<rect x="210" y="2185.0" width="157.6" height="12" rx="2" class="bar-ours"/>
+<text x="374.6" y="2195.0" class="small"><tspan class="value ours">836</tspan><tspan class="libname ours" dx="6">JsonBeef</tspan><tspan class="note-plain" dx="6">Beef</tspan></text>
 <line x1="40" y1="2206.0" x2="880" y2="2206.0" class="rule"/>
 <text x="190.0" y="2247.0" class="label" text-anchor="end">integers</text>
 <rect x="210" y="2212.0" width="330.0" height="12" rx="2" class="bar"/>
@@ -377,8 +377,8 @@
 <text x="462.1" y="2237.0" class="small"><tspan class="value">634</tspan><tspan class="libname" dx="6">sonic-rs Value</tspan><tspan class="note-plain" dx="6">Rust</tspan></text>
 <rect x="210" y="2242.0" width="242.9" height="12" rx="2" class="bar"/>
 <text x="459.9" y="2252.0" class="small"><tspan class="value">628</tspan><tspan class="libname" dx="6">simdjson DOM</tspan><tspan class="note-plain" dx="6">C++</tspan></text>
-<rect x="210" y="2257.0" width="204.5" height="12" rx="2" class="bar-ours"/>
-<text x="421.5" y="2267.0" class="small"><tspan class="value ours">529</tspan><tspan class="libname ours" dx="6">JsonBeef</tspan><tspan class="note-plain" dx="6">Beef</tspan></text>
+<rect x="210" y="2257.0" width="204.9" height="12" rx="2" class="bar-ours"/>
+<text x="421.9" y="2267.0" class="small"><tspan class="value ours">530</tspan><tspan class="libname ours" dx="6">JsonBeef</tspan><tspan class="note-plain" dx="6">Beef</tspan></text>
 <line x1="40" y1="2278.0" x2="880" y2="2278.0" class="rule"/>
 <text x="190.0" y="2319.0" class="label" text-anchor="end">hard floats</text>
 <rect x="210" y="2284.0" width="330.0" height="12" rx="2" class="bar"/>
@@ -387,8 +387,8 @@
 <text x="502.9" y="2309.0" class="small"><tspan class="value">337</tspan><tspan class="libname" dx="6">JsonDocument</tspan><tspan class="note-plain" dx="6">C#</tspan></text>
 <rect x="210" y="2314.0" width="251.0" height="12" rx="2" class="bar"/>
 <text x="468.0" y="2324.0" class="small"><tspan class="value">296</tspan><tspan class="libname" dx="6">orjson</tspan><tspan class="note-plain" dx="6">Python</tspan></text>
-<rect x="210" y="2329.0" width="223.3" height="12" rx="2" class="bar-ours"/>
-<text x="440.3" y="2339.0" class="small"><tspan class="value ours">263</tspan><tspan class="libname ours" dx="6">JsonBeef</tspan><tspan class="note-plain" dx="6">Beef</tspan></text>
+<rect x="210" y="2329.0" width="223.9" height="12" rx="2" class="bar-ours"/>
+<text x="440.9" y="2339.0" class="small"><tspan class="value ours">264</tspan><tspan class="libname ours" dx="6">JsonBeef</tspan><tspan class="note-plain" dx="6">Beef</tspan></text>
 <line x1="40" y1="2350.0" x2="880" y2="2350.0" class="rule"/>
 <text x="190.0" y="2391.0" class="label" text-anchor="end">NDJSON log</text>
 <rect x="210" y="2356.0" width="330.0" height="12" rx="2" class="bar"/>
@@ -398,7 +398,7 @@
 <rect x="210" y="2386.0" width="240.8" height="12" rx="2" class="bar"/>
 <text x="457.8" y="2396.0" class="small"><tspan class="value">946</tspan><tspan class="libname" dx="6">sonic-rs Value</tspan><tspan class="note-plain" dx="6">Rust</tspan></text>
 <rect x="210" y="2401.0" width="186.0" height="12" rx="2" class="bar-ours"/>
-<text x="403.0" y="2411.0" class="small"><tspan class="value ours">731</tspan><tspan class="libname ours" dx="6">JsonBeef</tspan><tspan class="note-plain" dx="6">Beef</tspan></text>
+<text x="403.0" y="2411.0" class="small"><tspan class="value ours">730</tspan><tspan class="libname ours" dx="6">JsonBeef</tspan><tspan class="note-plain" dx="6">Beef</tspan></text>
 <line x1="40" y1="2422.0" x2="880" y2="2422.0" class="rule"/>
 <text x="40.0" y="2450.0" class="footnote" text-anchor="start">* RapidJSON in-situ failed canada and hard floats (default float conversion is not always correctly rounded).</text>
 <text x="40.0" y="2470.0" class="footnote" text-anchor="start">* RapidJSON failed canada and hard floats (default float conversion is not always correctly rounded).</text>
