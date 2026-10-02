@@ -37,7 +37,8 @@
 # input held in memory and, for garbage-collected runtimes, whatever the collector let accumulate.
 #
 # Setup: ./fetch.sh && ./build.sh && ./gen-inputs.py
-# Usage: run.sh [min-samples] [input names...]      (TRACKS='dom stream' limits the tracks)
+# Usage: run.sh [min-samples] [input names...]      (TRACKS='dom stream' limits the tracks measured;
+#   a full run prints only those, a partial one keeps the others' saved tables)
 # A full run prints results.md (save it: ./run.sh > results.md, then ./plot.py). With ONLY (merge.sh),
 # for example ONLY='yyjson|simdjson.*' ./run.sh, only the matching implementations are measured and
 # results.md (or the file RESULTS names) is updated in place; inputs not named keep their saved rows. JsonBeef's own columns
@@ -293,7 +294,7 @@ track_tables() { # track title implementations...
 	for input in "${inputs[@]}"; do
 		for impl in "$@"; do
 			IFS='|' read -r name lib cmd <<< "$impl"
-			if selected "$name" && [[ "$requested" == *" $input "* ]]; then
+			if selected "$name" && [[ "$requested" == *" $input "* ]] && [[ " $TRACKS " == *" $track "* ]]; then
 				# Word splitting of the command prefix is intended
 				# shellcheck disable=SC2086
 				results["$input|$name"]=$(cell "$(reference_line "$track" "$input")" "$(input_path "$input")" $cmd)
@@ -448,7 +449,10 @@ else
 	echo "trust. Warm steady state only (cold start is out of scope)."
 fi
 echo
-for track in $TRACKS; do
+# A partial rerun prints every track (those not in TRACKS from the saved results), so none is dropped
+printed_tracks="$TRACKS"
+if [ -n "${ONLY:-}" ]; then printed_tracks="dom typed stream query"; fi
+for track in $printed_tracks; do
 	case $track in
 	dom)
 		echo "## DOM / untyped: JSON into the library's generic value tree"
