@@ -18,6 +18,9 @@ tests/suites/
 # Test script logs
 test-*.log
 
+# Python's bytecode cache (the oracles import each other)
+__pycache__/
+
 # Benchmark comparison: fetched implementations, toolchains, builds and generated inputs
 bench/compare/deps/
 bench/compare/bin/
