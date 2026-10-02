@@ -25,6 +25,8 @@ namespace JsonTester;
 /// one per line), -echo (the document as Write(output) gives it: with -preserve, as it was read),
 /// -mutate SEED (PreserveStyle, random edits, the preserving writer's output must read back into the
 /// edited document; prints that output).
+/// Patches (applied to the document before the output mode): -patch FILE (JSON Patch, RFC 6902; a
+/// failure prints `patch error: ...` and exits 1), -merge-patch FILE (RFC 7396).
 /// Metadata: -preserve (JsonMetadataMode.PreserveStyle).
 /// Dialect: -comments, -trailing-commas, -jsonc (both), -json5, -nonfinite (NaN, Infinity, -Infinity),
 /// -ijson (RFC 7493), -utf8=error|replace, -surrogates=error|replace|wtf8.
@@ -74,6 +76,9 @@ class Program
 		// -push N: fed to a JsonPushReader N bytes at a time (0: not)
 		int pushChunk = 0;
 		bool skipEmpty = false;
+		// -patch FILE, -merge-patch FILE
+		String patchPath = null;
+		bool mergePatch = false;
 		String path = null;
 		for (int i < args.Count)
 		{
@@ -123,6 +128,11 @@ class Program
 			{
 				output = .Select;
 				pointer = args[++i];
+			}
+			else if ((arg == "-patch" || arg == "-merge-patch") && i + 1 < args.Count)
+			{
+				mergePatch = arg == "-merge-patch";
+				patchPath = args[++i];
 			}
 			else if (arg == "-no-bom")
 				config.AllowBom = false;
@@ -202,6 +212,8 @@ class Program
 			return Usage("-events prints the canonical form only");
 		if (output == .Select && config.CollectErrors)
 			return Usage("-select stops at the first error");
+		if (patchPath != null && (events || pushChunk > 0 || sequence >= 0 || output == .Select || output == .Mutate))
+			return Usage("-patch and -merge-patch change the document");
 
 		let input = scope List<uint8>();
 		FileStream file = null;
@@ -355,6 +367,22 @@ class Program
 		}
 		if (read case .Err(let readError))
 			return PrintError(readError);
+		if (patchPath != null)
+		{
+			let patch = scope JsonDocument();
+			if (patch.ReadFile(patchPath) case .Err(let patchReadError))
+			{
+				Console.Error.Write("the patch: ");
+				return PrintError(patchReadError);
+			}
+			if (mergePatch)
+				JsonPatch.Merge(doc, patch.Root);
+			else if (JsonPatch.Apply(doc, patch.Root) case .Err(let patchError))
+			{
+				Console.Error.WriteLine($"patch error: {patchError}");
+				return 1;
+			}
+		}
 
 		switch (output)
 		{
@@ -435,6 +463,7 @@ class Program
 		Console.Error.WriteLine($"JsonTester: {message}");
 		Console.Error.WriteLine("usage: JsonTester [-document|-events] [-stream N] [output mode] [options] FILE");
 		Console.Error.WriteLine("       output modes: -rewrite -rewrite-pretty -compact -pretty -jcs -pointer P -select P -strings");
+		Console.Error.WriteLine("       patches: -patch FILE -merge-patch FILE");
 		Console.Error.WriteLine("       options: -no-bom -max-depth N -dup=keep|last|first|error -comments -trailing-commas -jsonc");
 		Console.Error.WriteLine("                -nonfinite -ijson -utf8=error|replace -surrogates=error|replace|wtf8");
 		Console.Error.WriteLine("       JsonTester -fxx [-every K] FILE...");

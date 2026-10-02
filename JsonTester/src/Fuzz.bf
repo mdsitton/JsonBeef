@@ -221,7 +221,33 @@ static class Fuzz
 		if (!pushAgrees)
 			Console.WriteLine($"  push: {pushed.Substring(0, Math.Min(pushed.Length, 200))}");
 
-		if (a == b && b == c && d == e && firstAgrees && skipsAgree && lenientAgrees && json5Agrees && pushAgrees)
+		// A document copied into another (SetValue) prints the same and is ValueEquals to it, and a JSON
+		// Patch that tests the copy against the original and then replaces it with the original applies
+		bool copyAgrees = true;
+		if (!document.IsEmpty)
+		{
+			let copy = scope JsonDocument();
+			copy.CreateRoot().SetValue(document.Root);
+			let copied = scope String();
+			Canonical.Write(copy.Root, copied);
+			let patch = scope JsonDocument();
+			let operations = patch.CreateRoot().SetArray();
+			for (let op in StringView[]("test", "replace"))
+			{
+				let operation = operations.Add().SetObject();
+				operation.Add("op").SetString(op);
+				operation.Add("path").SetString("");
+				operation.Add("value").SetValue(document.Root);
+			}
+			let applied = JsonPatch.Apply(copy, patch.Root);
+			let patched = scope String();
+			Canonical.Write(copy.Root, patched);
+			copyAgrees = copied == a && copy.Root.ValueEquals(document.Root) && applied case .Ok && patched == a;
+			if (!copyAgrees)
+				Console.WriteLine($"  copy: {copied.Substring(0, Math.Min(copied.Length, 200))} / patched {patched.Substring(0, Math.Min(patched.Length, 200))}");
+		}
+
+		if (a == b && b == c && d == e && firstAgrees && skipsAgree && lenientAgrees && json5Agrees && pushAgrees && copyAgrees)
 			return true;
 		Console.WriteLine($"  document: {a.Substring(0, Math.Min(a.Length, 200))}");
 		Console.WriteLine($"  reader:   {b.Substring(0, Math.Min(b.Length, 200))}");

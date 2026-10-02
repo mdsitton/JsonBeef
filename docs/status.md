@@ -1,24 +1,24 @@
 # JsonBeef status
 
-Last reviewed: 2026-10-02 (phase 7 under way: non-finite numbers, replacement modes, I-JSON, JSON5,
-sequences, push streaming done; JSON Patch and Merge Patch next).
+Last reviewed: 2026-10-02 (phases 1–7 done; the timed benchmark run, P3T, waits for a quiet
+machine).
 
 ## Verification baseline
 
 | Check | Expected result |
 |-------|-----------------|
-| `beefbuild -test` (Debug checks) | 273/273 pass |
-| `beefbuild -test -config=TestRelease` (Release settings) | 273/273 pass |
+| `beefbuild -test` (Debug checks) | 281/281 pass |
+| `beefbuild -test -config=TestRelease` (Release settings) | 281/281 pass |
 | `bash ./test-json-suite.sh` (Debug `JsonTester`; run `beefbuild` first) | In each of the document, events, stream1, stream16, push1, push7 (a JsonPushReader fed 1 or 7 bytes at a time), rewrite, rewrite-pretty, collect, stream-collect and preserve modes: nst 107/107 accepted (95 `y_` + 12 `i_`) and 211/211 rejected (188 `n_` + 23 `i_`); nst transform 16/16 accepted with the committed outputs, 6/6 rejected; JSON_checker 5/5 and 31/31; simdjson jsonchecker 33/33 and 75/75; adversarial 1457/1457 rejected without a crash; nativejson 27/27; json5-tests (strict) 25/25 and 89/89. Accepted cases match the oracle's canonical form byte for byte; rejected ones their golden message (`tests/errors/`). Then the extension modes: with `-comments` every `y_` case accepted and exactly the 3 listed `n_` cases and 36 json5-tests files, with `-jsonc` 6 and 38, with `-nonfinite` 3 and 28, with `-ijson` 0 and 24 and exactly the 10 listed `y_` cases rejected, with `-json5` 36 and 83 (`tests/nst/accept-*.txt`, `reject-ijson.txt`, `tests/json5/accept-*.txt`); every nst case and json5-tests file with `-json5` (as a document, as tokens, as tokens from 1-byte streams) agrees with `tests/tools/json5-canonical.py` (226 accepted with its canonical form, 206 rejected); every nst parsing and transform case with `-utf8=replace -surrogates=replace` (149 accepted, 191 rejected) and with `-surrogates=wtf8` (136, 204) agrees with the oracle under the same options, from memory and 1-byte streams; nativejson written back by the compact writer 27/27 byte for byte, and RFC 8785 vectors 6/6 |
 | `bash ./test-roundtrip.sh` (and with the Release `BIN`) | 269 accepted inputs (the suites' strict ones, the 38 JSONC-accepted json5-tests files with `-jsonc`, the other 45 JSON5 ones with `-json5`, the 14 corpus files): PreserveStyle writes each back byte for byte from memory and from a 16-byte stream, and 3 seeds of random edits each (807 runs) read back into the edited document. Run with `SEEDS=10` (2,240 runs) during phase 5 |
 | `BIN=./build/Release_Linux64/JsonTester/JsonTester bash ./test-json-suite.sh` (run `beefbuild -config=Release` first) | Same as Debug |
 | `bash ./test-json-corpus.sh` (and with the Release `BIN`) | The 14 simdjson-data jsonexamples files: canonical form in 6 modes equal to the oracle's, compact writer a fixed point; twitter/twitterescaped strings equal; mesh/mesh.pretty RFC 8785 output equal; 27 JSON Pointer lookups agree with the oracle on the document (`-pointer`) and on demand (`-select`, from memory and from 7-byte stream reads) |
 | `bash ./test-json-numbers.sh` (and with the Release `BIN`) | fxx: 1,414,285 lines, 0 mismatches (1,414,116 numbers bit-exact in f64 and f32, 169 non-JSON strings rejected, 30,700 overflows); es6: 100,000 lines, 0 mismatches (writes and reads) |
 | `bash ./test-leaks.sh` | No leaks (LeakSanitizer over the TestRelease `[Test]`s) |
-| `beefbuild-win -test`, `beefbuild-win -test -config=TestRelease` (`~/development/beef-proton`) | 273/273 pass (the Debug runtime's leak check at exit also passes: it breaks the run, exit code 0x80000003, on a leak LeakSanitizer can miss) |
+| `beefbuild-win -test`, `beefbuild-win -test -config=TestRelease` (`~/development/beef-proton`) | 281/281 pass (the Debug runtime's leak check at exit also passes: it breaks the run, exit code 0x80000003, on a leak LeakSanitizer can miss) |
 | `tests/fetch-suites.sh` | Pinned suites in `tests/suites/` (`docs/test-suites.md`) |
 | `bash ./test-json-lines.sh` (and with the Release `BIN`) | JsonSequenceReader against the oracle's `-lines` and `-concatenated`, from memory and from 7-byte stream reads: amazon_cellphones.ndjson (793 records), simdjson-data's three jsonchecker .ndjson files, 8 generated inputs (CRLF, empty lines, a BOM, ill-formed UTF-8, touching values) and every nst parsing case, both ways: 1,320 runs, 0 differences |
-| `bash ./test-json-fuzz.sh` (and with the Release `BIN`) | The stream sweep: every suite input through streams fed 1 to 31 bytes per read (16,895 runs) reads as from memory; then 2 seeds × 50 rounds of every suite input (57,200 runs) and 3 rounds of the 14 real-world files: fast build, reader, 1-byte stream and a push reader fed 1 byte at a time agree on every mutation, with CollectErrors memory and stream give the same errors and recovered document, SkipValue (the fast loop from memory, the token loop from a stream; the whole value and the first one inside it) gives the reader's outcome, and with `InvalidUtf8.Replace` and `InvalidSurrogates.Wtf8`, and as JSON5 (with SkipValue there too), a document from memory, one from 1-byte streams and the reader's tokens agree. Run with `SEEDS=3 ROUNDS=200` (343,326 runs, Release) at the end of phase 6: 0 disagreements |
+| `bash ./test-json-fuzz.sh` (and with the Release `BIN`) | The stream sweep: every suite input through streams fed 1 to 31 bytes per read (16,895 runs) reads as from memory; then 2 seeds × 50 rounds of every suite input (57,200 runs) and 3 rounds of the 14 real-world files: fast build, reader, 1-byte stream and a push reader fed 1 byte at a time agree on every mutation, with CollectErrors memory and stream give the same errors and recovered document, SkipValue (the fast loop from memory, the token loop from a stream; the whole value and the first one inside it) gives the reader's outcome, and with `InvalidUtf8.Replace` and `InvalidSurrogates.Wtf8`, and as JSON5 (with SkipValue there too), a document from memory, one from 1-byte streams and the reader's tokens agree; each document read, copied into another with SetValue, prints the same, is ValueEquals to it and passes a JSON Patch testing and replacing it with the original. Run with `SEEDS=3 ROUNDS=200` (343,326 runs, Release) at the end of phase 6: 0 disagreements |
 | `bench/compare/run.sh` | The existing implementations and JsonBeef's columns in all four tracks: `JsonBeef` (DOM), `JsonBeef JsonReader` (streaming), `JsonBeef [JsonObject]` (typed), `JsonBeef JsonReader` (on-demand query); refuses to run above load average 2. JsonBeef's check lines equal the reference on all 16 inputs in the DOM and streaming tracks and on twitter, citm_catalog and canada in the typed and query tracks (`./build.sh beef`). No timed run yet (P3T): there is no `results.md`, so the first timed run is the full one, then `ONLY='JsonBeef.*'` |
 | `bash bench/instructions.sh` (after `beefbuild -config=Release`; `MODES="events document typed query"` after `bench/compare/build.sh beef`) | The instruction counts below |
 
@@ -80,7 +80,7 @@ text): only twitter, citm_catalog and canada are in those tracks.
 | JSON5 (`JsonDialect.Json5`, the `Json5` preset): identifier and single-quoted names, JSON5 strings and escapes, hexadecimal and other JSON5 numbers reported as JSON numbers, JSON5 whitespace | Done (phase 7) |
 | Sequences (`JsonSequenceReader`: JSON Lines, concatenated, RFC 7464; memory and streams) | Done (phase 7) |
 | Push streaming (`JsonPushReader`: `Feed`/`Finish`, whole tokens only, every chunk size reads as the whole input) | Done (phase 7) |
-| JSON Patch (RFC 6902), Merge Patch (RFC 7396) | Phase 7 |
+| JSON Patch (`JsonPatch.Apply`, RFC 6902: all or nothing, `test` by value), Merge Patch (`JsonPatch.Merge`, RFC 7396), `JsonNode.SetValue` (deep copy from any document) and `ValueEquals`; `JsonTester -patch`/`-merge-patch` | Done (phase 7). Checked once, outside the committed tests, against json-patch-tests (108 enabled cases, 0 failures) |
 
 ## Open items
 
@@ -90,6 +90,6 @@ text): only twitter, citm_catalog and canada are in those tracks.
 | P3S | The stream event pass costs 1.3–1.5× the memory one in instructions (XmlBeef got its to 1.1–1.3×): the reader's `Grow` checks in scans | S |
 | P6T | Typed binding's overhead over the event pass in instructions (twitter 19.9 per byte against 14.7; citm_catalog 19.0 against 13.4): the generated member matching (User's 40 fields: about 2 per byte), allocation (about 1), and the per-token calls through `JsonReader`'s memory/stream dispatch; worth looking at once the timed run says where JsonBeef stands in the typed track | M |
 | P6S | The on-demand fast loop serves memory input only; streams skip through the token loop | S |
-| P7 | Phase 7's rest: JSON Patch and Merge Patch (`plan.md` §6) | M |
+| P7S | json-patch-tests (github.com/json-patch/json-patch-tests: `tests.json`, `spec_tests.json`) could join `tests/fetch-suites.sh` as a pinned suite with a runner over `JsonTester -patch`; checked once by hand so far, when the author agrees to add a suite | S |
 | T | TomlTester's BJSON dependency could move to JsonBeef now that the document and writer exist (`plan.md` §9 open item 2): a separate step in TomlBeef, when the author asks | S |
 | Q | Open questions (`plan.md` §9): the proposals are in use (floats keep `.0`, JCS separate; TomlTester moves later; a flat document only if phase 3 asks for one) | — |

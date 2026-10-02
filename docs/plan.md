@@ -281,7 +281,17 @@ Windows tests, committed (`AGENTS.md`).
    figures wait for P3T with the rest.*
    Typed binding from the reader and nodes; the typed and on-demand
    benchmark tracks.
-7. **Extras.** Sequence reader (JSON Lines), JSON5, non-finite numbers, I-JSON check, replacement
+7. **Extras.** *Done (2026-10-02): `AllowNonFiniteNumbers`; `InvalidUtf8` and `InvalidSurrogates`
+   (Replace with maximal subparts, WTF-8 with the writer's `\udxxx`); the `IJson` check; JSON5
+   (`JsonDialect.Json5`, the `Json5` preset) agreeing with an independent JSON5 oracle on every nst and
+   json5-tests input, and costing strict JSON nothing measurable (its whitespace and tokens on the
+   error paths); `JsonSequenceReader` (JSON Lines, concatenated, RFC 7464, from memory and streams)
+   agreeing with the oracle's sequence modes; `JsonPushReader` (`Feed`/`Finish`), whose tokens and
+   errors at every chunk size are those of the whole input (the suite's push1 and push7 modes);
+   `JsonPatch.Apply` (RFC 6902, all or nothing, `test` by value with numbers compared exactly),
+   `JsonPatch.Merge` (RFC 7396), `JsonNode.SetValue` (deep copy) and `JsonNode.ValueEquals`, with both
+   RFCs' Appendix A examples as tests.*
+   Sequence reader (JSON Lines), JSON5, non-finite numbers, I-JSON check, replacement
    modes; then push streaming, Patch.
 
 ## 7. Testing

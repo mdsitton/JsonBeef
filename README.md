@@ -9,8 +9,8 @@ sibling of [TomlBeef](https://github.com/mdsitton/TomlBeef), KdlBeef and XmlBeef
 suite; the document (`JsonDocument`:
 lookups, JSON Pointer, mutation, positions, PreserveStyle round trips); the writers (compact, indented,
 RFC 8785); JSONC, JSON5, non-finite numbers, I-JSON and replacement modes; JSON Lines, concatenated
-and RFC 7464 sequences; collect-errors; and typed mapping. JSON Patch and Merge Patch are next
-(`docs/status.md`).
+and RFC 7464 sequences; JSON Patch and Merge Patch; collect-errors; and typed mapping. The timed
+benchmark run is still to come (`docs/status.md`).
 
 ```beef
 [JsonObject(Naming = .CamelCase)]

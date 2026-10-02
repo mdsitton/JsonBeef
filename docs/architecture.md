@@ -10,10 +10,10 @@ the suites in [test-suites.md](test-suites.md). Code conventions and Beef gotcha
   memory or a `Stream`, with on-demand `SkipValue`, `ReadRaw` and `Find`, and a fed **push reader**
   (`JsonPushReader`); number conversion and
   formatting (`JsonNumber`); a **document** built on the reader (`JsonDocument` with `JsonNode`
-  handles, lookups, JSON Pointer, mutation, positions, PreserveStyle); **writers**: the streaming
-  `JsonWriter` (compact or indented) and the document's `Write`, also in RFC 8785 canonical form;
-  JSONC and JSON5; **sequences** (JSON Lines, concatenated, RFC 7464); and **typed mapping**
-  (`[JsonObject]`, `JsonSerializer`) bound straight from the reader. Patch follows `plan.md` §6.
+  handles, lookups, JSON Pointer, mutation, positions, PreserveStyle, JSON Patch and Merge Patch);
+  **writers**: the streaming `JsonWriter` (compact or indented) and the document's `Write`, also in
+  RFC 8785 canonical form; JSONC and JSON5; **sequences** (JSON Lines, concatenated, RFC 7464); and
+  **typed mapping** (`[JsonObject]`, `JsonSerializer`) bound straight from the reader.
 - **Strict and complete.** Every token is validated when it is read: UTF-8, the grammar, escapes,
   surrogate pairs, the number grammar. Nothing is skipped for speed. The first error stops the read
   with a located `JsonParseError` (kind, message, line, column in code points, byte offset, length,
@@ -33,6 +33,7 @@ the suites in [test-suites.md](test-suites.md). Code conventions and Beef gotcha
 | `JsonNode.bf` | `JsonNodeId`, the `JsonNode` handle (kind, navigation, lookups by name and index, values), `JsonNodeList`, `JsonMember`, `JsonMemberList` |
 | `JsonMemberIndex.bf` | The seeded hash index of large objects |
 | `JsonPointer.bf` | `JsonPointer` (RFC 6901 evaluation, syntax, escaping), `JsonPointerError` |
+| `JsonPatch.bf` | `JsonPatch` (RFC 6902 `Apply`, RFC 7396 `Merge`), `JsonPatchError`; the document's `Checkpoint`, `CopyDetached` and `Adopt`; `JsonNode.SetValue` and `ValueEquals` |
 | `JsonWriter.bf` | `JsonWriteOptions`, `JsonNonFiniteNumbers`, `JsonWriteError`; `JsonWriter`: the streaming writer, escaping, number output |
 | `JsonValueKind.bf` | `JsonValueKind` |
 | `JsonTextArena.bf`, `JsonStack.bf` | Internal: XmlBeef's chunked byte arena (kept across reads) and growable array with inlined `Add` |
@@ -60,8 +61,8 @@ the suites in [test-suites.md](test-suites.md). Code conventions and Beef gotcha
 Tests are in `src/JsonBeef/tests/`: `JsonEdgeCaseTests` (spec-reference §16, one test per edge case,
 numbered as there; each input is read from memory and through 1-byte stream reads, which must agree),
 `JsonReaderTests` (API, limits, streams, number layouts), `JsonDocumentTests` (the document, the
-writers), `JsonCollectTests`, `JsonPreserveTests`, `JsonObjectTests`, `JsonOnDemandTests` and
-`JsonPushTests`, with `JsonTestUtil` (the trace helpers and a trickling test stream). The CLI is
+writers), `JsonCollectTests`, `JsonPreserveTests`, `JsonObjectTests`, `JsonOnDemandTests`,
+`JsonPushTests` and `JsonPatchTests`, with `JsonTestUtil` (the trace helpers and a trickling test stream). The CLI is
 `JsonTester/src/` (`Program.bf`, `Canonical.bf`, `Numbers.bf`, `TrickleStream.bf`, `Push.bf`,
 `Bench.bf`, `Fuzz.bf`, `Mutate.bf`);
 the scripts are `test-json-suite.sh`, `test-json-corpus.sh`, `test-json-numbers.sh`,
@@ -448,6 +449,34 @@ is a programming error (fatal), as in XmlBeef. New text goes to the string table
 object's members drops its lookup index. Removed records keep their slots until the document is
 cleared or read again.
 
+`SetValue(source)` copies a value and its subtree from any document: `CopyDetached` builds the copy
+first as new records linked to nothing (iteratively, in preorder; text from another document goes to
+the string table, text of the same document is shared by reference), so the source may lie under the
+target, and `Adopt` then moves the copy's value and children into the target node, which keeps its
+ID, name and place. `ValueEquals` compares two values (of any documents) with an explicit stack: kinds,
+strings byte for byte, arrays in order, objects as sets of names (a repeated name counts once, with
+the last value, as lookups do). Numbers of one kind compare directly (integers by payload, doubles as
+doubles); mixed kinds compare exact decimal values: an integer or lexeme by its text, a double by its
+exact binary value written out in base 10^9 limbs (2^64 is `18446744073709551616`, where its shortest
+digits are `18446744073709552000`), each reduced to sign, significant digits and exponent.
+
+### Patch
+
+`JsonPatch.Apply` (RFC 6902) checks each operation object (`op`, `path`, `from`, `value`; a member
+given twice is an error, unknown members are ignored) and applies it on the document's own
+operations: `add` resolves the parent pointer and the last token (`-` appends, an index may equal
+the count, an existing member is replaced in place), `remove` and `replace` the target, `move` and
+`copy` copy `from` detached first (move then removes it: the add's indexes are those after the
+removal), `test` is `ValueEquals`. All or nothing: a `JsonDocument.Checkpoint` taken first copies the
+node records and style slots and counts the string table and range records (both only grow), and a
+failure restores them, drops the member indexes and leaves handles from before valid (the generation
+does not change). Its cost is linear in the document; the patch must be another document's.
+`JsonPatch.Merge` (RFC 7396) cannot fail: a non-object patch replaces the value (`SetValue`), an
+object patch walks its members depth first with an explicit stack in document order (so a later
+member of the same name sees the earlier one's result), removing members for `null`, merging into
+objects (made objects if they were not) and replacing anything else. With PreserveStyle the edits are
+ordinary mutations: what a patch does not touch is written back as it was read.
+
 ### PreserveStyle
 
 `JsonMetadataMode.PreserveStyle` keeps the source (a stream is read whole first) and, per node, where
@@ -599,14 +628,18 @@ shared stack, so it is iterative too.
   memory read's outcome every time), then mutates every input at random and requires one outcome from
   the fast build, the reader, a 1-byte stream, a push reader fed 1 byte at a time, collect-errors from
   memory and from a stream, and
-  SkipValue (its fast loop from memory, the token loop from a stream). `test-roundtrip.sh` writes every
+  SkipValue (its fast loop from memory, the token loop from a stream); each document read is also
+  copied into another (`SetValue`), which must print the same, be `ValueEquals` to it and pass a JSON
+  Patch that tests and replaces it with the original. `test-roundtrip.sh` writes every
   accepted input back with PreserveStyle (byte for byte) and checks random edits (`-mutate`).
 - The `[Test]`s: `JsonEdgeCaseTests` (spec-reference §16), `JsonReaderTests`, `JsonDocumentTests`,
   `JsonCollectTests`, `JsonPreserveTests` (with ported jsonc-parser edit cases), `JsonObjectTests`
   (every field shape, names, errors with paths, duplicates, polymorphism, converters, allocators,
   files, documents in place), `JsonOnDemandTests` (SkipValue, ReadRaw, Find, from memory and
-  streams) and `JsonPushTests` (every chunk size against the memory read, waiting for whole tokens,
-  limits). They run in Debug and TestRelease on Linux and Windows (the Windows Debug runtime's leak
+  streams), `JsonPushTests` (every chunk size against the memory read, waiting for whole tokens,
+  limits) and `JsonPatchTests` (RFC 6902's and RFC 7396's Appendix A, every operation's errors, the
+  rollback, PreserveStyle, exact number equality, deep values; JsonTester's `-patch FILE` and
+  `-merge-patch FILE` apply a patch before printing). They run in Debug and TestRelease on Linux and Windows (the Windows Debug runtime's leak
   check at exit catches what LeakSanitizer can miss), and under LeakSanitizer (`test-leaks.sh`).
 - `bench/compare` checks every JsonBeef column's check line against `reference.py` (all four tracks),
   and `bench/instructions.sh` counts instructions per byte, which the load does not change.
