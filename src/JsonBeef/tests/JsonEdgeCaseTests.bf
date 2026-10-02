@@ -465,7 +465,22 @@ static class JsonEdgeCaseTests
 	{
 		Rejects("NaN", .InvalidNumber, 1, 1);
 		Rejects("Infinity", .InvalidNumber, 1, 1);
-		Rejects("-Infinity", .InvalidNumber, 1, 2);
+		Rejects("-Infinity", .InvalidNumber, 1, 1);
+		// AllowNonFiniteNumbers: numbers of kind NonFinite with the values they name
+		var config = JsonReadConfig();
+		config.AllowNonFiniteNumbers = true;
+		Accepts("[NaN, Infinity, -Infinity]", "[ NaN Infinity -Infinity ]", config);
+		let reader = scope JsonReader("[NaN,Infinity,-Infinity]", config);
+		Test.Assert(reader.Next() case .Ok(.StartArray));
+		double value = 0;
+		Test.Assert(reader.Next() case .Ok(.Number));
+		Test.Assert(reader.NumberKind == .NonFinite && reader.TryGetDouble(out value) && value.IsNaN);
+		Test.Assert(reader.Next() case .Ok(.Number));
+		Test.Assert(reader.TryGetDouble(out value) && value == double.PositiveInfinity);
+		Test.Assert(reader.Next() case .Ok(.Number));
+		Test.Assert(reader.GetDouble() == .Ok(double.NegativeInfinity));
+		Rejects("NaNa", .InvalidNumber, 1, 1, -1, config);
+		Rejects("[Infinit]", .InvalidNumber, 1, 2, -1, config);
 	}
 
 	[Test]
@@ -475,6 +490,13 @@ static class JsonEdgeCaseTests
 		Rejects("+Infinity", .InvalidNumber, 1, 1);
 		Rejects("Inf", .InvalidLiteral, 1, 1);
 		Rejects("nan", .InvalidLiteral, 1, 1);
+		// Not with AllowNonFiniteNumbers either (`-NaN` and `+Infinity` are JSON5's)
+		var config = JsonReadConfig();
+		config.AllowNonFiniteNumbers = true;
+		Rejects("-NaN", .InvalidNumber, 1, 2, -1, config);
+		Rejects("+Infinity", .InvalidNumber, 1, 1, -1, config);
+		Rejects("Inf", .InvalidNumber, 1, 1, -1, config);
+		Rejects("nan", .InvalidLiteral, 1, 1, -1, config);
 	}
 
 	[Test]
@@ -833,6 +855,28 @@ static class JsonEdgeCaseTests
 	public static void E098_LoneHighSurrogate()
 	{
 		Rejects("\"\\uD834\"", .InvalidSurrogate, 1, 2);
+		Test.Assert(StringOf("\"\\uD834\"", scope .(), Surrogates(.Replace)) == "\u{FFFD}");
+		let wtf8 = StringOf("\"\\uD834\"", scope .(), Surrogates(.Wtf8));
+		Test.Assert(wtf8 == "\xED\xA0\xB4");
+		// The writer turns WTF-8 back into the escape, so the text round-trips
+		let output = scope String();
+		let writer = scope JsonWriter(output);
+		writer.WriteString(wtf8);
+		Test.Assert(writer.Finish() case .Ok && output == "\"\\ud834\"");
+	}
+
+	static JsonReadConfig Surrogates(JsonInvalidSurrogates mode)
+	{
+		var config = JsonReadConfig();
+		config.InvalidSurrogates = mode;
+		return config;
+	}
+
+	static JsonReadConfig ReplaceUtf8()
+	{
+		var config = JsonReadConfig();
+		config.InvalidUtf8 = .Replace;
+		return config;
 	}
 
 	[Test]
@@ -854,12 +898,22 @@ static class JsonEdgeCaseTests
 		Rejects("\"\\uD800\\uD800\"", .InvalidSurrogate, 1, 2);
 		Rejects("\"\\uD800abc\"", .InvalidSurrogate, 1, 2);
 		Rejects("\"\\uD800\\n\"", .InvalidSurrogate, 1, 2);
+		// One U+FFFD per unpaired escape; what follows it is read as usual
+		Test.Assert(StringOf("\"\\uD800A\"", scope .(), Surrogates(.Replace)) == "\u{FFFD}A");
+		Test.Assert(StringOf("\"\\uD800\\uD800\"", scope .(), Surrogates(.Replace)) == "\u{FFFD}\u{FFFD}");
+		Test.Assert(StringOf("\"\\uDD1E\\uD834\"", scope .(), Surrogates(.Replace)) == "\u{FFFD}\u{FFFD}");
+		Test.Assert(StringOf("\"\\uD800\\n\"", scope .(), Surrogates(.Wtf8)) == "\xED\xA0\x80\n");
+		// A pair stays a pair
+		Test.Assert(StringOf("\"\\uD834\\uDD1E\"", scope .(), Surrogates(.Wtf8)) == "\u{1D11E}");
+		// A malformed escape after a high surrogate is still an error
+		Rejects("\"\\uD800\\uZZZZ\"", .InvalidEscape, 1, 8, -1, Surrogates(.Replace));
 	}
 
 	[Test]
 	public static void E102_HighThenRawSupplementary()
 	{
 		Rejects("\"\\uD800\u{10000}\"", .InvalidSurrogate, 1, 2);
+		Test.Assert(StringOf("\"\\uD800\u{10000}\"", scope .(), Surrogates(.Wtf8)) == "\xED\xA0\x80\xF0\x90\x80\x80");
 	}
 
 	[Test]
@@ -868,6 +922,15 @@ static class JsonEdgeCaseTests
 		Test.Assert(StringOf("\"\\uFFFF\"", scope .()) == "\u{FFFF}");
 		Test.Assert(StringOf("\"\\uFDD0\"", scope .()) == "\u{FDD0}");
 		Test.Assert(StringOf("\"\\uDBFF\\uDFFF\"", scope .()) == "\u{10FFFF}");
+		// Not I-JSON: raw ones located at the character, escaped ones at the string
+		var ijson = JsonReadConfig();
+		ijson.IJson = true;
+		Rejects("\"\\uFFFF\"", .Noncharacter, 1, 1, -1, ijson);
+		Rejects("[\"ab\u{FDD0}\"]", .Noncharacter, 1, 5, -1, ijson);
+		Rejects("{\"\u{10FFFE}\": 1}", .Noncharacter, 1, 3, -1, ijson);
+		Rejects("\"\\uD83F\\uDFFF\"", .Noncharacter, 1, 1, -1, ijson);
+		// Neighbors are fine
+		Test.Assert(StringOf("\"\u{FDCF}\u{FDF0}\u{FFFD}\u{10FFFD}\"", scope .(), ijson) == "\u{FDCF}\u{FDF0}\u{FFFD}\u{10FFFD}");
 	}
 
 	[Test]
@@ -922,18 +985,24 @@ static class JsonEdgeCaseTests
 		Rejects("\"\xFF\"", .InvalidUtf8, 1, 2);
 		Rejects("\"\x81\"", .InvalidUtf8, 1, 2);
 		Rejects("\"\xE9\"", .InvalidUtf8, 1, 2);
+		// InvalidUtf8.Replace: one U+FFFD each, the text around kept
+		Test.Assert(StringOf("\"a\xFFb\"", scope .(), ReplaceUtf8()) == "a\u{FFFD}b");
+		Test.Assert(StringOf("\"\x81\"", scope .(), ReplaceUtf8()) == "\u{FFFD}");
+		Test.Assert(StringOf("\"\xE9t\xE9\\n\"", scope .(), ReplaceUtf8()) == "\u{FFFD}t\u{FFFD}\n");
 	}
 
 	[Test]
 	public static void E112_Overlong()
 	{
 		Rejects("\"\xC0\xAF\"", .InvalidUtf8, 1, 2);
+		Test.Assert(StringOf("\"\xC0\xAF\"", scope .(), ReplaceUtf8()) == "\u{FFFD}\u{FFFD}");
 	}
 
 	[Test]
 	public static void E113_EncodedSurrogate()
 	{
 		Rejects("\"\xED\xA0\x80\"", .InvalidUtf8, 1, 2);
+		Test.Assert(StringOf("\"\xED\xA0\x80\"", scope .(), ReplaceUtf8()) == "\u{FFFD}\u{FFFD}\u{FFFD}");
 	}
 
 	[Test]
@@ -941,18 +1010,22 @@ static class JsonEdgeCaseTests
 	{
 		Rejects("\"\xF4\x90\x80\x80\"", .InvalidUtf8, 1, 2);
 		Test.Assert(StringOf("\"\xF4\x8F\xBF\xBF\"", scope .()) == "\u{10FFFF}");
+		Test.Assert(StringOf("\"\xF4\x90\x80\x80\"", scope .(), ReplaceUtf8()) == "\u{FFFD}\u{FFFD}\u{FFFD}\u{FFFD}");
 	}
 
 	[Test]
 	public static void E115_TruncatedSequence()
 	{
 		Rejects("\"\xE2\x82\"", .InvalidUtf8, 1, 2);
+		Test.Assert(StringOf("\"\xE2\x82\"", scope .(), ReplaceUtf8()) == "\u{FFFD}");
 	}
 
 	[Test]
 	public static void E116_InvalidOutsideString()
 	{
 		Rejects("[\xE5]", .InvalidUtf8, 1, 2);
+		// Replacement is for strings only
+		Rejects("[\xE5]", .InvalidUtf8, 1, 2, -1, ReplaceUtf8());
 	}
 
 	[Test]

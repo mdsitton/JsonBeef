@@ -9,6 +9,11 @@ Usage:
   json-canonical.py -pointer P FILE print the canonical form of the value at JSON Pointer P (RFC 6901;
                                     a duplicated name resolves to the last member), exit 1 if none
 
+Options, before the other arguments: -utf8=replace (ill-formed UTF-8 in strings becomes one U+FFFD
+per maximal subpart, as Python's decoder does; outside strings it still fails the parse),
+-surrogates=replace|wtf8 (an unpaired surrogate escape becomes U+FFFD, or is kept and printed as
+`\\udxxx`).
+
 Strict RFC 8259 with JsonBeef's default policies: one leading UTF-8 BOM skipped, invalid UTF-8 and
 lone surrogate escapes rejected, numbers of any size accepted. Canonical form: UTF-8, no whitespace,
 one final newline; members in document order with duplicates; strings with JCS escaping (lowercase
@@ -21,6 +26,9 @@ import os
 import sys
 
 sys.setrecursionlimit(100000)
+
+# -utf8= and -surrogates= (see the usage)
+OPTIONS = {"utf8": "error", "surrogates": "error"}
 
 
 class Number:
@@ -51,7 +59,8 @@ def parse(data):
     if data.startswith(b"\xef\xbb\xbf"):
         data = data[3:]
     try:
-        text = data.decode("utf-8", errors="strict")
+        # A U+FFFD that replaced bytes outside a string fails the JSON parse below, as it should
+        text = data.decode("utf-8", errors="replace" if OPTIONS["utf8"] == "replace" else "strict")
     except UnicodeDecodeError as e:
         raise NotJson(f"invalid UTF-8: {e}")
     try:
@@ -120,6 +129,12 @@ def string(s):
     for ch in s:
         c = ord(ch)
         if 0xD800 <= c <= 0xDFFF:
+            if OPTIONS["surrogates"] == "replace":
+                out.append("�")
+                continue
+            if OPTIONS["surrogates"] == "wtf8":
+                out.append("\\u%04x" % c)
+                continue
             raise NotJson("lone surrogate")
         if ch == '"':
             out.append('\\"')
@@ -194,6 +209,9 @@ def select(value, pointer):
 
 
 def main():
+    while len(sys.argv) > 1 and (sys.argv[1].startswith("-utf8=") or sys.argv[1].startswith("-surrogates=")):
+        name, value = sys.argv.pop(1)[1:].split("=", 1)
+        OPTIONS[name] = value
     if len(sys.argv) == 3 and sys.argv[1] == "-batch":
         outdir = sys.argv[2]
         for line in sys.stdin:

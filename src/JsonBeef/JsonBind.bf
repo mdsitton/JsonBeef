@@ -387,7 +387,7 @@ public static class JsonBind
 
 	static JsonParseError IntegerError(JsonReader reader, StringView min, StringView max)
 	{
-		if (reader.TokenType != .Number || reader.NumberKind == .Float)
+		if (reader.TokenType != .Number || reader.NumberKind == .Float || reader.NumberKind == .NonFinite)
 			return Mismatch(reader, "an integer");
 		return At(reader, .NumberOutOfRange, scope $"The number {reader.RawValue} is out of the field's range ({min} to {max})");
 	}
@@ -421,6 +421,11 @@ public static class JsonBind
 		{
 			reader.mBindError = Mismatch(reader, "a number");
 			return false;
+		}
+		if (reader.NumberKind == .NonFinite)
+		{
+			value = (float)JsonNumber.NonFiniteValue(reader.RawValue);
+			return true;
 		}
 		if (JsonNumber.ParseFloat(reader.RawValue, out value))
 			return true;

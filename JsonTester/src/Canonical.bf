@@ -199,11 +199,20 @@ static class Canonical
 				let text = node.AppendNumber(.. scope .());
 				output.Append(text[0] == '-' ? "-Infinity" : "Infinity");
 			}
+		case .NonFinite:
+			AppendNonFinite(output, node.GetDouble());
 		}
 	}
 
+	/// `NaN`, `Infinity` or `-Infinity` (a NonFinite number, with -nonfinite or -json5).
+	static void AppendNonFinite(String output, double value)
+	{
+		output.Append(value.IsNaN ? "NaN" : value < 0 ? "-Infinity" : "Infinity");
+	}
+
 	/// A string in JCS escaping (RFC 8785 §3.2.2.2): `\"`, `\\`, `\b \t \n \f \r`, other controls as
-	/// `\u00xx` in lowercase hex, everything else raw.
+	/// `\u00xx` in lowercase hex, a surrogate in WTF-8 (-surrogates=wtf8) as `\udxxx`, everything else
+	/// raw.
 	public static void AppendString(String output, StringView text)
 	{
 		output.Append('"');
@@ -211,6 +220,14 @@ static class Canonical
 		for (int i < text.Length)
 		{
 			char8 c = text[i];
+			if ((uint8)c == 0xED && i + 2 < text.Length && (uint8)text[i + 1] >= 0xA0)
+			{
+				output.Append(text.Ptr + runStart, i - runStart);
+				output.AppendF("\\u{0:x4}", 0xD000 | (((int)(uint8)text[i + 1] & 0x3F) << 6) | ((int)(uint8)text[i + 2] & 0x3F));
+				i += 2;
+				runStart = i + 1;
+				continue;
+			}
 			if (c != '"' && c != '\\' && (uint8)c >= 0x20)
 				continue;
 			output.Append(text.Ptr + runStart, i - runStart);
@@ -253,6 +270,9 @@ static class Canonical
 			output.AppendF("{}", value);
 		case .Float, .BigInteger:
 			AppendDouble(output, reader.RawValue);
+		case .NonFinite:
+			reader.TryGetDouble(let value);
+			AppendNonFinite(output, value);
 		}
 	}
 

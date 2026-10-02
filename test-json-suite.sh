@@ -30,9 +30,11 @@
 # (the first error must still be the golden one, and recovery must finish); preserve reads with
 # JsonMetadataMode.PreserveStyle (test-roundtrip.sh checks that it writes back byte for byte).
 #
-# The extension modes of EXTENSIONS (default "comments jsonc") run once each: every y_ case stays
-# accepted, and exactly the cases listed in tests/nst/accept-<mode>.txt and tests/json5/accept-<mode>.txt
-# are accepted among the nst n_ cases and json5-tests (docs/test-suites.md §1.5, §4.1).
+# The extension modes of EXTENSIONS (default "comments jsonc nonfinite ijson") run once each: every y_
+# case stays accepted (but those of tests/nst/reject-<mode>.txt, for I-JSON), and exactly the cases
+# listed in tests/nst/accept-<mode>.txt and tests/json5/accept-<mode>.txt are accepted among the nst n_
+# cases and json5-tests (docs/test-suites.md §1.5, §4.1). Then the string options (-utf8=replace,
+# -surrogates=replace|wtf8) are compared with the oracle on every nst case.
 #
 # Two more checks run once: every nativejson round-trip file written by the compact writer must equal
 # the file byte for byte (JsonFloatFormat.Plain keeps `0.0`, `-0.0`, `1.7976931348623157e308`), and
@@ -302,7 +304,7 @@ done
 read_list() { # file
 	grep -v '^#' "$1" | grep -v '^$' | sort
 }
-for ext in ${EXTENSIONS:-comments jsonc}; do
+for ext in ${EXTENSIONS:-comments jsonc nonfinite ijson}; do
 	: > "$tmpdir/nst-accepted"
 	y_rejected=()
 	for f in "$SUITES"/JSONTestSuite/test_parsing/[yn]_*.json; do
@@ -323,6 +325,16 @@ for ext in ${EXTENSIONS:-comments jsonc}; do
 		esac
 	done
 	ok=1
+	y_accepted=$((95 - ${#y_rejected[@]}))
+	if [ -f "tests/nst/reject-$ext.txt" ]; then
+		# A mode stricter than RFC 8259 (I-JSON) rejects exactly the listed y_ cases
+		if ! diff <(read_list "tests/nst/reject-$ext.txt") <(printf '%s\n' "${y_rejected[@]}" | grep -v '^$' | sort) > "$tmpdir/diff"; then
+			echo "[-$ext] y_ cases rejected differ from tests/nst/reject-$ext.txt:"
+			sed 's/^/  /' "$tmpdir/diff"
+			ok=0
+		fi
+		y_rejected=()
+	fi
 	if [ ${#y_rejected[@]} -gt 0 ]; then
 		echo "[-$ext] y_ cases rejected: ${y_rejected[*]}"
 		ok=0
@@ -338,8 +350,41 @@ for ext in ${EXTENSIONS:-comments jsonc}; do
 		ok=0
 	fi
 	if [ $ok -eq 1 ]; then
-		echo "[-$ext] nst: 95 y_ accepted, n_ accepted as listed ($(wc -l < "$tmpdir/nst-accepted")); json5-tests accepted as listed ($(wc -l < "$tmpdir/json5-accepted"))"
+		echo "[-$ext] nst: $y_accepted y_ accepted, n_ accepted as listed ($(wc -l < "$tmpdir/nst-accepted")); json5-tests accepted as listed ($(wc -l < "$tmpdir/json5-accepted"))"
 	else
+		failed=1
+	fi
+done
+
+# String options (docs/test-suites.md §1.2, §1.4): every nst parsing and transform case read with
+# -utf8=replace -surrogates=replace and with -surrogates=wtf8, as a document from memory and as tokens
+# from 1-byte stream reads: accepted with the oracle's canonical form under the same options, or
+# rejected by both
+ls "$SUITES"/JSONTestSuite/test_parsing/*.json "$SUITES"/JSONTestSuite/test_transform/*.json | awk '{ print NR "\t" $0 }' > "$tmpdir/optcases"
+for opts in "-utf8=replace -surrogates=replace" "-surrogates=wtf8"; do
+	rm -rf "$tmpdir/opt"
+	mkdir -p "$tmpdir/opt"
+	python3 "$ORACLE" $opts -batch "$tmpdir/opt" < "$tmpdir/optcases" || { echo "ERROR: the oracle failed"; exit 1; }
+	accepted=0
+	rejected=0
+	bad=()
+	while IFS=$'\t' read -r n f; do
+		if [ -f "$tmpdir/opt/$n.out" ]; then accepted=$((accepted + 1)); else rejected=$((rejected + 1)); fi
+		for flag in "" "-events -stream 1"; do
+			timeout 10 "$BIN" $opts $flag "$f" > "$tmpdir/out" 2> /dev/null
+			status=$?
+			if [ -f "$tmpdir/opt/$n.out" ]; then
+				{ [ $status -eq 0 ] && cmp -s "$tmpdir/out" "$tmpdir/opt/$n.out"; } || bad+=("$(basename "$f") [$flag] exit $status")
+			elif [ $status -ne 1 ]; then
+				bad+=("$(basename "$f") [$flag] exit $status, the oracle rejects it")
+			fi
+		done
+	done < "$tmpdir/optcases"
+	if [ ${#bad[@]} -eq 0 ]; then
+		echo "[$opts] nst: $accepted accepted with the oracle's canonical form, $rejected rejected by both"
+	else
+		echo "[$opts] ${#bad[@]} disagreements with the oracle:"
+		printf '  %s\n' "${bad[@]:0:20}"
 		failed=1
 	fi
 done

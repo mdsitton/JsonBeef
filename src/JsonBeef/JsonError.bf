@@ -37,6 +37,9 @@ public enum JsonErrorKind : uint8
 	InvalidStructure,
 	/// @brief A member name an earlier member of the object already has (JsonDuplicateNames.Error).
 	DuplicateName,
+	/// @brief A noncharacter (U+FDD0-U+FDEF, U+FFFE, U+FFFF and the last two code points of every
+	/// plane) in a string or name: legal JSON, but not I-JSON (JsonReadConfig.IJson, RFC 7493 §2.1).
+	Noncharacter,
 
 	// Values
 	/// @brief A number whose value does not fit the requested type (a double beyond ±1.8e308, an

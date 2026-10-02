@@ -135,16 +135,18 @@ static class JsonTestUtil
 	}
 
 	/// The decoded text of `text`, a string document.
-	public static String StringOf(StringView text, String output)
+	public static String StringOf(StringView text, String output, JsonReadConfig config = .())
 	{
-		let reader = scope JsonReader(text);
+		let reader = scope JsonReader(text, config);
 		Test.Assert(reader.Next() case .Ok(let token) && token == .String, scope $"`{text}` is not a string");
 		output.Append(reader.StringValue);
 		Test.Assert(reader.Next() case .Ok(let end) && end == .EndOfDocument);
 		// The same through a stream
 		let stream = scope JsonTestStream(text, 1);
 		let streamReader = scope JsonReader();
-		streamReader.Reset(stream);
+		var streamConfig = config;
+		streamConfig.StreamBufferBytes = 16;
+		streamReader.Reset(stream, streamConfig);
 		Test.Assert(streamReader.Next() case .Ok(let streamToken) && streamToken == .String && streamReader.StringValue == output);
 		return output;
 	}

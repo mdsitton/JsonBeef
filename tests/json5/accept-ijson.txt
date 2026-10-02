@@ -1,0 +1,26 @@
+# json5-tests files JsonBeef accepts with JsonReadConfig.IJson: the 25 strict JSON files but
+# objects/duplicate-keys.json (RFC 7493 §2.3).
+arrays/empty-array.json
+arrays/regular-array.json
+comments/block-comment-in-string.json
+comments/inline-comment-in-string.json
+misc/npm-package.json
+numbers/float.json
+numbers/float-leading-zero.json
+numbers/float-with-integer-exponent.json
+numbers/integer.json
+numbers/integer-with-integer-exponent.json
+numbers/integer-with-negative-integer-exponent.json
+numbers/integer-with-negative-zero-integer-exponent.json
+numbers/integer-with-positive-integer-exponent.json
+numbers/integer-with-positive-zero-integer-exponent.json
+numbers/integer-with-zero-integer-exponent.json
+numbers/negative-float.json
+numbers/negative-float-leading-zero.json
+numbers/negative-integer.json
+numbers/negative-zero-float.json
+numbers/negative-zero-integer.json
+numbers/zero-float.json
+numbers/zero-integer.json
+numbers/zero-integer-with-integer-exponent.json
+objects/empty-object.json

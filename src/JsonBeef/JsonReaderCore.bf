@@ -123,6 +123,13 @@ internal class JsonReaderCore<TCursor> where TCursor : IJsonCursor
 	{
 		mCursor = cursor;
 		mConfig = config;
+		if (config.IJson)
+		{
+			// I-JSON is UTF-8 Unicode text with finite numbers: no leniency
+			mConfig.AllowNonFiniteNumbers = false;
+			mConfig.InvalidUtf8 = .Error;
+			mConfig.InvalidSurrogates = .Error;
+		}
 		mData = null;
 		mBase = 0;
 		mPos = 0;
@@ -207,7 +214,8 @@ internal class JsonReaderCore<TCursor> where TCursor : IJsonCursor
 	/// @return Whether it reached the end of the container at `depth` (mToken its End token).
 	bool SkipFast(int depth)
 	{
-		if (!mCursor.IsWhole || mConfig.CollectErrors)
+		// (I-JSON's checks on strings and numbers are the token loop's)
+		if (!mCursor.IsWhole || mConfig.CollectErrors || mConfig.IJson)
 			return false;
 		while (true)
 		{
@@ -632,8 +640,36 @@ internal class JsonReaderCore<TCursor> where TCursor : IJsonCursor
 			}
 			return .Err(Unexpected(.InvalidStructure, "a value"));
 		default:
+			if ((c == 'N' || c == 'I') && mConfig.AllowNonFiniteNumbers)
+				return ReadNonFinite(mPos);
 			return .Err(UnexpectedInValue());
 		}
+	}
+
+	/// `NaN`, `Infinity` or `-Infinity` at `start` (AllowNonFiniteNumbers): a number of kind NonFinite.
+	Result<JsonToken, JsonFailure> ReadNonFinite(int start)
+	{
+		Retain(start);
+		int p = start;
+		if (mData[p] == '-')
+			p++;
+		StringView expected = (Avail(p) && mData[p] == 'N') ? "NaN" : "Infinity";
+		int end = WordEnd(p);
+		if (end - p != expected.Length || View(p, expected.Length) != expected || (expected == "NaN" && p > start))
+		{
+			end = Math.Max(end, p);
+			return .Err(Fail(.InvalidNumber, scope $"Invalid number `{View(start, end - start)}` (the non-finite numbers are `NaN`, `Infinity` and `-Infinity`)", start, Math.Max(end - start, 1)));
+		}
+		mNumberKind = .NonFinite;
+		mToken = .Number;
+		mTokenStart = start;
+		mTokenEnd = end;
+		mValue = View(start, end - start);
+		mRaw = mValue;
+		mEscaped = false;
+		mPos = end;
+		mState = .AfterValue;
+		return .Ok(.Number);
 	}
 
 	/// The error for a byte that cannot start a value, worded for the likely cause.
@@ -651,7 +687,7 @@ internal class JsonReaderCore<TCursor> where TCursor : IJsonCursor
 			int end = WordEnd(mPos);
 			StringView word = View(mPos, end - mPos);
 			if (word == "NaN" || word == "Infinity")
-				return Fail(.InvalidNumber, scope $"`{word}` is not a JSON number (non-finite numbers are not allowed)", mPos, end - mPos);
+				return Fail(.InvalidNumber, scope $"`{word}` is not a JSON number (JsonReadConfig.AllowNonFiniteNumbers allows `NaN`, `Infinity` and `-Infinity`)", mPos, end - mPos);
 			return Fail(.InvalidLiteral, scope $"Invalid literal `{word}` (JSON's literals are `true`, `false` and `null`)", mPos, end - mPos);
 		}
 		return Unexpected(.UnexpectedChar, "a value");
@@ -768,6 +804,14 @@ internal class JsonReaderCore<TCursor> where TCursor : IJsonCursor
 		{
 			negative = true;
 			p++;
+			if (Avail(p) && mData[p] == 'I')
+			{
+				if (mConfig.AllowNonFiniteNumbers)
+					return ReadNonFinite(start);
+				int end = WordEnd(p);
+				if (View(p, end - p) == "Infinity")
+					return .Err(Fail(.InvalidNumber, "`-Infinity` is not a JSON number (JsonReadConfig.AllowNonFiniteNumbers allows `NaN`, `Infinity` and `-Infinity`)", start, end - start));
+			}
 			if (!Avail(p) || !JsonChar.IsDigit(mData[p]))
 				return .Err(NumberError("Expected a digit after `-`", p));
 		}
@@ -927,6 +971,8 @@ internal class JsonReaderCore<TCursor> where TCursor : IJsonCursor
 		mValue = View(start, length);
 		mRaw = mValue;
 		mEscaped = false;
+		if (mConfig.IJson && (isFloat || mNumberKind == .BigInteger) && !GetDouble(?))
+			return .Err(Fail(.NumberOutOfRange, scope $"The number `{mRaw}` is beyond the range of a double, which I-JSON does not allow (RFC 7493 §2.2)", start, length));
 		mPos = p;
 		mState = .AfterValue;
 		return .Ok(.Number);
@@ -980,8 +1026,9 @@ internal class JsonReaderCore<TCursor> where TCursor : IJsonCursor
 			mRaw = mValue;
 			mEscaped = false;
 		}
-		else if (c == '\\')
+		else if (c == '\\' || (uint8)c >= 0x80)
 		{
+			// Escapes, or (InvalidUtf8.Replace) an ill-formed sequence: decoded
 			Try!(DecodeEscaped(start, ref p));
 			mValue = mStringBuffer;
 			mRaw = View(start + 1, p - start - 1);
@@ -991,6 +1038,18 @@ internal class JsonReaderCore<TCursor> where TCursor : IJsonCursor
 			return .Err(ControlCharacter(p));
 		if (mConfig.MaxStringBytes > 0 && mValue.Length > mConfig.MaxStringBytes)
 			return .Err(Fail(.ResourceLimitExceeded, scope $"The string ({mValue.Length} bytes) exceeds MaxStringBytes ({mConfig.MaxStringBytes})", start, p + 1 - start));
+		if (mConfig.IJson)
+		{
+			int at = JsonChar.FindNoncharacter(mValue);
+			if (at >= 0)
+			{
+				// Located at the character when it is written raw, else at the string
+				int offset = mEscaped ? start : start + 1 + at;
+				int length = mEscaped ? p + 1 - start : (((uint8)mValue[at] == 0xEF) ? 3 : 4);
+				uint32 cp = (uint32)JsonChar.Decode(mValue.Ptr, at, ?);
+				return .Err(Fail(.Noncharacter, scope $"The noncharacter U+{cp:X4} is not allowed in I-JSON (RFC 7493 §2.1)", offset, length));
+			}
+		}
 		mToken = isName ? .PropertyName : .String;
 		mTokenStart = start;
 		mTokenEnd = p + 1;
@@ -1033,7 +1092,8 @@ internal class JsonReaderCore<TCursor> where TCursor : IJsonCursor
 
 	/// From `p` inside the string that starts at `start`, past plain text and well-formed UTF-8 to the
 	/// next `"`, `\` or control character, which is then in the window. UTF-8 is checked here, the one
-	/// place non-ASCII text can be (the input is not validated before the reader).
+	/// place non-ASCII text can be (the input is not validated before the reader). With
+	/// InvalidUtf8.Replace an ill-formed sequence is a stop too, for the decoder to replace.
 	[Inline]
 	Result<int, JsonFailure> ScanStringText(int start, int p)
 	{
@@ -1050,7 +1110,11 @@ internal class JsonReaderCore<TCursor> where TCursor : IJsonCursor
 				{
 					int length = Utf8At(p);
 					if (length == 0)
+					{
+						if (mConfig.InvalidUtf8 == .Replace)
+							return p;
 						return .Err(InvalidUtf8(p));
+					}
 					p += length;
 				}
 				while (p < mEnd && (uint8)mData[p] >= 0x80);
@@ -1087,8 +1151,9 @@ internal class JsonReaderCore<TCursor> where TCursor : IJsonCursor
 		return Fail(.InvalidUtf8, message, p, length);
 	}
 
-	/// Decodes a string with escapes into mStringBuffer, from its opening quote at `start`; `p` is at its
-	/// first backslash and ends at its closing quote.
+	/// Decodes a string with escapes (or, with InvalidUtf8.Replace, ill-formed UTF-8) into mStringBuffer,
+	/// from its opening quote at `start`; `p` is at its first backslash or ill-formed byte and ends at
+	/// its closing quote.
 	Result<void, JsonFailure> DecodeEscaped(int start, ref int p)
 	{
 		mStringBuffer.Clear();
@@ -1100,6 +1165,18 @@ internal class JsonReaderCore<TCursor> where TCursor : IJsonCursor
 				return .Ok;
 			if ((uint8)c < 0x20)
 				return .Err(ControlCharacter(p));
+			if ((uint8)c >= 0x80)
+			{
+				// InvalidUtf8.Replace: the scan stopped at an ill-formed sequence
+				if (p + 4 > mEnd)
+					Grow(p, 4);
+				mStringBuffer.Append("\u{FFFD}");
+				p += JsonChar.MaximalSubpartLength(mData, p, mEnd);
+				int q = Try!(ScanStringText(start, p));
+				mStringBuffer.Append(mData + p, q - p);
+				p = q;
+				continue;
+			}
 			// A backslash
 			if (!Avail(p + 1))
 				return .Err(UnterminatedString(start, p + 1));
@@ -1136,7 +1213,30 @@ internal class JsonReaderCore<TCursor> where TCursor : IJsonCursor
 	Result<void, JsonFailure> DecodeUnicodeEscape(ref int p)
 	{
 		uint32 cp = Try!(ReadHex4(p));
-		if (cp >= 0xD800 && cp <= 0xDFFF)
+		if (cp >= 0xD800 && cp <= 0xDFFF && mConfig.InvalidSurrogates != .Error)
+		{
+			// Replace or Wtf8: a pair as usual, an unpaired escape replaced or kept as WTF-8 bytes
+			int low = cp < 0xDC00 ? LowSurrogateAt(p + 6) : -1;
+			if (low >= 0)
+			{
+				cp = 0x10000 + ((cp - 0xD800) << 10) + ((uint32)low - 0xDC00);
+				p += 12;
+			}
+			else
+			{
+				p += 6;
+				if (mConfig.InvalidSurrogates == .Replace)
+					mStringBuffer.Append("\u{FFFD}");
+				else
+				{
+					mStringBuffer.Append((char8)(0xE0 | (cp >> 12)));
+					mStringBuffer.Append((char8)(0x80 | ((cp >> 6) & 0x3F)));
+					mStringBuffer.Append((char8)(0x80 | (cp & 0x3F)));
+				}
+				return .Ok;
+			}
+		}
+		else if (cp >= 0xD800 && cp <= 0xDFFF)
 		{
 			if (cp >= 0xDC00)
 				return .Err(Fail(.InvalidSurrogate, scope $"The escape `{View(p, 6)}` is a low surrogate without a high surrogate before it (a lone surrogate is not Unicode text)", p, 6));
@@ -1155,6 +1255,23 @@ internal class JsonReaderCore<TCursor> where TCursor : IJsonCursor
 		int count = JsonChar.EncodeUtf8(&utf8, cp);
 		mStringBuffer.Append(&utf8, count);
 		return .Ok;
+	}
+
+	/// The low surrogate escaped at `p` (`\uDC00`-`\uDFFF`), or -1 for anything else (reported where it
+	/// is read on its own).
+	int LowSurrogateAt(int p)
+	{
+		if (!AvailN(p, 6) || mData[p] != '\\' || mData[p + 1] != 'u')
+			return -1;
+		int value = 0;
+		for (int i = 2; i < 6; i++)
+		{
+			uint8 digit = JsonChar.HexDigitValue(mData[p + i]);
+			if (digit == 255)
+				return -1;
+			value = (value << 4) | digit;
+		}
+		return value >= 0xDC00 && value <= 0xDFFF ? value : -1;
 	}
 
 	/// The value of the four hex digits of the `\u` escape at `p`.
@@ -1694,6 +1811,7 @@ internal class JsonReaderCore<TCursor> where TCursor : IJsonCursor
 	// Values of the current token
 
 	/// The current number token's double (correctly rounded); false if it overflows (the value is ±∞).
+	/// A NonFinite token gives its NaN or infinity, and true: it names that value.
 	public bool GetDouble(out double value)
 	{
 		switch (mNumberKind)
@@ -1708,6 +1826,9 @@ internal class JsonReaderCore<TCursor> where TCursor : IJsonCursor
 		case .Float:
 			if (mFloatExact && JsonNumber.TryClinger(mFloatMantissa, mFloatExponent, mRaw[0] == '-', out value))
 				return true;
+		case .NonFinite:
+			value = JsonNumber.NonFiniteValue(mRaw);
+			return true;
 		default:
 		}
 		return JsonNumber.ParseDoubleSlow(mRaw, out value);

@@ -264,7 +264,7 @@ public class JsonDocument
 		mSourceLength = owned.Length;
 		mNodes.Reserve(owned.Length / 8 + 16);
 		// The fast build first (JsonDocument.Fast.bf); at any problem, the reader reads again and reports it
-		if (config.DuplicateNames == .KeepAll && config.MetadataMode == .None && !config.CollectErrors &&
+		if (config.DuplicateNames == .KeepAll && config.MetadataMode == .None && !config.CollectErrors && !config.IJson &&
 			(config.MaxInputBytes <= 0 || owned.Length <= config.MaxInputBytes))
 		{
 			if (JsonInputStart.Check(owned.Ptr, owned.Length, config.AllowBom) case .Ok(let start) && FastBuild(owned.Ptr, start, owned.Length, config))
@@ -416,7 +416,8 @@ public class JsonDocument
 		bool nameInTable = false;
 		bool hasName = false;
 		bool discard = false;
-		let duplicates = config.DuplicateNames;
+		// I-JSON: no duplicates, whatever the policy
+		JsonDuplicateNames duplicates = config.IJson ? .Error : config.DuplicateNames;
 		bool positions = config.MetadataMode != .None;
 		bool preserve = config.MetadataMode == .PreserveStyle;
 		// Positions: the pending name's range, and the line and column of what a stream read locates
@@ -468,7 +469,7 @@ public class JsonDocument
 							let message = scope String();
 							message.Append("The member name ");
 							AppendQuoted(message, core.mValue);
-							message.Append(" appears twice in this object (JsonDuplicateNames.Error)");
+							message.Append(config.IJson ? " appears twice in this object (I-JSON, RFC 7493 §2.3)" : " appears twice in this object (JsonDuplicateNames.Error)");
 							return .Err(reader.MakeError(.DuplicateName, message, core.mTokenStart, core.mTokenEnd - core.mTokenStart));
 						case .LastWins:
 							Unlink(existing);
@@ -625,6 +626,8 @@ public class JsonDocument
 			node.mFlags |= .Lexeme;
 			if (inTable)
 				node.mFlags |= .ValueInTable;
+		case .NonFinite:
+			node.mPayload = JsonNumber.ToBits(JsonNumber.NonFiniteValue(core.mRaw));
 		}
 	}
 

@@ -1,1 +1,1 @@
-1:1: InvalidNumber: `Infinity` is not a JSON number (non-finite numbers are not allowed)
+1:1: InvalidNumber: `Infinity` is not a JSON number (JsonReadConfig.AllowNonFiniteNumbers allows `NaN`, `Infinity` and `-Infinity`)

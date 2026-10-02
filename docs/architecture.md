@@ -120,6 +120,37 @@ commas: it falls back to the reader at the first one. The suite checks that each
 the nst `n_` cases and json5-tests files jsonc-parser does (`tests/nst/accept-*.txt`,
 `tests/json5/accept-*.txt`).
 
+### Non-finite numbers, replacement, I-JSON
+
+Opt-in departures from RFC 8259 in either direction (spec-reference §5.2, §5.3, §8, §12.5), each a
+`JsonReadConfig` field and a `JsonTester` flag:
+
+- **`AllowNonFiniteNumbers`**: `NaN`, `Infinity` and `-Infinity` are number tokens of kind `NonFinite`
+  (where a value starts with `N` or `I`, and after `-`); their doubles are the values they name, and
+  documents store them as doubles. The writers still follow `NonFiniteNumbers` (an error by default),
+  and a PreserveStyle document writes them back as they were.
+- **`InvalidUtf8 = Replace`**: the string scan treats an ill-formed sequence as a stop, like `\`, and
+  the decoder writes one U+FFFD per maximal subpart (`JsonChar.MaximalSubpartLength`: the lead and the
+  continuation bytes that could still have completed it), as Unicode §3.9 and Python's decoder do.
+  Outside strings ill-formed bytes stay errors.
+- **`InvalidSurrogates = Replace | Wtf8`**: an unpaired `\u` surrogate escape becomes U+FFFD, or its
+  code point as three generalized-UTF-8 bytes (`ED A0 80`). Strings holding such bytes are not
+  UTF-8; the writer turns them back into `\udxxx` escapes (not in canonical output: RFC 8785 makes them
+  an error), so a WTF-8 document round-trips.
+- **`IJson`** (RFC 7493): noncharacters in strings and names are `Noncharacter` errors (checked on the
+  decoded text, so escaped ones count; `JsonChar.FindNoncharacter` looks only at lead bytes EF-F4),
+  numbers beyond a finite double are `NumberOutOfRange`, documents reject duplicate names whatever
+  `DuplicateNames` says, and the lenient options above are turned off. The reader still reports every
+  member, as under every duplicate policy.
+
+The fast build and SkipValue's fast loop take none of these paths themselves: what they do not accept
+(a non-finite token, an ill-formed sequence, a lone surrogate) is handed to the token loop, and with
+`IJson` neither runs. `test-json-suite.sh` checks the acceptance lists of `-nonfinite` and `-ijson`
+(`tests/nst/accept-*.txt`, `reject-ijson.txt`, `tests/json5/accept-*.txt`) and compares every nst
+case read with `-utf8=replace -surrogates=replace` and with `-surrogates=wtf8` with the oracle under
+the same options; `JsonTester -fuzz` reads every mutation in the replacement modes from memory and
+from 1-byte streams.
+
 ### Collect-errors
 
 With `JsonReadConfig.CollectErrors` an error does not stop the read: `NextToken` returns it and calls
@@ -158,7 +189,8 @@ one store per string (`mStringStart`).
 - **Numbers** are scanned once: the grammar (leading zeros, digits after `.` and in the exponent), the
   magnitude of an integer accumulated in a uint64 (19 digits always fit; the 20th is checked), and the
   kind: `Integer` (fits int64; `-0` is one, with value 0), `UInteger` (2^63 to 2^64 − 1), `Float` (a
-  fraction or an exponent), `BigInteger` (more than 64 bits). A number that runs into a letter, `.`,
+  fraction or an exponent), `BigInteger` (more than 64 bits), and with `AllowNonFiniteNumbers`
+  `NonFinite` (`NaN`, `Infinity`, `-Infinity`). A number that runs into a letter, `.`,
   `+` or `-` is an `InvalidNumber` (`0x1F`, `1.2.3`), not a missing comma. `MaxNumberLength` bounds the
   token.
 - **Strings** are scanned 8 bytes at a time for `"`, `\` and bytes below 0x20 (`JsonChar.StringStops`,
@@ -167,7 +199,7 @@ one store per string (`mStringStart`).
   so far is copied into the reader's buffer and the rest is decoded there: the eight one-character
   escapes, `\uXXXX` (hex in either case) and surrogate pairs, which must be a high `\uD800`–`\uDBFF`
   immediately followed by an escaped low one; a lone or inverted surrogate is an `InvalidSurrogate`
-  error (`plan.md` §9 item 5). `RawValue` is the text between the quotes as written, `StringValue` the
+  error (`plan.md` §9 item 5) unless `InvalidSurrogates` says otherwise (see below). `RawValue` is the text between the quotes as written, `StringValue` the
   decoded text (it may hold NUL), `ValueIsEscaped` tells them apart. `MaxStringBytes` bounds the
   decoded length.
 

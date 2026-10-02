@@ -225,11 +225,13 @@ public static class JsonSerializer
 		return error;
 	}
 
-	/// For the text written from a node: no depth limit (the document had its own).
+	/// For the text written from a node: no depth limit (the document had its own), and the non-finite
+	/// numbers a document read with AllowNonFiniteNumbers may hold.
 	static JsonReadConfig NodeConfig()
 	{
 		var config = JsonReadConfig();
 		config.MaxDepth = 0;
+		config.AllowNonFiniteNumbers = true;
 		return config;
 	}
 }

@@ -1,1 +1,1 @@
-1:3: InvalidNumber: Expected a digit after `-`, found `I`
+1:2: InvalidNumber: `-Infinity` is not a JSON number (JsonReadConfig.AllowNonFiniteNumbers allows `NaN`, `Infinity` and `-Infinity`)

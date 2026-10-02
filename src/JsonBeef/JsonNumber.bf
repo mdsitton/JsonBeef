@@ -14,7 +14,10 @@ public enum JsonNumberKind : uint8
 	/// @brief A token with a fraction or an exponent. Its double may be out of range (`1e400`).
 	Float,
 	/// @brief An integer token beyond the 64-bit types. Its text is exact; its double is approximate.
-	BigInteger
+	BigInteger,
+	/// @brief `NaN`, `Infinity` or `-Infinity` (JsonReadConfig.AllowNonFiniteNumbers; JSON5 adds `+`
+	/// and `-NaN`): not JSON, read only when asked for. Its double is the NaN or infinity it names.
+	NonFinite
 }
 
 /// @brief How doubles are written.
@@ -224,6 +227,14 @@ public static class JsonNumber
 			magnitude = magnitude * 10 + digit;
 		}
 		return true;
+	}
+
+	/// The double of a NonFinite token: `NaN` (any sign) or `Infinity` with an optional sign.
+	internal static double NonFiniteValue(StringView token)
+	{
+		if (token.EndsWith("NaN"))
+			return double.NaN;
+		return token[0] == '-' ? double.NegativeInfinity : double.PositiveInfinity;
 	}
 
 	/// @brief Whether `text` is a JSON number: RFC 8259's number production, nothing before or after

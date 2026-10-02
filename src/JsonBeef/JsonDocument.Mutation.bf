@@ -242,6 +242,8 @@ extension JsonNode
 		case .BigInteger:
 			node.mPayload = mDocument.AddText(text);
 			node.mFlags |= .Lexeme | .ValueInTable;
+		case .NonFinite:
+			// (Not JSON number text: IsNumberText rejected it above)
 		}
 		return true;
 	}

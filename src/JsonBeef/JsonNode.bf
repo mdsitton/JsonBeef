@@ -276,7 +276,8 @@ public struct JsonNode : IEquatable<JsonNode>
 	public uint64 GetUInt64(uint64 fallback = 0) => TryGetUInt64(let value) ? value : fallback;
 
 	/// @brief The correctly rounded double of any number, if it is finite (`1e400` is not: never a silent
-	/// infinity). `-0` gives −0.0.
+	/// infinity). `-0` gives −0.0. A NonFinite number (`NaN`, `Infinity`, read with
+	/// AllowNonFiniteNumbers) gives the value it names.
 	public bool TryGetDouble(out double value)
 	{
 		value = 0;

@@ -1,0 +1,12 @@
+# The nst y_ cases JsonReadConfig.IJson rejects (RFC 7493): duplicate names (§2.3) and noncharacters,
+# escaped or raw (§2.1). Every other y_ case is I-JSON.
+y_object_duplicated_key
+y_object_duplicated_key_and_value
+y_string_escaped_noncharacter
+y_string_last_surrogates_1_and_2
+y_string_nonCharacterInUTF-8_U+10FFFF
+y_string_nonCharacterInUTF-8_U+FFFF
+y_string_unicode_U+10FFFE_nonchar
+y_string_unicode_U+1FFFE_nonchar
+y_string_unicode_U+FDD0_nonchar
+y_string_unicode_U+FFFE_nonchar

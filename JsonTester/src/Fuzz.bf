@@ -160,7 +160,32 @@ static class Fuzz
 			}
 		}
 
-		if (a == b && b == c && d == e && firstAgrees && skipsAgree)
+		// The replacement modes (U+FFFD for ill-formed UTF-8, WTF-8 for lone surrogates): a document from
+		// memory, from 1-byte stream reads and the reader's tokens agree too
+		var lenient = JsonReadConfig();
+		lenient.InvalidUtf8 = .Replace;
+		lenient.InvalidSurrogates = .Wtf8;
+		let lenientDoc = scope JsonDocument();
+		let f = scope String();
+		Outcome(lenientDoc.Read(text, lenient), lenientDoc, f);
+		let lenientStream = scope TrickleStream(scope FixedMemoryStream(Span<uint8>((uint8*)text.Ptr, text.Length)), 1);
+		var lenientStreamConfig = lenient;
+		lenientStreamConfig.StreamBufferBytes = 16;
+		let lenientStreamed = scope JsonDocument();
+		let g = scope String();
+		Outcome(lenientStreamed.Read(lenientStream, lenientStreamConfig), lenientStreamed, g);
+		let lenientReader = scope JsonReader(text, lenient);
+		let h = scope String();
+		if (Canonical.Write(lenientReader, h) case .Err(let lenientError))
+		{
+			h.Clear();
+			h.AppendF("error {} {}:{} @{}", lenientError.mKind, lenientError.mLine, lenientError.mColumn, lenientError.mOffset);
+		}
+		bool lenientAgrees = f == g && g == h;
+		if (!lenientAgrees)
+			Console.WriteLine($"  replace/wtf8: document {f.Substring(0, Math.Min(f.Length, 200))} / stream {g.Substring(0, Math.Min(g.Length, 200))} / reader {h.Substring(0, Math.Min(h.Length, 200))}");
+
+		if (a == b && b == c && d == e && firstAgrees && skipsAgree && lenientAgrees)
 			return true;
 		Console.WriteLine($"  document: {a.Substring(0, Math.Min(a.Length, 200))}");
 		Console.WriteLine($"  reader:   {b.Substring(0, Math.Min(b.Length, 200))}");

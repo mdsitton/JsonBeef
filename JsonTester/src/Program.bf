@@ -25,7 +25,8 @@ namespace JsonTester;
 /// -mutate SEED (PreserveStyle, random edits, the preserving writer's output must read back into the
 /// edited document; prints that output).
 /// Metadata: -preserve (JsonMetadataMode.PreserveStyle).
-/// Dialect: -comments, -trailing-commas, -jsonc (both).
+/// Dialect: -comments, -trailing-commas, -jsonc (both), -nonfinite (NaN, Infinity, -Infinity), -ijson
+/// (RFC 7493), -utf8=error|replace, -surrogates=error|replace|wtf8.
 /// Options: -no-bom, -max-depth N, -dup=keep|last|first|error, -collect (JsonReadConfig.CollectErrors:
 /// every error is printed, the first one first, and the exit status is 1 if there was any); for the
 /// batch modes -every K and -limit N.
@@ -121,6 +122,29 @@ class Program
 			{
 				config.Comments = true;
 				config.TrailingCommas = true;
+			}
+			else if (arg == "-nonfinite")
+				config.AllowNonFiniteNumbers = true;
+			else if (arg == "-ijson")
+				config.IJson = true;
+			else if (arg.StartsWith("-utf8="))
+			{
+				switch (arg.Substring(6))
+				{
+				case "error": config.InvalidUtf8 = .Error;
+				case "replace": config.InvalidUtf8 = .Replace;
+				default: return Usage(scope $"unknown UTF-8 policy `{arg}`");
+				}
+			}
+			else if (arg.StartsWith("-surrogates="))
+			{
+				switch (arg.Substring(12))
+				{
+				case "error": config.InvalidSurrogates = .Error;
+				case "replace": config.InvalidSurrogates = .Replace;
+				case "wtf8": config.InvalidSurrogates = .Wtf8;
+				default: return Usage(scope $"unknown surrogate policy `{arg}`");
+				}
 			}
 			else if (arg == "-max-depth" && i + 1 < args.Count && int.Parse(args[i + 1]) case .Ok(let depth))
 			{
@@ -331,7 +355,8 @@ class Program
 		Console.Error.WriteLine($"JsonTester: {message}");
 		Console.Error.WriteLine("usage: JsonTester [-document|-events] [-stream N] [output mode] [options] FILE");
 		Console.Error.WriteLine("       output modes: -rewrite -rewrite-pretty -compact -pretty -jcs -pointer P -select P -strings");
-		Console.Error.WriteLine("       options: -no-bom -max-depth N -dup=keep|last|first|error");
+		Console.Error.WriteLine("       options: -no-bom -max-depth N -dup=keep|last|first|error -comments -trailing-commas -jsonc");
+		Console.Error.WriteLine("                -nonfinite -ijson -utf8=error|replace -surrogates=error|replace|wtf8");
 		Console.Error.WriteLine("       JsonTester -fxx [-every K] FILE...");
 		Console.Error.WriteLine("       JsonTester -es6 [-limit N] [-every K] FILE");
 		return 2;

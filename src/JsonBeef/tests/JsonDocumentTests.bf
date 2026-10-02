@@ -318,4 +318,67 @@ static class JsonDocumentTests
 		Test.Assert(JsonDocument.CompareUtf16("\u{1F600}", "\u{E000}") < 0 && JsonDocument.CompareUtf16("\u{1F600}", "\u{D7FF}") > 0);
 		Test.Assert(JsonDocument.CompareUtf16("\u{1F600}", "\u{1F601}") < 0 && JsonDocument.CompareUtf16("\u{10000}", "\u{1F600}") < 0);
 	}
+
+	[Test]
+	public static void IJson_Checks()
+	{
+		var config = JsonReadConfig();
+		config.IJson = true;
+		let doc = scope JsonDocument();
+		// Numbers beyond a double are errors; precision loss is not
+		Test.Assert(doc.Read("[1e400]", config) case .Err(let big) && big.mKind == .NumberOutOfRange && big.mColumn == 2);
+		Test.Assert(doc.Read("[-1e309]", config) case .Err(let negative) && negative.mKind == .NumberOutOfRange);
+		Test.Assert(doc.Read("[123456789012345678901234567890, 0.1, 1e-400]", config) case .Ok);
+		// Duplicates are errors whatever DuplicateNames says
+		config.DuplicateNames = .LastWins;
+		Test.Assert(doc.Read("{\"a\": 1, \"a\": 2}", config) case .Err(let duplicate) && duplicate.mKind == .DuplicateName && duplicate.mColumn == 10);
+		// The lenient options give way
+		config.AllowNonFiniteNumbers = true;
+		config.InvalidUtf8 = .Replace;
+		config.InvalidSurrogates = .Wtf8;
+		Test.Assert(doc.Read("[NaN]", config) case .Err(let nan) && nan.mKind == .InvalidNumber);
+		Test.Assert(doc.Read("[\"\xFF\"]", config) case .Err(let utf8) && utf8.mKind == .InvalidUtf8);
+		Test.Assert(doc.Read("[\"\\uD800\"]", config) case .Err(let surrogate) && surrogate.mKind == .InvalidSurrogate);
+		// Through the reader too, and SkipValue checks the same
+		let reader = scope JsonReader("[[\"\\uFFFF\"], 1]", config);
+		Test.Assert(reader.Next() case .Ok(.StartArray));
+		Test.Assert(reader.Next() case .Ok(.StartArray));
+		Test.Assert(reader.SkipValue() case .Err(let skipped) && skipped.mKind == .Noncharacter);
+	}
+
+	[Test]
+	public static void NonFinite_ReadAndWrite()
+	{
+		var config = JsonReadConfig();
+		config.AllowNonFiniteNumbers = true;
+		let text = "[NaN, Infinity, -Infinity, 1.5]";
+		for (int chunk < 2)
+		{
+			let doc = scope JsonDocument();
+			if (chunk == 0)
+				Test.Assert(doc.Read(text, config) case .Ok);
+			else
+			{
+				var streamConfig = config;
+				streamConfig.StreamBufferBytes = 16;
+				Test.Assert(doc.Read(scope JsonTestStream(text, 1), streamConfig) case .Ok);
+			}
+			Test.Assert(doc.Root[0].NumberKind == .NonFinite && doc.Root[0].GetDouble().IsNaN);
+			Test.Assert(doc.Root[1].GetDouble() == double.PositiveInfinity && doc.Root[2].GetDouble() == double.NegativeInfinity);
+			// Writing them is the writer's choice: an error by default (the output stays JSON)
+			Test.Assert(doc.Write(scope String()) case .Err(let error) && error.mKind == .NonFiniteNumber);
+			var tokens = JsonWriteOptions();
+			tokens.NonFiniteNumbers = .Tokens;
+			Test.Assert(doc.Write(.. scope .(), tokens) == "[NaN,Infinity,-Infinity,1.5]");
+			var nulls = JsonWriteOptions();
+			nulls.NonFiniteNumbers = .Null;
+			Test.Assert(doc.Write(.. scope .(), nulls) == "[null,null,null,1.5]");
+		}
+		// A document read with PreserveStyle writes them back as they were
+		var preserve = config;
+		preserve.MetadataMode = .PreserveStyle;
+		let kept = scope JsonDocument();
+		Test.Assert(kept.Read(text, preserve) case .Ok);
+		Test.Assert(kept.Write(.. scope .()) == text);
+	}
 }

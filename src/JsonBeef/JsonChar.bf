@@ -516,6 +516,62 @@ internal static class JsonChar
 		return seqLength;
 	}
 
+	/// @brief The byte index of the first noncharacter in the well-formed UTF-8 `text` (U+FDD0-U+FDEF, and
+	/// U+xFFFE and U+xFFFF in every plane: RFC 7493 §2.1), or -1. Only lead bytes EF-F4 can start one.
+	public static int FindNoncharacter(StringView text)
+	{
+		char8* p = text.Ptr;
+		int length = text.Length;
+		for (int i < length)
+		{
+			uint8 b = (uint8)p[i];
+			if (b < 0xEF)
+				continue;
+			if (b == 0xEF && i + 2 < length)
+			{
+				uint8 b1 = (uint8)p[i + 1];
+				uint8 b2 = (uint8)p[i + 2];
+				// EF B7 90-AF: U+FDD0-U+FDEF; EF BF BE-BF: U+FFFE, U+FFFF
+				if ((b1 == 0xB7 && b2 >= 0x90 && b2 <= 0xAF) || (b1 == 0xBF && b2 >= 0xBE))
+					return i;
+			}
+			else if (b >= 0xF0 && b <= 0xF4 && i + 3 < length)
+			{
+				// U+nFFFE, U+nFFFF: the low 16 bits all ones but the last: xx 8F|9F|AF|BF BF BE|BF
+				if (((uint8)p[i + 1] & 0x0F) == 0x0F && (uint8)p[i + 2] == 0xBF && (uint8)p[i + 3] >= 0xBE)
+					return i;
+			}
+		}
+		return -1;
+	}
+
+	/// @brief The length of the maximal ill-formed subpart at `p[i]` (a byte ≥ 0x80 that starts no
+	/// well-formed sequence within `p[i ..< length]`): the lead byte and the continuation bytes after it
+	/// that could still have been part of a sequence (Unicode §3.9, "U+FFFD Substitution of Maximal
+	/// Subparts"). One U+FFFD replaces each: `C0 AF` is two subparts, `ED A0 80` three, `E2 82` one.
+	public static int MaximalSubpartLength(char8* p, int i, int length)
+	{
+		uint8 b = (uint8)p[i];
+		if (b < 0xC2 || b > 0xF4)
+			return 1;
+		int seqLength = b < 0xE0 ? 2 : b < 0xF0 ? 3 : 4;
+		uint8 low = 0x80;
+		uint8 high = 0xBF;
+		if (b == 0xE0) low = 0xA0;
+		else if (b == 0xED) high = 0x9F;
+		else if (b == 0xF0) low = 0x90;
+		else if (b == 0xF4) high = 0x8F;
+		int n = 1;
+		while (n < seqLength && i + n < length)
+		{
+			uint8 c = (uint8)p[i + n];
+			if (n == 1 ? (c < low || c > high) : (c & 0xC0) != 0x80)
+				break;
+			n++;
+		}
+		return n;
+	}
+
 	/// @brief The end of the complete UTF-8 sequences in `text[from ..< to]`: `to`, or the start of a
 	/// sequence cut off by `to` (a stream validates it once the rest arrives).
 	public static int CompleteSequencesEnd(char8* text, int from, int to)

@@ -505,8 +505,9 @@ public class JsonWriter
 
 	/// Appends `text` escaped: `"`, `\` and U+0000-U+001F always (`\b \t \n \f \r`, else `\u00xx` in
 	/// lowercase hex: JCS's and JSON.stringify's spelling), and what the options add. Plain runs are
-	/// found 8 bytes at a time. @return Whether `text` is well-formed UTF-8 (the bytes are appended
-	/// either way).
+	/// found 8 bytes at a time. Surrogates in WTF-8 (`ED A0 80`: strings read with
+	/// JsonInvalidSurrogates.Wtf8) are written as their escapes (`\ud800`), except in canonical output.
+	/// @return Whether `text` is well-formed UTF-8 (the bytes are appended either way).
 	internal static bool AppendEscaped(String output, StringView text, JsonWriteOptions options)
 	{
 		char8* p = text.Ptr;
@@ -540,6 +541,16 @@ public class JsonWriter
 				int seqLength = JsonChar.ValidSequenceLength(p, i, length);
 				if (seqLength == 0)
 				{
+					// A surrogate in WTF-8 (JsonInvalidSurrogates.Wtf8): back to its escape, so the text
+					// reads back the same. Not in canonical output (RFC 8785 §3.2.2.2: an error).
+					if (b == 0xED && !options.Canonical && i + 2 < length && (uint8)p[i + 1] >= 0xA0 && (uint8)p[i + 1] <= 0xBF && ((uint8)p[i + 2] & 0xC0) == 0x80)
+					{
+						output.Append(p + run, i - run);
+						AppendUnicodeEscape(output, 0xD000 | (((uint32)(uint8)p[i + 1] & 0x3F) << 6) | ((uint32)(uint8)p[i + 2] & 0x3F));
+						i += 3;
+						run = i;
+						continue;
+					}
 					valid = false;
 					i++;
 					continue;

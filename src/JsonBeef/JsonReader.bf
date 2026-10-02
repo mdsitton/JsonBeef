@@ -320,9 +320,10 @@ public class JsonReader
 	}
 
 	/// @brief Number: the correctly rounded double of any number token, if it is finite (`1e400` is not:
-	/// GetDouble reports it). Integers beyond 2^53 round as their text does.
+	/// GetDouble reports it). Integers beyond 2^53 round as their text does. A NonFinite token
+	/// (`NaN`, `Infinity`, with AllowNonFiniteNumbers) gives the value it names.
 	/// @param value Receives the double.
-	/// @return Whether the token is a number with a finite double.
+	/// @return Whether the token is a number with a finite double, or a NonFinite one.
 	public bool TryGetDouble(out double value)
 	{
 		value = 0;

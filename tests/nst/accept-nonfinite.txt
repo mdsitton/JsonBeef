@@ -1,0 +1,5 @@
+# The nst n_ cases JsonBeef accepts with JsonReadConfig.AllowNonFiniteNumbers (docs/test-suites.md
+# §1.5): Python's set, `NaN`, `Infinity`, `-Infinity`. `-NaN`, `+Inf` and `Inf` stay invalid.
+n_number_NaN
+n_number_infinity
+n_number_minus_infinity
