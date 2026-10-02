@@ -182,38 +182,38 @@
 <line x1="40" y1="224.0" x2="1398" y2="224.0" class="rule"/>
 <rect x="40" y="224.0" width="1358" height="26" class="row-ours"/>
 <text x="40" y="241.5"><tspan class="lang">Beef</tspan><tspan x="112" class="label ours">JsonBeef</tspan><tspan class="repo" dx="7"></tspan></text>
-<rect x="472" y="227.0" width="54" height="20" rx="3" class="heat" fill-opacity="0.33"/>
-<text x="521.0" y="241.5" class="cell ours" text-anchor="end">1202</text>
-<rect x="530" y="227.0" width="54" height="20" rx="3" class="heat" fill-opacity="0.32"/>
-<text x="579.0" y="241.5" class="cell ours" text-anchor="end">627</text>
+<rect x="472" y="227.0" width="54" height="20" rx="3" class="heat" fill-opacity="0.34"/>
+<text x="521.0" y="241.5" class="cell ours" text-anchor="end">1309</text>
+<rect x="530" y="227.0" width="54" height="20" rx="3" class="heat" fill-opacity="0.35"/>
+<text x="579.0" y="241.5" class="cell ours" text-anchor="end">1024</text>
 <rect x="588" y="227.0" width="54" height="20" rx="3" class="heat" fill-opacity="0.35"/>
-<text x="637.0" y="241.5" class="cell ours" text-anchor="end">1621</text>
+<text x="637.0" y="241.5" class="cell ours" text-anchor="end">1637</text>
 <rect x="646" y="227.0" width="54" height="20" rx="3" class="heat" fill-opacity="0.35"/>
-<text x="695.0" y="241.5" class="cell ours" text-anchor="end">494</text>
+<text x="695.0" y="241.5" class="cell ours" text-anchor="end">485</text>
 <rect x="704" y="227.0" width="54" height="20" rx="3" class="heat" fill-opacity="0.35"/>
 <text x="753.0" y="241.5" class="cell ours" text-anchor="end">1635</text>
-<rect x="762" y="227.0" width="54" height="20" rx="3" class="heat" fill-opacity="0.36"/>
-<text x="811.0" y="241.5" class="cell ours" text-anchor="end">2381</text>
+<rect x="762" y="227.0" width="54" height="20" rx="3" class="heat" fill-opacity="0.37"/>
+<text x="811.0" y="241.5" class="cell ours" text-anchor="end">2555</text>
 <rect x="820" y="227.0" width="54" height="20" rx="3" class="heat" fill-opacity="0.37"/>
-<text x="869.0" y="241.5" class="cell ours" text-anchor="end">603</text>
+<text x="869.0" y="241.5" class="cell ours" text-anchor="end">602</text>
 <rect x="878" y="227.0" width="54" height="20" rx="3" class="heat" fill-opacity="0.38"/>
-<text x="927.0" y="241.5" class="cell ours" text-anchor="end">837</text>
-<rect x="936" y="227.0" width="54" height="20" rx="3" class="heat" fill-opacity="0.35"/>
-<text x="985.0" y="241.5" class="cell ours" text-anchor="end">618</text>
+<text x="927.0" y="241.5" class="cell ours" text-anchor="end">809</text>
+<rect x="936" y="227.0" width="54" height="20" rx="3" class="heat" fill-opacity="0.36"/>
+<text x="985.0" y="241.5" class="cell ours" text-anchor="end">628</text>
 <rect x="994" y="227.0" width="54" height="20" rx="3" class="heat" fill-opacity="0.35"/>
-<text x="1043.0" y="241.5" class="cell ours" text-anchor="end">511</text>
+<text x="1043.0" y="241.5" class="cell ours" text-anchor="end">482</text>
 <rect x="1052" y="227.0" width="54" height="20" rx="3" class="heat" fill-opacity="0.36"/>
-<text x="1101.0" y="241.5" class="cell ours" text-anchor="end">1056</text>
+<text x="1101.0" y="241.5" class="cell ours" text-anchor="end">1049</text>
 <rect x="1110" y="227.0" width="54" height="20" rx="3" class="heat" fill-opacity="0.35"/>
-<text x="1159.0" y="241.5" class="cell ours" text-anchor="end">724</text>
-<rect x="1168" y="227.0" width="54" height="20" rx="3" class="heat" fill-opacity="0.29"/>
-<text x="1217.0" y="241.5" class="cell ours" text-anchor="end">414</text>
+<text x="1159.0" y="241.5" class="cell ours" text-anchor="end">731</text>
+<rect x="1168" y="227.0" width="54" height="20" rx="3" class="heat" fill-opacity="0.34"/>
+<text x="1217.0" y="241.5" class="cell ours" text-anchor="end">828</text>
 <rect x="1226" y="227.0" width="54" height="20" rx="3" class="heat" fill-opacity="0.36"/>
-<text x="1275.0" y="241.5" class="cell ours" text-anchor="end">528</text>
+<text x="1275.0" y="241.5" class="cell ours" text-anchor="end">529</text>
 <rect x="1284" y="227.0" width="54" height="20" rx="3" class="heat" fill-opacity="0.37"/>
-<text x="1333.0" y="241.5" class="cell ours" text-anchor="end">262</text>
+<text x="1333.0" y="241.5" class="cell ours" text-anchor="end">263</text>
 <rect x="1342" y="227.0" width="54" height="20" rx="3" class="heat" fill-opacity="0.36"/>
-<text x="1391.0" y="241.5" class="cell ours" text-anchor="end">740</text>
+<text x="1391.0" y="241.5" class="cell ours" text-anchor="end">731</text>
 <line x1="40" y1="250.0" x2="1398" y2="250.0" class="rule"/>
 <text x="40" y="267.5"><tspan class="lang">C++</tspan><tspan x="112" class="label">RapidJSON in-situ*</tspan><tspan class="repo" dx="7">Tencent/rapidjson</tspan></text>
 <rect x="472" y="253.0" width="54" height="20" rx="3" class="heat" fill-opacity="0.30"/>
@@ -247,71 +247,71 @@
 <rect x="1342" y="253.0" width="54" height="20" rx="3" class="heat" fill-opacity="0.34"/>
 <text x="1391.0" y="267.5" class="cell" text-anchor="end">611</text>
 <line x1="40" y1="276.0" x2="1398" y2="276.0" class="rule"/>
-<text x="40" y="293.5"><tspan class="lang">C++</tspan><tspan x="112" class="label">RapidJSON*</tspan><tspan class="repo" dx="7">Tencent/rapidjson</tspan></text>
-<rect x="472" y="279.0" width="54" height="20" rx="3" class="heat" fill-opacity="0.27"/>
-<text x="521.0" y="293.5" class="cell" text-anchor="end">490</text>
-<rect x="530" y="279.0" width="54" height="20" rx="3" class="heat" fill-opacity="0.29"/>
-<text x="579.0" y="293.5" class="cell" text-anchor="end">417</text>
-<rect x="588" y="279.0" width="54" height="20" rx="3" class="heat" fill-opacity="0.30"/>
-<text x="637.0" y="293.5" class="cell" text-anchor="end">828</text>
-<text x="696.0" y="293.0" class="cell-missing" text-anchor="end">FAIL</text>
-<rect x="704" y="279.0" width="54" height="20" rx="3" class="heat" fill-opacity="0.27"/>
-<text x="753.0" y="293.5" class="cell" text-anchor="end">585</text>
-<rect x="762" y="279.0" width="54" height="20" rx="3" class="heat" fill-opacity="0.24"/>
-<text x="811.0" y="293.5" class="cell" text-anchor="end">471</text>
-<rect x="820" y="279.0" width="54" height="20" rx="3" class="heat" fill-opacity="0.35"/>
-<text x="869.0" y="293.5" class="cell" text-anchor="end">489</text>
-<rect x="878" y="279.0" width="54" height="20" rx="3" class="heat" fill-opacity="0.35"/>
-<text x="927.0" y="293.5" class="cell" text-anchor="end">546</text>
-<rect x="936" y="279.0" width="54" height="20" rx="3" class="heat" fill-opacity="0.33"/>
-<text x="985.0" y="293.5" class="cell" text-anchor="end">456</text>
+<text x="40" y="293.5"><tspan class="lang">Rust</tspan><tspan x="112" class="label">jiter JsonValue</tspan><tspan class="repo" dx="7">pydantic/jiter</tspan></text>
+<rect x="472" y="279.0" width="54" height="20" rx="3" class="heat" fill-opacity="0.29"/>
+<text x="521.0" y="293.5" class="cell" text-anchor="end">653</text>
+<rect x="530" y="279.0" width="54" height="20" rx="3" class="heat" fill-opacity="0.24"/>
+<text x="579.0" y="293.5" class="cell" text-anchor="end">230</text>
+<rect x="588" y="279.0" width="54" height="20" rx="3" class="heat" fill-opacity="0.28"/>
+<text x="637.0" y="293.5" class="cell" text-anchor="end">619</text>
+<rect x="646" y="279.0" width="54" height="20" rx="3" class="heat" fill-opacity="0.32"/>
+<text x="695.0" y="293.5" class="cell" text-anchor="end">322</text>
+<rect x="704" y="279.0" width="54" height="20" rx="3" class="heat" fill-opacity="0.30"/>
+<text x="753.0" y="293.5" class="cell" text-anchor="end">866</text>
+<rect x="762" y="279.0" width="54" height="20" rx="3" class="heat" fill-opacity="0.34"/>
+<text x="811.0" y="293.5" class="cell" text-anchor="end">1689</text>
+<rect x="820" y="279.0" width="54" height="20" rx="3" class="heat" fill-opacity="0.32"/>
+<text x="869.0" y="293.5" class="cell" text-anchor="end">296</text>
+<rect x="878" y="279.0" width="54" height="20" rx="3" class="heat" fill-opacity="0.37"/>
+<text x="927.0" y="293.5" class="cell" text-anchor="end">687</text>
+<rect x="936" y="279.0" width="54" height="20" rx="3" class="heat" fill-opacity="0.31"/>
+<text x="985.0" y="293.5" class="cell" text-anchor="end">353</text>
 <rect x="994" y="279.0" width="54" height="20" rx="3" class="heat" fill-opacity="0.32"/>
-<text x="1043.0" y="293.5" class="cell" text-anchor="end">336</text>
+<text x="1043.0" y="293.5" class="cell" text-anchor="end">317</text>
 <rect x="1052" y="279.0" width="54" height="20" rx="3" class="heat" fill-opacity="0.31"/>
-<text x="1101.0" y="293.5" class="cell" text-anchor="end">509</text>
-<rect x="1110" y="279.0" width="54" height="20" rx="3" class="heat" fill-opacity="0.30"/>
-<text x="1159.0" y="293.5" class="cell" text-anchor="end">339</text>
-<rect x="1168" y="279.0" width="54" height="20" rx="3" class="heat" fill-opacity="0.31"/>
-<text x="1217.0" y="293.5" class="cell" text-anchor="end">535</text>
-<rect x="1226" y="279.0" width="54" height="20" rx="3" class="heat" fill-opacity="0.34"/>
-<text x="1275.0" y="293.5" class="cell" text-anchor="end">368</text>
-<text x="1334.0" y="293.0" class="cell-missing" text-anchor="end">FAIL</text>
+<text x="1101.0" y="293.5" class="cell" text-anchor="end">507</text>
+<rect x="1110" y="279.0" width="54" height="20" rx="3" class="heat" fill-opacity="0.27"/>
+<text x="1159.0" y="293.5" class="cell" text-anchor="end">245</text>
+<rect x="1168" y="279.0" width="54" height="20" rx="3" class="heat" fill-opacity="0.27"/>
+<text x="1217.0" y="293.5" class="cell" text-anchor="end">307</text>
+<rect x="1226" y="279.0" width="54" height="20" rx="3" class="heat" fill-opacity="0.31"/>
+<text x="1275.0" y="293.5" class="cell" text-anchor="end">263</text>
+<rect x="1284" y="279.0" width="54" height="20" rx="3" class="heat" fill-opacity="0.37"/>
+<text x="1333.0" y="293.5" class="cell" text-anchor="end">272</text>
 <rect x="1342" y="279.0" width="54" height="20" rx="3" class="heat" fill-opacity="0.31"/>
-<text x="1391.0" y="293.5" class="cell" text-anchor="end">406</text>
+<text x="1391.0" y="293.5" class="cell" text-anchor="end">372</text>
 <line x1="40" y1="302.0" x2="1398" y2="302.0" class="rule"/>
-<text x="40" y="319.5"><tspan class="lang">Rust</tspan><tspan x="112" class="label">jiter JsonValue</tspan><tspan class="repo" dx="7">pydantic/jiter</tspan></text>
-<rect x="472" y="305.0" width="54" height="20" rx="3" class="heat" fill-opacity="0.29"/>
-<text x="521.0" y="319.5" class="cell" text-anchor="end">653</text>
-<rect x="530" y="305.0" width="54" height="20" rx="3" class="heat" fill-opacity="0.24"/>
-<text x="579.0" y="319.5" class="cell" text-anchor="end">230</text>
-<rect x="588" y="305.0" width="54" height="20" rx="3" class="heat" fill-opacity="0.28"/>
-<text x="637.0" y="319.5" class="cell" text-anchor="end">619</text>
-<rect x="646" y="305.0" width="54" height="20" rx="3" class="heat" fill-opacity="0.32"/>
-<text x="695.0" y="319.5" class="cell" text-anchor="end">322</text>
-<rect x="704" y="305.0" width="54" height="20" rx="3" class="heat" fill-opacity="0.30"/>
-<text x="753.0" y="319.5" class="cell" text-anchor="end">866</text>
-<rect x="762" y="305.0" width="54" height="20" rx="3" class="heat" fill-opacity="0.34"/>
-<text x="811.0" y="319.5" class="cell" text-anchor="end">1689</text>
-<rect x="820" y="305.0" width="54" height="20" rx="3" class="heat" fill-opacity="0.32"/>
-<text x="869.0" y="319.5" class="cell" text-anchor="end">296</text>
-<rect x="878" y="305.0" width="54" height="20" rx="3" class="heat" fill-opacity="0.37"/>
-<text x="927.0" y="319.5" class="cell" text-anchor="end">687</text>
-<rect x="936" y="305.0" width="54" height="20" rx="3" class="heat" fill-opacity="0.31"/>
-<text x="985.0" y="319.5" class="cell" text-anchor="end">353</text>
+<text x="40" y="319.5"><tspan class="lang">C++</tspan><tspan x="112" class="label">RapidJSON*</tspan><tspan class="repo" dx="7">Tencent/rapidjson</tspan></text>
+<rect x="472" y="305.0" width="54" height="20" rx="3" class="heat" fill-opacity="0.27"/>
+<text x="521.0" y="319.5" class="cell" text-anchor="end">490</text>
+<rect x="530" y="305.0" width="54" height="20" rx="3" class="heat" fill-opacity="0.29"/>
+<text x="579.0" y="319.5" class="cell" text-anchor="end">417</text>
+<rect x="588" y="305.0" width="54" height="20" rx="3" class="heat" fill-opacity="0.30"/>
+<text x="637.0" y="319.5" class="cell" text-anchor="end">828</text>
+<text x="696.0" y="319.0" class="cell-missing" text-anchor="end">FAIL</text>
+<rect x="704" y="305.0" width="54" height="20" rx="3" class="heat" fill-opacity="0.27"/>
+<text x="753.0" y="319.5" class="cell" text-anchor="end">585</text>
+<rect x="762" y="305.0" width="54" height="20" rx="3" class="heat" fill-opacity="0.24"/>
+<text x="811.0" y="319.5" class="cell" text-anchor="end">471</text>
+<rect x="820" y="305.0" width="54" height="20" rx="3" class="heat" fill-opacity="0.35"/>
+<text x="869.0" y="319.5" class="cell" text-anchor="end">489</text>
+<rect x="878" y="305.0" width="54" height="20" rx="3" class="heat" fill-opacity="0.35"/>
+<text x="927.0" y="319.5" class="cell" text-anchor="end">546</text>
+<rect x="936" y="305.0" width="54" height="20" rx="3" class="heat" fill-opacity="0.33"/>
+<text x="985.0" y="319.5" class="cell" text-anchor="end">456</text>
 <rect x="994" y="305.0" width="54" height="20" rx="3" class="heat" fill-opacity="0.32"/>
-<text x="1043.0" y="319.5" class="cell" text-anchor="end">317</text>
+<text x="1043.0" y="319.5" class="cell" text-anchor="end">336</text>
 <rect x="1052" y="305.0" width="54" height="20" rx="3" class="heat" fill-opacity="0.31"/>
-<text x="1101.0" y="319.5" class="cell" text-anchor="end">507</text>
-<rect x="1110" y="305.0" width="54" height="20" rx="3" class="heat" fill-opacity="0.27"/>
-<text x="1159.0" y="319.5" class="cell" text-anchor="end">245</text>
-<rect x="1168" y="305.0" width="54" height="20" rx="3" class="heat" fill-opacity="0.27"/>
-<text x="1217.0" y="319.5" class="cell" text-anchor="end">307</text>
-<rect x="1226" y="305.0" width="54" height="20" rx="3" class="heat" fill-opacity="0.31"/>
-<text x="1275.0" y="319.5" class="cell" text-anchor="end">263</text>
-<rect x="1284" y="305.0" width="54" height="20" rx="3" class="heat" fill-opacity="0.37"/>
-<text x="1333.0" y="319.5" class="cell" text-anchor="end">272</text>
+<text x="1101.0" y="319.5" class="cell" text-anchor="end">509</text>
+<rect x="1110" y="305.0" width="54" height="20" rx="3" class="heat" fill-opacity="0.30"/>
+<text x="1159.0" y="319.5" class="cell" text-anchor="end">339</text>
+<rect x="1168" y="305.0" width="54" height="20" rx="3" class="heat" fill-opacity="0.31"/>
+<text x="1217.0" y="319.5" class="cell" text-anchor="end">535</text>
+<rect x="1226" y="305.0" width="54" height="20" rx="3" class="heat" fill-opacity="0.34"/>
+<text x="1275.0" y="319.5" class="cell" text-anchor="end">368</text>
+<text x="1334.0" y="319.0" class="cell-missing" text-anchor="end">FAIL</text>
 <rect x="1342" y="305.0" width="54" height="20" rx="3" class="heat" fill-opacity="0.31"/>
-<text x="1391.0" y="319.5" class="cell" text-anchor="end">372</text>
+<text x="1391.0" y="319.5" class="cell" text-anchor="end">406</text>
 <line x1="40" y1="328.0" x2="1398" y2="328.0" class="rule"/>
 <text x="40" y="345.5"><tspan class="lang">C#</tspan><tspan x="112" class="label">JsonDocument</tspan><tspan class="repo" dx="7">.NET 10 System.Text.Json</tspan></text>
 <rect x="472" y="331.0" width="54" height="20" rx="3" class="heat" fill-opacity="0.28"/>
@@ -721,96 +721,96 @@
 <rect x="1342" y="617.0" width="54" height="20" rx="3" class="heat" fill-opacity="0.27"/>
 <text x="1391.0" y="631.5" class="cell" text-anchor="end">238</text>
 <line x1="40" y1="640.0" x2="1398" y2="640.0" class="rule"/>
-<text x="40" y="657.5"><tspan class="lang">Perl</tspan><tspan x="112" class="label">JSON::XS*</tspan><tspan class="repo" dx="7">CPAN JSON::XS</tspan></text>
-<text x="522.0" y="657.0" class="cell-missing" text-anchor="end">FAIL</text>
-<text x="580.0" y="657.0" class="cell-missing" text-anchor="end">FAIL</text>
-<rect x="588" y="643.0" width="54" height="20" rx="3" class="heat" fill-opacity="0.24"/>
-<text x="637.0" y="657.5" class="cell" text-anchor="end">387</text>
-<rect x="646" y="643.0" width="54" height="20" rx="3" class="heat" fill-opacity="0.29"/>
-<text x="695.0" y="657.5" class="cell" text-anchor="end">224</text>
-<rect x="704" y="643.0" width="54" height="20" rx="3" class="heat" fill-opacity="0.24"/>
-<text x="753.0" y="657.5" class="cell" text-anchor="end">359</text>
-<rect x="762" y="643.0" width="54" height="20" rx="3" class="heat" fill-opacity="0.27"/>
-<text x="811.0" y="657.5" class="cell" text-anchor="end">688</text>
-<text x="870.0" y="657.0" class="cell-missing" text-anchor="end">FAIL</text>
-<text x="928.0" y="657.0" class="cell-missing" text-anchor="end">FAIL</text>
-<text x="986.0" y="657.0" class="cell-missing" text-anchor="end">FAIL</text>
-<text x="1044.0" y="657.0" class="cell-missing" text-anchor="end">FAIL</text>
-<text x="1102.0" y="657.0" class="cell-missing" text-anchor="end">FAIL</text>
-<text x="1160.0" y="657.0" class="cell-missing" text-anchor="end">FAIL</text>
-<rect x="1168" y="643.0" width="54" height="20" rx="3" class="heat" fill-opacity="0.30"/>
-<text x="1217.0" y="657.5" class="cell" text-anchor="end">456</text>
-<text x="1276.0" y="657.0" class="cell-missing" text-anchor="end">FAIL</text>
-<text x="1334.0" y="657.0" class="cell-missing" text-anchor="end">FAIL</text>
-<text x="1392.0" y="657.0" class="cell-missing" text-anchor="end">FAIL</text>
+<text x="40" y="657.5"><tspan class="lang">Go</tspan><tspan x="112" class="label">go-json any</tspan><tspan class="repo" dx="7">goccy/go-json</tspan></text>
+<rect x="472" y="643.0" width="54" height="20" rx="3" class="heat" fill-opacity="0.25"/>
+<text x="521.0" y="657.5" class="cell" text-anchor="end">386</text>
+<rect x="530" y="643.0" width="54" height="20" rx="3" class="heat" fill-opacity="0.26"/>
+<text x="579.0" y="657.5" class="cell" text-anchor="end">290</text>
+<rect x="588" y="643.0" width="54" height="20" rx="3" class="heat" fill-opacity="0.25"/>
+<text x="637.0" y="657.5" class="cell" text-anchor="end">424</text>
+<rect x="646" y="643.0" width="54" height="20" rx="3" class="heat" fill-opacity="0.28"/>
+<text x="695.0" y="657.5" class="cell" text-anchor="end">199</text>
+<rect x="704" y="643.0" width="54" height="20" rx="3" class="heat" fill-opacity="0.26"/>
+<text x="753.0" y="657.5" class="cell" text-anchor="end">507</text>
+<rect x="762" y="643.0" width="54" height="20" rx="3" class="heat" fill-opacity="0.29"/>
+<text x="811.0" y="657.5" class="cell" text-anchor="end">926</text>
+<rect x="820" y="643.0" width="54" height="20" rx="3" class="heat" fill-opacity="0.32"/>
+<text x="869.0" y="657.5" class="cell" text-anchor="end">324</text>
+<rect x="878" y="643.0" width="54" height="20" rx="3" class="heat" fill-opacity="0.34"/>
+<text x="927.0" y="657.5" class="cell" text-anchor="end">464</text>
+<rect x="936" y="643.0" width="54" height="20" rx="3" class="heat" fill-opacity="0.29"/>
+<text x="985.0" y="657.5" class="cell" text-anchor="end">263</text>
+<rect x="994" y="643.0" width="54" height="20" rx="3" class="heat" fill-opacity="0.26"/>
+<text x="1043.0" y="657.5" class="cell" text-anchor="end">153</text>
+<rect x="1052" y="643.0" width="54" height="20" rx="3" class="heat" fill-opacity="0.27"/>
+<text x="1101.0" y="657.5" class="cell" text-anchor="end">298</text>
+<rect x="1110" y="643.0" width="54" height="20" rx="3" class="heat" fill-opacity="0.25"/>
+<text x="1159.0" y="657.5" class="cell" text-anchor="end">186</text>
+<rect x="1168" y="643.0" width="54" height="20" rx="3" class="heat" fill-opacity="0.29"/>
+<text x="1217.0" y="657.5" class="cell" text-anchor="end">405</text>
+<rect x="1226" y="643.0" width="54" height="20" rx="3" class="heat" fill-opacity="0.29"/>
+<text x="1275.0" y="657.5" class="cell" text-anchor="end">203</text>
+<rect x="1284" y="643.0" width="54" height="20" rx="3" class="heat" fill-opacity="0.24"/>
+<text x="1333.0" y="657.5" class="cell" text-anchor="end">46.1</text>
+<rect x="1342" y="643.0" width="54" height="20" rx="3" class="heat" fill-opacity="0.27"/>
+<text x="1391.0" y="657.5" class="cell" text-anchor="end">210</text>
 <line x1="40" y1="666.0" x2="1398" y2="666.0" class="rule"/>
-<text x="40" y="683.5"><tspan class="lang">Go</tspan><tspan x="112" class="label">go-json any</tspan><tspan class="repo" dx="7">goccy/go-json</tspan></text>
-<rect x="472" y="669.0" width="54" height="20" rx="3" class="heat" fill-opacity="0.25"/>
-<text x="521.0" y="683.5" class="cell" text-anchor="end">386</text>
-<rect x="530" y="669.0" width="54" height="20" rx="3" class="heat" fill-opacity="0.26"/>
-<text x="579.0" y="683.5" class="cell" text-anchor="end">290</text>
+<text x="40" y="683.5"><tspan class="lang">Python</tspan><tspan x="112" class="label">msgspec</tspan><tspan class="repo" dx="7">jcrist/msgspec</tspan></text>
+<rect x="472" y="669.0" width="54" height="20" rx="3" class="heat" fill-opacity="0.26"/>
+<text x="521.0" y="683.5" class="cell" text-anchor="end">439</text>
+<rect x="530" y="669.0" width="54" height="20" rx="3" class="heat" fill-opacity="0.27"/>
+<text x="579.0" y="683.5" class="cell" text-anchor="end">337</text>
 <rect x="588" y="669.0" width="54" height="20" rx="3" class="heat" fill-opacity="0.25"/>
-<text x="637.0" y="683.5" class="cell" text-anchor="end">424</text>
-<rect x="646" y="669.0" width="54" height="20" rx="3" class="heat" fill-opacity="0.28"/>
-<text x="695.0" y="683.5" class="cell" text-anchor="end">199</text>
-<rect x="704" y="669.0" width="54" height="20" rx="3" class="heat" fill-opacity="0.26"/>
-<text x="753.0" y="683.5" class="cell" text-anchor="end">507</text>
-<rect x="762" y="669.0" width="54" height="20" rx="3" class="heat" fill-opacity="0.29"/>
-<text x="811.0" y="683.5" class="cell" text-anchor="end">926</text>
-<rect x="820" y="669.0" width="54" height="20" rx="3" class="heat" fill-opacity="0.32"/>
-<text x="869.0" y="683.5" class="cell" text-anchor="end">324</text>
+<text x="637.0" y="683.5" class="cell" text-anchor="end">447</text>
+<rect x="646" y="669.0" width="54" height="20" rx="3" class="heat" fill-opacity="0.30"/>
+<text x="695.0" y="683.5" class="cell" text-anchor="end">255</text>
+<rect x="704" y="669.0" width="54" height="20" rx="3" class="heat" fill-opacity="0.28"/>
+<text x="753.0" y="683.5" class="cell" text-anchor="end">614</text>
+<rect x="762" y="669.0" width="54" height="20" rx="3" class="heat" fill-opacity="0.30"/>
+<text x="811.0" y="683.5" class="cell" text-anchor="end">984</text>
+<rect x="820" y="669.0" width="54" height="20" rx="3" class="heat" fill-opacity="0.31"/>
+<text x="869.0" y="683.5" class="cell" text-anchor="end">275</text>
 <rect x="878" y="669.0" width="54" height="20" rx="3" class="heat" fill-opacity="0.34"/>
-<text x="927.0" y="683.5" class="cell" text-anchor="end">464</text>
-<rect x="936" y="669.0" width="54" height="20" rx="3" class="heat" fill-opacity="0.29"/>
-<text x="985.0" y="683.5" class="cell" text-anchor="end">263</text>
-<rect x="994" y="669.0" width="54" height="20" rx="3" class="heat" fill-opacity="0.26"/>
-<text x="1043.0" y="683.5" class="cell" text-anchor="end">153</text>
-<rect x="1052" y="669.0" width="54" height="20" rx="3" class="heat" fill-opacity="0.27"/>
-<text x="1101.0" y="683.5" class="cell" text-anchor="end">298</text>
-<rect x="1110" y="669.0" width="54" height="20" rx="3" class="heat" fill-opacity="0.25"/>
-<text x="1159.0" y="683.5" class="cell" text-anchor="end">186</text>
-<rect x="1168" y="669.0" width="54" height="20" rx="3" class="heat" fill-opacity="0.29"/>
-<text x="1217.0" y="683.5" class="cell" text-anchor="end">405</text>
-<rect x="1226" y="669.0" width="54" height="20" rx="3" class="heat" fill-opacity="0.29"/>
-<text x="1275.0" y="683.5" class="cell" text-anchor="end">203</text>
-<rect x="1284" y="669.0" width="54" height="20" rx="3" class="heat" fill-opacity="0.24"/>
-<text x="1333.0" y="683.5" class="cell" text-anchor="end">46.1</text>
-<rect x="1342" y="669.0" width="54" height="20" rx="3" class="heat" fill-opacity="0.27"/>
-<text x="1391.0" y="683.5" class="cell" text-anchor="end">210</text>
+<text x="927.0" y="683.5" class="cell" text-anchor="end">488</text>
+<rect x="936" y="669.0" width="54" height="20" rx="3" class="heat" fill-opacity="0.28"/>
+<text x="985.0" y="683.5" class="cell" text-anchor="end">240</text>
+<rect x="994" y="669.0" width="54" height="20" rx="3" class="heat" fill-opacity="0.30"/>
+<text x="1043.0" y="683.5" class="cell" text-anchor="end">250</text>
+<rect x="1052" y="669.0" width="54" height="20" rx="3" class="heat" fill-opacity="0.29"/>
+<text x="1101.0" y="683.5" class="cell" text-anchor="end">402</text>
+<rect x="1110" y="669.0" width="54" height="20" rx="3" class="heat" fill-opacity="0.22"/>
+<text x="1159.0" y="683.5" class="cell" text-anchor="end">122</text>
+<rect x="1168" y="669.0" width="54" height="20" rx="3" class="heat" fill-opacity="0.26"/>
+<text x="1217.0" y="683.5" class="cell" text-anchor="end">262</text>
+<rect x="1226" y="669.0" width="54" height="20" rx="3" class="heat" fill-opacity="0.28"/>
+<text x="1275.0" y="683.5" class="cell" text-anchor="end">166</text>
+<rect x="1284" y="669.0" width="54" height="20" rx="3" class="heat" fill-opacity="0.16"/>
+<text x="1333.0" y="683.5" class="cell" text-anchor="end">14.8</text>
+<rect x="1342" y="669.0" width="54" height="20" rx="3" class="heat" fill-opacity="0.29"/>
+<text x="1391.0" y="683.5" class="cell" text-anchor="end">297</text>
 <line x1="40" y1="692.0" x2="1398" y2="692.0" class="rule"/>
-<text x="40" y="709.5"><tspan class="lang">Python</tspan><tspan x="112" class="label">msgspec</tspan><tspan class="repo" dx="7">jcrist/msgspec</tspan></text>
-<rect x="472" y="695.0" width="54" height="20" rx="3" class="heat" fill-opacity="0.26"/>
-<text x="521.0" y="709.5" class="cell" text-anchor="end">439</text>
-<rect x="530" y="695.0" width="54" height="20" rx="3" class="heat" fill-opacity="0.27"/>
-<text x="579.0" y="709.5" class="cell" text-anchor="end">337</text>
-<rect x="588" y="695.0" width="54" height="20" rx="3" class="heat" fill-opacity="0.25"/>
-<text x="637.0" y="709.5" class="cell" text-anchor="end">447</text>
-<rect x="646" y="695.0" width="54" height="20" rx="3" class="heat" fill-opacity="0.30"/>
-<text x="695.0" y="709.5" class="cell" text-anchor="end">255</text>
-<rect x="704" y="695.0" width="54" height="20" rx="3" class="heat" fill-opacity="0.28"/>
-<text x="753.0" y="709.5" class="cell" text-anchor="end">614</text>
-<rect x="762" y="695.0" width="54" height="20" rx="3" class="heat" fill-opacity="0.30"/>
-<text x="811.0" y="709.5" class="cell" text-anchor="end">984</text>
-<rect x="820" y="695.0" width="54" height="20" rx="3" class="heat" fill-opacity="0.31"/>
-<text x="869.0" y="709.5" class="cell" text-anchor="end">275</text>
-<rect x="878" y="695.0" width="54" height="20" rx="3" class="heat" fill-opacity="0.34"/>
-<text x="927.0" y="709.5" class="cell" text-anchor="end">488</text>
-<rect x="936" y="695.0" width="54" height="20" rx="3" class="heat" fill-opacity="0.28"/>
-<text x="985.0" y="709.5" class="cell" text-anchor="end">240</text>
-<rect x="994" y="695.0" width="54" height="20" rx="3" class="heat" fill-opacity="0.30"/>
-<text x="1043.0" y="709.5" class="cell" text-anchor="end">250</text>
-<rect x="1052" y="695.0" width="54" height="20" rx="3" class="heat" fill-opacity="0.29"/>
-<text x="1101.0" y="709.5" class="cell" text-anchor="end">402</text>
-<rect x="1110" y="695.0" width="54" height="20" rx="3" class="heat" fill-opacity="0.22"/>
-<text x="1159.0" y="709.5" class="cell" text-anchor="end">122</text>
-<rect x="1168" y="695.0" width="54" height="20" rx="3" class="heat" fill-opacity="0.26"/>
-<text x="1217.0" y="709.5" class="cell" text-anchor="end">262</text>
-<rect x="1226" y="695.0" width="54" height="20" rx="3" class="heat" fill-opacity="0.28"/>
-<text x="1275.0" y="709.5" class="cell" text-anchor="end">166</text>
-<rect x="1284" y="695.0" width="54" height="20" rx="3" class="heat" fill-opacity="0.16"/>
-<text x="1333.0" y="709.5" class="cell" text-anchor="end">14.8</text>
-<rect x="1342" y="695.0" width="54" height="20" rx="3" class="heat" fill-opacity="0.29"/>
-<text x="1391.0" y="709.5" class="cell" text-anchor="end">297</text>
+<text x="40" y="709.5"><tspan class="lang">Perl</tspan><tspan x="112" class="label">JSON::XS*</tspan><tspan class="repo" dx="7">CPAN JSON::XS</tspan></text>
+<text x="522.0" y="709.0" class="cell-missing" text-anchor="end">FAIL</text>
+<text x="580.0" y="709.0" class="cell-missing" text-anchor="end">FAIL</text>
+<rect x="588" y="695.0" width="54" height="20" rx="3" class="heat" fill-opacity="0.24"/>
+<text x="637.0" y="709.5" class="cell" text-anchor="end">387</text>
+<rect x="646" y="695.0" width="54" height="20" rx="3" class="heat" fill-opacity="0.29"/>
+<text x="695.0" y="709.5" class="cell" text-anchor="end">224</text>
+<rect x="704" y="695.0" width="54" height="20" rx="3" class="heat" fill-opacity="0.24"/>
+<text x="753.0" y="709.5" class="cell" text-anchor="end">359</text>
+<rect x="762" y="695.0" width="54" height="20" rx="3" class="heat" fill-opacity="0.27"/>
+<text x="811.0" y="709.5" class="cell" text-anchor="end">688</text>
+<text x="870.0" y="709.0" class="cell-missing" text-anchor="end">FAIL</text>
+<text x="928.0" y="709.0" class="cell-missing" text-anchor="end">FAIL</text>
+<text x="986.0" y="709.0" class="cell-missing" text-anchor="end">FAIL</text>
+<text x="1044.0" y="709.0" class="cell-missing" text-anchor="end">FAIL</text>
+<text x="1102.0" y="709.0" class="cell-missing" text-anchor="end">FAIL</text>
+<text x="1160.0" y="709.0" class="cell-missing" text-anchor="end">FAIL</text>
+<rect x="1168" y="695.0" width="54" height="20" rx="3" class="heat" fill-opacity="0.30"/>
+<text x="1217.0" y="709.5" class="cell" text-anchor="end">456</text>
+<text x="1276.0" y="709.0" class="cell-missing" text-anchor="end">FAIL</text>
+<text x="1334.0" y="709.0" class="cell-missing" text-anchor="end">FAIL</text>
+<text x="1392.0" y="709.0" class="cell-missing" text-anchor="end">FAIL</text>
 <line x1="40" y1="718.0" x2="1398" y2="718.0" class="rule"/>
 <text x="40" y="735.5"><tspan class="lang">Rust</tspan><tspan x="112" class="label">serde_json Value float_roundtrip</tspan><tspan class="repo" dx="7"></tspan></text>
 <rect x="472" y="721.0" width="54" height="20" rx="3" class="heat" fill-opacity="0.22"/>
@@ -946,61 +946,73 @@
 <rect x="1342" y="799.0" width="54" height="20" rx="3" class="heat" fill-opacity="0.25"/>
 <text x="1391.0" y="813.5" class="cell" text-anchor="end">168</text>
 <line x1="40" y1="822.0" x2="1398" y2="822.0" class="rule"/>
-<text x="40" y="839.5"><tspan class="lang">Beef</tspan><tspan x="112" class="label">StructuredData*</tspan><tspan class="repo" dx="7">Beef's Beefy2D</tspan></text>
-<text x="522.0" y="839.0" class="cell-missing" text-anchor="end">FAIL</text>
-<text x="580.0" y="839.0" class="cell-missing" text-anchor="end">FAIL</text>
-<rect x="588" y="825.0" width="54" height="20" rx="3" class="heat" fill-opacity="0.22"/>
-<text x="637.0" y="839.5" class="cell" text-anchor="end">292</text>
-<text x="696.0" y="839.0" class="cell-missing" text-anchor="end">FAIL</text>
-<rect x="704" y="825.0" width="54" height="20" rx="3" class="heat" fill-opacity="0.24"/>
-<text x="753.0" y="839.5" class="cell" text-anchor="end">398</text>
-<rect x="762" y="825.0" width="54" height="20" rx="3" class="heat" fill-opacity="0.24"/>
-<text x="811.0" y="839.5" class="cell" text-anchor="end">442</text>
-<text x="870.0" y="839.0" class="cell-missing" text-anchor="end">FAIL</text>
-<text x="928.0" y="839.0" class="cell-missing" text-anchor="end">FAIL</text>
-<text x="986.0" y="839.0" class="cell-missing" text-anchor="end">FAIL</text>
-<text x="1044.0" y="839.0" class="cell-missing" text-anchor="end">FAIL</text>
-<text x="1102.0" y="839.0" class="cell-missing" text-anchor="end">FAIL</text>
-<text x="1160.0" y="839.0" class="cell-missing" text-anchor="end">FAIL</text>
-<rect x="1168" y="825.0" width="54" height="20" rx="3" class="heat" fill-opacity="0.26"/>
-<text x="1217.0" y="839.5" class="cell" text-anchor="end">259</text>
-<text x="1276.0" y="839.0" class="cell-missing" text-anchor="end">FAIL</text>
-<text x="1334.0" y="839.0" class="cell-missing" text-anchor="end">FAIL</text>
-<text x="1392.0" y="839.0" class="cell-missing" text-anchor="end">FAIL</text>
+<text x="40" y="839.5"><tspan class="lang">Perl</tspan><tspan x="112" class="label">Cpanel::JSON::XS</tspan><tspan class="repo" dx="7">rurban/Cpanel-JSON-XS</tspan></text>
+<rect x="472" y="825.0" width="54" height="20" rx="3" class="heat" fill-opacity="0.21"/>
+<text x="521.0" y="839.5" class="cell" text-anchor="end">243</text>
+<rect x="530" y="825.0" width="54" height="20" rx="3" class="heat" fill-opacity="0.25"/>
+<text x="579.0" y="839.5" class="cell" text-anchor="end">257</text>
+<rect x="588" y="825.0" width="54" height="20" rx="3" class="heat" fill-opacity="0.23"/>
+<text x="637.0" y="839.5" class="cell" text-anchor="end">312</text>
+<rect x="646" y="825.0" width="54" height="20" rx="3" class="heat" fill-opacity="0.25"/>
+<text x="695.0" y="839.5" class="cell" text-anchor="end">125</text>
+<rect x="704" y="825.0" width="54" height="20" rx="3" class="heat" fill-opacity="0.22"/>
+<text x="753.0" y="839.5" class="cell" text-anchor="end">311</text>
+<rect x="762" y="825.0" width="54" height="20" rx="3" class="heat" fill-opacity="0.26"/>
+<text x="811.0" y="839.5" class="cell" text-anchor="end">633</text>
+<rect x="820" y="825.0" width="54" height="20" rx="3" class="heat" fill-opacity="0.27"/>
+<text x="869.0" y="839.5" class="cell" text-anchor="end">164</text>
+<rect x="878" y="825.0" width="54" height="20" rx="3" class="heat" fill-opacity="0.25"/>
+<text x="927.0" y="839.5" class="cell" text-anchor="end">146</text>
+<rect x="936" y="825.0" width="54" height="20" rx="3" class="heat" fill-opacity="0.24"/>
+<text x="985.0" y="839.5" class="cell" text-anchor="end">133</text>
+<rect x="994" y="825.0" width="54" height="20" rx="3" class="heat" fill-opacity="0.25"/>
+<text x="1043.0" y="839.5" class="cell" text-anchor="end">135</text>
+<rect x="1052" y="825.0" width="54" height="20" rx="3" class="heat" fill-opacity="0.24"/>
+<text x="1101.0" y="839.5" class="cell" text-anchor="end">216</text>
+<rect x="1110" y="825.0" width="54" height="20" rx="3" class="heat" fill-opacity="0.19"/>
+<text x="1159.0" y="839.5" class="cell" text-anchor="end">83.6</text>
+<rect x="1168" y="825.0" width="54" height="20" rx="3" class="heat" fill-opacity="0.31"/>
+<text x="1217.0" y="839.5" class="cell" text-anchor="end">488</text>
+<rect x="1226" y="825.0" width="54" height="20" rx="3" class="heat" fill-opacity="0.29"/>
+<text x="1275.0" y="839.5" class="cell" text-anchor="end">196</text>
+<rect x="1284" y="825.0" width="54" height="20" rx="3" class="heat" fill-opacity="0.30"/>
+<text x="1333.0" y="839.5" class="cell" text-anchor="end">101</text>
+<rect x="1342" y="825.0" width="54" height="20" rx="3" class="heat" fill-opacity="0.25"/>
+<text x="1391.0" y="839.5" class="cell" text-anchor="end">163</text>
 <line x1="40" y1="848.0" x2="1398" y2="848.0" class="rule"/>
-<text x="40" y="865.5"><tspan class="lang">Perl</tspan><tspan x="112" class="label">Cpanel::JSON::XS</tspan><tspan class="repo" dx="7">rurban/Cpanel-JSON-XS</tspan></text>
+<text x="40" y="865.5"><tspan class="lang">Java</tspan><tspan x="112" class="label">Gson tree</tspan><tspan class="repo" dx="7">google/gson</tspan></text>
 <rect x="472" y="851.0" width="54" height="20" rx="3" class="heat" fill-opacity="0.21"/>
-<text x="521.0" y="865.5" class="cell" text-anchor="end">243</text>
-<rect x="530" y="851.0" width="54" height="20" rx="3" class="heat" fill-opacity="0.25"/>
-<text x="579.0" y="865.5" class="cell" text-anchor="end">257</text>
-<rect x="588" y="851.0" width="54" height="20" rx="3" class="heat" fill-opacity="0.23"/>
-<text x="637.0" y="865.5" class="cell" text-anchor="end">312</text>
-<rect x="646" y="851.0" width="54" height="20" rx="3" class="heat" fill-opacity="0.25"/>
-<text x="695.0" y="865.5" class="cell" text-anchor="end">125</text>
-<rect x="704" y="851.0" width="54" height="20" rx="3" class="heat" fill-opacity="0.22"/>
-<text x="753.0" y="865.5" class="cell" text-anchor="end">311</text>
-<rect x="762" y="851.0" width="54" height="20" rx="3" class="heat" fill-opacity="0.26"/>
-<text x="811.0" y="865.5" class="cell" text-anchor="end">633</text>
+<text x="521.0" y="865.5" class="cell" text-anchor="end">236</text>
+<rect x="530" y="851.0" width="54" height="20" rx="3" class="heat" fill-opacity="0.21"/>
+<text x="579.0" y="865.5" class="cell" text-anchor="end">153</text>
+<rect x="588" y="851.0" width="54" height="20" rx="3" class="heat" fill-opacity="0.25"/>
+<text x="637.0" y="865.5" class="cell" text-anchor="end">432</text>
+<rect x="646" y="851.0" width="54" height="20" rx="3" class="heat" fill-opacity="0.27"/>
+<text x="695.0" y="865.5" class="cell" text-anchor="end">165</text>
+<rect x="704" y="851.0" width="54" height="20" rx="3" class="heat" fill-opacity="0.23"/>
+<text x="753.0" y="865.5" class="cell" text-anchor="end">331</text>
+<rect x="762" y="851.0" width="54" height="20" rx="3" class="heat" fill-opacity="0.21"/>
+<text x="811.0" y="865.5" class="cell" text-anchor="end">294</text>
 <rect x="820" y="851.0" width="54" height="20" rx="3" class="heat" fill-opacity="0.27"/>
-<text x="869.0" y="865.5" class="cell" text-anchor="end">164</text>
-<rect x="878" y="851.0" width="54" height="20" rx="3" class="heat" fill-opacity="0.25"/>
-<text x="927.0" y="865.5" class="cell" text-anchor="end">146</text>
-<rect x="936" y="851.0" width="54" height="20" rx="3" class="heat" fill-opacity="0.24"/>
-<text x="985.0" y="865.5" class="cell" text-anchor="end">133</text>
-<rect x="994" y="851.0" width="54" height="20" rx="3" class="heat" fill-opacity="0.25"/>
-<text x="1043.0" y="865.5" class="cell" text-anchor="end">135</text>
+<text x="869.0" y="865.5" class="cell" text-anchor="end">149</text>
+<rect x="878" y="851.0" width="54" height="20" rx="3" class="heat" fill-opacity="0.28"/>
+<text x="927.0" y="865.5" class="cell" text-anchor="end">217</text>
+<rect x="936" y="851.0" width="54" height="20" rx="3" class="heat" fill-opacity="0.26"/>
+<text x="985.0" y="865.5" class="cell" text-anchor="end">168</text>
+<rect x="994" y="851.0" width="54" height="20" rx="3" class="heat" fill-opacity="0.21"/>
+<text x="1043.0" y="865.5" class="cell" text-anchor="end">72.4</text>
 <rect x="1052" y="851.0" width="54" height="20" rx="3" class="heat" fill-opacity="0.24"/>
-<text x="1101.0" y="865.5" class="cell" text-anchor="end">216</text>
-<rect x="1110" y="851.0" width="54" height="20" rx="3" class="heat" fill-opacity="0.19"/>
-<text x="1159.0" y="865.5" class="cell" text-anchor="end">83.6</text>
-<rect x="1168" y="851.0" width="54" height="20" rx="3" class="heat" fill-opacity="0.31"/>
-<text x="1217.0" y="865.5" class="cell" text-anchor="end">488</text>
-<rect x="1226" y="851.0" width="54" height="20" rx="3" class="heat" fill-opacity="0.29"/>
-<text x="1275.0" y="865.5" class="cell" text-anchor="end">196</text>
-<rect x="1284" y="851.0" width="54" height="20" rx="3" class="heat" fill-opacity="0.30"/>
-<text x="1333.0" y="865.5" class="cell" text-anchor="end">101</text>
-<rect x="1342" y="851.0" width="54" height="20" rx="3" class="heat" fill-opacity="0.25"/>
-<text x="1391.0" y="865.5" class="cell" text-anchor="end">163</text>
+<text x="1101.0" y="865.5" class="cell" text-anchor="end">201</text>
+<rect x="1110" y="851.0" width="54" height="20" rx="3" class="heat" fill-opacity="0.24"/>
+<text x="1159.0" y="865.5" class="cell" text-anchor="end">164</text>
+<rect x="1168" y="851.0" width="54" height="20" rx="3" class="heat" fill-opacity="0.25"/>
+<text x="1217.0" y="865.5" class="cell" text-anchor="end">243</text>
+<rect x="1226" y="851.0" width="54" height="20" rx="3" class="heat" fill-opacity="0.26"/>
+<text x="1275.0" y="865.5" class="cell" text-anchor="end">125</text>
+<rect x="1284" y="851.0" width="54" height="20" rx="3" class="heat" fill-opacity="0.34"/>
+<text x="1333.0" y="865.5" class="cell" text-anchor="end">168</text>
+<rect x="1342" y="851.0" width="54" height="20" rx="3" class="heat" fill-opacity="0.24"/>
+<text x="1391.0" y="865.5" class="cell" text-anchor="end">147</text>
 <line x1="40" y1="874.0" x2="1398" y2="874.0" class="rule"/>
 <text x="40" y="891.5"><tspan class="lang">Lua</tspan><tspan x="112" class="label">lua-cjson (LuaJIT)*</tspan><tspan class="repo" dx="7">openresty/lua-cjson</tspan></text>
 <rect x="472" y="877.0" width="54" height="20" rx="3" class="heat" fill-opacity="0.22"/>
@@ -1035,73 +1047,61 @@
 <rect x="1342" y="877.0" width="54" height="20" rx="3" class="heat" fill-opacity="0.22"/>
 <text x="1391.0" y="891.5" class="cell" text-anchor="end">109</text>
 <line x1="40" y1="900.0" x2="1398" y2="900.0" class="rule"/>
-<text x="40" y="917.5"><tspan class="lang">Java</tspan><tspan x="112" class="label">Gson tree</tspan><tspan class="repo" dx="7">google/gson</tspan></text>
-<rect x="472" y="903.0" width="54" height="20" rx="3" class="heat" fill-opacity="0.21"/>
-<text x="521.0" y="917.5" class="cell" text-anchor="end">236</text>
-<rect x="530" y="903.0" width="54" height="20" rx="3" class="heat" fill-opacity="0.21"/>
-<text x="579.0" y="917.5" class="cell" text-anchor="end">153</text>
-<rect x="588" y="903.0" width="54" height="20" rx="3" class="heat" fill-opacity="0.25"/>
-<text x="637.0" y="917.5" class="cell" text-anchor="end">432</text>
-<rect x="646" y="903.0" width="54" height="20" rx="3" class="heat" fill-opacity="0.27"/>
-<text x="695.0" y="917.5" class="cell" text-anchor="end">165</text>
-<rect x="704" y="903.0" width="54" height="20" rx="3" class="heat" fill-opacity="0.23"/>
-<text x="753.0" y="917.5" class="cell" text-anchor="end">331</text>
-<rect x="762" y="903.0" width="54" height="20" rx="3" class="heat" fill-opacity="0.21"/>
-<text x="811.0" y="917.5" class="cell" text-anchor="end">294</text>
-<rect x="820" y="903.0" width="54" height="20" rx="3" class="heat" fill-opacity="0.27"/>
-<text x="869.0" y="917.5" class="cell" text-anchor="end">149</text>
-<rect x="878" y="903.0" width="54" height="20" rx="3" class="heat" fill-opacity="0.28"/>
-<text x="927.0" y="917.5" class="cell" text-anchor="end">217</text>
-<rect x="936" y="903.0" width="54" height="20" rx="3" class="heat" fill-opacity="0.26"/>
-<text x="985.0" y="917.5" class="cell" text-anchor="end">168</text>
-<rect x="994" y="903.0" width="54" height="20" rx="3" class="heat" fill-opacity="0.21"/>
-<text x="1043.0" y="917.5" class="cell" text-anchor="end">72.4</text>
+<text x="40" y="917.5"><tspan class="lang">C</tspan><tspan x="112" class="label">cJSON</tspan><tspan class="repo" dx="7">DaveGamble/cJSON</tspan></text>
+<rect x="472" y="903.0" width="54" height="20" rx="3" class="heat" fill-opacity="0.25"/>
+<text x="521.0" y="917.5" class="cell" text-anchor="end">383</text>
+<rect x="530" y="903.0" width="54" height="20" rx="3" class="heat" fill-opacity="0.22"/>
+<text x="579.0" y="917.5" class="cell" text-anchor="end">173</text>
+<rect x="588" y="903.0" width="54" height="20" rx="3" class="heat" fill-opacity="0.23"/>
+<text x="637.0" y="917.5" class="cell" text-anchor="end">328</text>
+<rect x="646" y="903.0" width="54" height="20" rx="3" class="heat" fill-opacity="0.22"/>
+<text x="695.0" y="917.5" class="cell" text-anchor="end">82.0</text>
+<rect x="704" y="903.0" width="54" height="20" rx="3" class="heat" fill-opacity="0.24"/>
+<text x="753.0" y="917.5" class="cell" text-anchor="end">391</text>
+<rect x="762" y="903.0" width="54" height="20" rx="3" class="heat" fill-opacity="0.27"/>
+<text x="811.0" y="917.5" class="cell" text-anchor="end">675</text>
+<rect x="820" y="903.0" width="54" height="20" rx="3" class="heat" fill-opacity="0.22"/>
+<text x="869.0" y="917.5" class="cell" text-anchor="end">79.2</text>
+<rect x="878" y="903.0" width="54" height="20" rx="3" class="heat" fill-opacity="0.21"/>
+<text x="927.0" y="917.5" class="cell" text-anchor="end">86.8</text>
+<rect x="936" y="903.0" width="54" height="20" rx="3" class="heat" fill-opacity="0.22"/>
+<text x="985.0" y="917.5" class="cell" text-anchor="end">106</text>
+<rect x="994" y="903.0" width="54" height="20" rx="3" class="heat" fill-opacity="0.28"/>
+<text x="1043.0" y="917.5" class="cell" text-anchor="end">205</text>
 <rect x="1052" y="903.0" width="54" height="20" rx="3" class="heat" fill-opacity="0.24"/>
-<text x="1101.0" y="917.5" class="cell" text-anchor="end">201</text>
-<rect x="1110" y="903.0" width="54" height="20" rx="3" class="heat" fill-opacity="0.24"/>
-<text x="1159.0" y="917.5" class="cell" text-anchor="end">164</text>
-<rect x="1168" y="903.0" width="54" height="20" rx="3" class="heat" fill-opacity="0.25"/>
-<text x="1217.0" y="917.5" class="cell" text-anchor="end">243</text>
-<rect x="1226" y="903.0" width="54" height="20" rx="3" class="heat" fill-opacity="0.26"/>
-<text x="1275.0" y="917.5" class="cell" text-anchor="end">125</text>
-<rect x="1284" y="903.0" width="54" height="20" rx="3" class="heat" fill-opacity="0.34"/>
-<text x="1333.0" y="917.5" class="cell" text-anchor="end">168</text>
-<rect x="1342" y="903.0" width="54" height="20" rx="3" class="heat" fill-opacity="0.24"/>
-<text x="1391.0" y="917.5" class="cell" text-anchor="end">147</text>
+<text x="1101.0" y="917.5" class="cell" text-anchor="end">206</text>
+<rect x="1110" y="903.0" width="54" height="20" rx="3" class="heat" fill-opacity="0.25"/>
+<text x="1159.0" y="917.5" class="cell" text-anchor="end">173</text>
+<rect x="1168" y="903.0" width="54" height="20" rx="3" class="heat" fill-opacity="0.29"/>
+<text x="1217.0" y="917.5" class="cell" text-anchor="end">401</text>
+<rect x="1226" y="903.0" width="54" height="20" rx="3" class="heat" fill-opacity="0.25"/>
+<text x="1275.0" y="917.5" class="cell" text-anchor="end">109</text>
+<rect x="1284" y="903.0" width="54" height="20" rx="3" class="heat" fill-opacity="0.29"/>
+<text x="1333.0" y="917.5" class="cell" text-anchor="end">84.3</text>
+<rect x="1342" y="903.0" width="54" height="20" rx="3" class="heat" fill-opacity="0.27"/>
+<text x="1391.0" y="917.5" class="cell" text-anchor="end">215</text>
 <line x1="40" y1="926.0" x2="1398" y2="926.0" class="rule"/>
-<text x="40" y="943.5"><tspan class="lang">C</tspan><tspan x="112" class="label">cJSON</tspan><tspan class="repo" dx="7">DaveGamble/cJSON</tspan></text>
-<rect x="472" y="929.0" width="54" height="20" rx="3" class="heat" fill-opacity="0.25"/>
-<text x="521.0" y="943.5" class="cell" text-anchor="end">383</text>
-<rect x="530" y="929.0" width="54" height="20" rx="3" class="heat" fill-opacity="0.22"/>
-<text x="579.0" y="943.5" class="cell" text-anchor="end">173</text>
-<rect x="588" y="929.0" width="54" height="20" rx="3" class="heat" fill-opacity="0.23"/>
-<text x="637.0" y="943.5" class="cell" text-anchor="end">328</text>
-<rect x="646" y="929.0" width="54" height="20" rx="3" class="heat" fill-opacity="0.22"/>
-<text x="695.0" y="943.5" class="cell" text-anchor="end">82.0</text>
+<text x="40" y="943.5"><tspan class="lang">Beef</tspan><tspan x="112" class="label">StructuredData*</tspan><tspan class="repo" dx="7">Beef's Beefy2D</tspan></text>
+<text x="522.0" y="943.0" class="cell-missing" text-anchor="end">FAIL</text>
+<text x="580.0" y="943.0" class="cell-missing" text-anchor="end">FAIL</text>
+<rect x="588" y="929.0" width="54" height="20" rx="3" class="heat" fill-opacity="0.22"/>
+<text x="637.0" y="943.5" class="cell" text-anchor="end">292</text>
+<text x="696.0" y="943.0" class="cell-missing" text-anchor="end">FAIL</text>
 <rect x="704" y="929.0" width="54" height="20" rx="3" class="heat" fill-opacity="0.24"/>
-<text x="753.0" y="943.5" class="cell" text-anchor="end">391</text>
-<rect x="762" y="929.0" width="54" height="20" rx="3" class="heat" fill-opacity="0.27"/>
-<text x="811.0" y="943.5" class="cell" text-anchor="end">675</text>
-<rect x="820" y="929.0" width="54" height="20" rx="3" class="heat" fill-opacity="0.22"/>
-<text x="869.0" y="943.5" class="cell" text-anchor="end">79.2</text>
-<rect x="878" y="929.0" width="54" height="20" rx="3" class="heat" fill-opacity="0.21"/>
-<text x="927.0" y="943.5" class="cell" text-anchor="end">86.8</text>
-<rect x="936" y="929.0" width="54" height="20" rx="3" class="heat" fill-opacity="0.22"/>
-<text x="985.0" y="943.5" class="cell" text-anchor="end">106</text>
-<rect x="994" y="929.0" width="54" height="20" rx="3" class="heat" fill-opacity="0.28"/>
-<text x="1043.0" y="943.5" class="cell" text-anchor="end">205</text>
-<rect x="1052" y="929.0" width="54" height="20" rx="3" class="heat" fill-opacity="0.24"/>
-<text x="1101.0" y="943.5" class="cell" text-anchor="end">206</text>
-<rect x="1110" y="929.0" width="54" height="20" rx="3" class="heat" fill-opacity="0.25"/>
-<text x="1159.0" y="943.5" class="cell" text-anchor="end">173</text>
-<rect x="1168" y="929.0" width="54" height="20" rx="3" class="heat" fill-opacity="0.29"/>
-<text x="1217.0" y="943.5" class="cell" text-anchor="end">401</text>
-<rect x="1226" y="929.0" width="54" height="20" rx="3" class="heat" fill-opacity="0.25"/>
-<text x="1275.0" y="943.5" class="cell" text-anchor="end">109</text>
-<rect x="1284" y="929.0" width="54" height="20" rx="3" class="heat" fill-opacity="0.29"/>
-<text x="1333.0" y="943.5" class="cell" text-anchor="end">84.3</text>
-<rect x="1342" y="929.0" width="54" height="20" rx="3" class="heat" fill-opacity="0.27"/>
-<text x="1391.0" y="943.5" class="cell" text-anchor="end">215</text>
+<text x="753.0" y="943.5" class="cell" text-anchor="end">398</text>
+<rect x="762" y="929.0" width="54" height="20" rx="3" class="heat" fill-opacity="0.24"/>
+<text x="811.0" y="943.5" class="cell" text-anchor="end">442</text>
+<text x="870.0" y="943.0" class="cell-missing" text-anchor="end">FAIL</text>
+<text x="928.0" y="943.0" class="cell-missing" text-anchor="end">FAIL</text>
+<text x="986.0" y="943.0" class="cell-missing" text-anchor="end">FAIL</text>
+<text x="1044.0" y="943.0" class="cell-missing" text-anchor="end">FAIL</text>
+<text x="1102.0" y="943.0" class="cell-missing" text-anchor="end">FAIL</text>
+<text x="1160.0" y="943.0" class="cell-missing" text-anchor="end">FAIL</text>
+<rect x="1168" y="929.0" width="54" height="20" rx="3" class="heat" fill-opacity="0.26"/>
+<text x="1217.0" y="943.5" class="cell" text-anchor="end">259</text>
+<text x="1276.0" y="943.0" class="cell-missing" text-anchor="end">FAIL</text>
+<text x="1334.0" y="943.0" class="cell-missing" text-anchor="end">FAIL</text>
+<text x="1392.0" y="943.0" class="cell-missing" text-anchor="end">FAIL</text>
 <line x1="40" y1="952.0" x2="1398" y2="952.0" class="rule"/>
 <text x="40" y="969.5"><tspan class="lang">C#</tspan><tspan x="112" class="label">JsonNode*</tspan><tspan class="repo" dx="7">.NET 10 System.Text.Json</tspan></text>
 <rect x="472" y="955.0" width="54" height="20" rx="3" class="heat" fill-opacity="0.22"/>
@@ -1757,21 +1757,21 @@
 <rect x="646" y="1605.0" width="54" height="20" rx="3" class="heat" fill-opacity="0.33"/>
 <text x="695.0" y="1619.5" class="cell" text-anchor="end">372</text>
 <line x1="40" y1="1628.0" x2="1398" y2="1628.0" class="rule"/>
-<rect x="40" y="1628.0" width="1358" height="26" class="row-ours"/>
-<text x="40" y="1645.5"><tspan class="lang">Beef</tspan><tspan x="112" class="label ours">JsonBeef [JsonObject]</tspan><tspan class="repo" dx="7"></tspan></text>
-<rect x="472" y="1631.0" width="54" height="20" rx="3" class="heat" fill-opacity="0.36"/>
-<text x="521.0" y="1645.5" class="cell ours" text-anchor="end">554</text>
-<rect x="588" y="1631.0" width="54" height="20" rx="3" class="heat" fill-opacity="0.32"/>
-<text x="637.0" y="1645.5" class="cell ours" text-anchor="end">752</text>
-<rect x="646" y="1631.0" width="54" height="20" rx="3" class="heat" fill-opacity="0.30"/>
-<text x="695.0" y="1645.5" class="cell ours" text-anchor="end">259</text>
+<text x="40" y="1645.5"><tspan class="lang">Rust</tspan><tspan x="112" class="label">serde_json*</tspan><tspan class="repo" dx="7">serde-rs/json</tspan></text>
+<rect x="472" y="1631.0" width="54" height="20" rx="3" class="heat" fill-opacity="0.35"/>
+<text x="521.0" y="1645.5" class="cell" text-anchor="end">490</text>
+<rect x="588" y="1631.0" width="54" height="20" rx="3" class="heat" fill-opacity="0.33"/>
+<text x="637.0" y="1645.5" class="cell" text-anchor="end">848</text>
+<text x="696.0" y="1645.0" class="cell-missing" text-anchor="end">FAIL</text>
 <line x1="40" y1="1654.0" x2="1398" y2="1654.0" class="rule"/>
-<text x="40" y="1671.5"><tspan class="lang">Rust</tspan><tspan x="112" class="label">serde_json*</tspan><tspan class="repo" dx="7">serde-rs/json</tspan></text>
-<rect x="472" y="1657.0" width="54" height="20" rx="3" class="heat" fill-opacity="0.35"/>
-<text x="521.0" y="1671.5" class="cell" text-anchor="end">490</text>
-<rect x="588" y="1657.0" width="54" height="20" rx="3" class="heat" fill-opacity="0.33"/>
-<text x="637.0" y="1671.5" class="cell" text-anchor="end">848</text>
-<text x="696.0" y="1671.0" class="cell-missing" text-anchor="end">FAIL</text>
+<rect x="40" y="1654.0" width="1358" height="26" class="row-ours"/>
+<text x="40" y="1671.5"><tspan class="lang">Beef</tspan><tspan x="112" class="label ours">JsonBeef [JsonObject]</tspan><tspan class="repo" dx="7"></tspan></text>
+<rect x="472" y="1657.0" width="54" height="20" rx="3" class="heat" fill-opacity="0.36"/>
+<text x="521.0" y="1671.5" class="cell ours" text-anchor="end">545</text>
+<rect x="588" y="1657.0" width="54" height="20" rx="3" class="heat" fill-opacity="0.32"/>
+<text x="637.0" y="1671.5" class="cell ours" text-anchor="end">731</text>
+<rect x="646" y="1657.0" width="54" height="20" rx="3" class="heat" fill-opacity="0.30"/>
+<text x="695.0" y="1671.5" class="cell ours" text-anchor="end">258</text>
 <line x1="40" y1="1680.0" x2="1398" y2="1680.0" class="rule"/>
 <text x="40" y="1697.5"><tspan class="lang">Python</tspan><tspan x="112" class="label">msgspec Struct</tspan><tspan class="repo" dx="7">jcrist/msgspec</tspan></text>
 <rect x="472" y="1683.0" width="54" height="20" rx="3" class="heat" fill-opacity="0.36"/>
@@ -2046,37 +2046,37 @@
 <rect x="40" y="2174.0" width="1358" height="26" class="row-ours"/>
 <text x="40" y="2191.5"><tspan class="lang">Beef</tspan><tspan x="112" class="label ours">JsonBeef JsonReader</tspan><tspan class="repo" dx="7"></tspan></text>
 <rect x="472" y="2177.0" width="54" height="20" rx="3" class="heat" fill-opacity="0.32"/>
-<text x="521.0" y="2191.5" class="cell ours" text-anchor="end">860</text>
-<rect x="530" y="2177.0" width="54" height="20" rx="3" class="heat" fill-opacity="0.30"/>
-<text x="579.0" y="2191.5" class="cell ours" text-anchor="end">456</text>
+<text x="521.0" y="2191.5" class="cell ours" text-anchor="end">853</text>
+<rect x="530" y="2177.0" width="54" height="20" rx="3" class="heat" fill-opacity="0.33"/>
+<text x="579.0" y="2191.5" class="cell ours" text-anchor="end">684</text>
 <rect x="588" y="2177.0" width="54" height="20" rx="3" class="heat" fill-opacity="0.33"/>
-<text x="637.0" y="2191.5" class="cell ours" text-anchor="end">988</text>
+<text x="637.0" y="2191.5" class="cell ours" text-anchor="end">990</text>
 <rect x="646" y="2177.0" width="54" height="20" rx="3" class="heat" fill-opacity="0.34"/>
-<text x="695.0" y="2191.5" class="cell ours" text-anchor="end">359</text>
+<text x="695.0" y="2191.5" class="cell ours" text-anchor="end">361</text>
 <rect x="704" y="2177.0" width="54" height="20" rx="3" class="heat" fill-opacity="0.33"/>
-<text x="753.0" y="2191.5" class="cell ours" text-anchor="end">1090</text>
+<text x="753.0" y="2191.5" class="cell ours" text-anchor="end">1071</text>
 <rect x="762" y="2177.0" width="54" height="20" rx="3" class="heat" fill-opacity="0.36"/>
-<text x="811.0" y="2191.5" class="cell ours" text-anchor="end">2241</text>
+<text x="811.0" y="2191.5" class="cell ours" text-anchor="end">2238</text>
 <rect x="820" y="2177.0" width="54" height="20" rx="3" class="heat" fill-opacity="0.34"/>
-<text x="869.0" y="2191.5" class="cell ours" text-anchor="end">344</text>
+<text x="869.0" y="2191.5" class="cell ours" text-anchor="end">339</text>
 <rect x="878" y="2177.0" width="54" height="20" rx="3" class="heat" fill-opacity="0.36"/>
-<text x="927.0" y="2191.5" class="cell ours" text-anchor="end">536</text>
+<text x="927.0" y="2191.5" class="cell ours" text-anchor="end">522</text>
 <rect x="936" y="2177.0" width="54" height="20" rx="3" class="heat" fill-opacity="0.34"/>
-<text x="985.0" y="2191.5" class="cell ours" text-anchor="end">374</text>
+<text x="985.0" y="2191.5" class="cell ours" text-anchor="end">378</text>
 <rect x="994" y="2177.0" width="54" height="20" rx="3" class="heat" fill-opacity="0.35"/>
-<text x="1043.0" y="2191.5" class="cell ours" text-anchor="end">350</text>
+<text x="1043.0" y="2191.5" class="cell ours" text-anchor="end">338</text>
 <rect x="1052" y="2177.0" width="54" height="20" rx="3" class="heat" fill-opacity="0.35"/>
-<text x="1101.0" y="2191.5" class="cell ours" text-anchor="end">711</text>
+<text x="1101.0" y="2191.5" class="cell ours" text-anchor="end">692</text>
 <rect x="1110" y="2177.0" width="54" height="20" rx="3" class="heat" fill-opacity="0.34"/>
-<text x="1159.0" y="2191.5" class="cell ours" text-anchor="end">487</text>
-<rect x="1168" y="2177.0" width="54" height="20" rx="3" class="heat" fill-opacity="0.28"/>
-<text x="1217.0" y="2191.5" class="cell ours" text-anchor="end">351</text>
+<text x="1159.0" y="2191.5" class="cell ours" text-anchor="end">478</text>
+<rect x="1168" y="2177.0" width="54" height="20" rx="3" class="heat" fill-opacity="0.33"/>
+<text x="1217.0" y="2191.5" class="cell ours" text-anchor="end">661</text>
 <rect x="1226" y="2177.0" width="54" height="20" rx="3" class="heat" fill-opacity="0.36"/>
-<text x="1275.0" y="2191.5" class="cell ours" text-anchor="end">289</text>
+<text x="1275.0" y="2191.5" class="cell ours" text-anchor="end">288</text>
 <rect x="1284" y="2177.0" width="54" height="20" rx="3" class="heat" fill-opacity="0.37"/>
-<text x="1333.0" y="2191.5" class="cell ours" text-anchor="end">237</text>
+<text x="1333.0" y="2191.5" class="cell ours" text-anchor="end">236</text>
 <rect x="1342" y="2177.0" width="54" height="20" rx="3" class="heat" fill-opacity="0.34"/>
-<text x="1391.0" y="2191.5" class="cell ours" text-anchor="end">481</text>
+<text x="1391.0" y="2191.5" class="cell ours" text-anchor="end">462</text>
 <line x1="40" y1="2200.0" x2="1398" y2="2200.0" class="rule"/>
 <text x="40" y="2217.5"><tspan class="lang">C++</tspan><tspan x="112" class="label">RapidJSON SAX full-precision</tspan><tspan class="repo" dx="7">Tencent/rapidjson</tspan></text>
 <rect x="472" y="2203.0" width="54" height="20" rx="3" class="heat" fill-opacity="0.31"/>
@@ -2571,20 +2571,20 @@
 <rect x="646" y="2619.0" width="54" height="20" rx="3" class="heat" fill-opacity="0.35"/>
 <text x="695.0" y="2633.5" class="cell" text-anchor="end">809</text>
 <line x1="40" y1="2642.0" x2="1398" y2="2642.0" class="rule"/>
-<text x="40" y="2659.5"><tspan class="lang">Rust</tspan><tspan x="112" class="label">serde_json partial struct*</tspan><tspan class="repo" dx="7">serde-rs/json</tspan></text>
+<text x="40" y="2659.5"><tspan class="lang">Rust</tspan><tspan x="112" class="label">serde_json partial float_roundtrip</tspan><tspan class="repo" dx="7"></tspan></text>
 <rect x="472" y="2645.0" width="54" height="20" rx="3" class="heat" fill-opacity="0.31"/>
-<text x="521.0" y="2659.5" class="cell" text-anchor="end">1280</text>
-<rect x="588" y="2645.0" width="54" height="20" rx="3" class="heat" fill-opacity="0.32"/>
-<text x="637.0" y="2659.5" class="cell" text-anchor="end">1443</text>
-<text x="696.0" y="2659.0" class="cell-missing" text-anchor="end">FAIL</text>
+<text x="521.0" y="2659.5" class="cell" text-anchor="end">1281</text>
+<rect x="588" y="2645.0" width="54" height="20" rx="3" class="heat" fill-opacity="0.31"/>
+<text x="637.0" y="2659.5" class="cell" text-anchor="end">1358</text>
+<rect x="646" y="2645.0" width="54" height="20" rx="3" class="heat" fill-opacity="0.32"/>
+<text x="695.0" y="2659.5" class="cell" text-anchor="end">530</text>
 <line x1="40" y1="2668.0" x2="1398" y2="2668.0" class="rule"/>
-<text x="40" y="2685.5"><tspan class="lang">Rust</tspan><tspan x="112" class="label">serde_json partial float_roundtrip</tspan><tspan class="repo" dx="7"></tspan></text>
+<text x="40" y="2685.5"><tspan class="lang">Rust</tspan><tspan x="112" class="label">serde_json partial struct*</tspan><tspan class="repo" dx="7">serde-rs/json</tspan></text>
 <rect x="472" y="2671.0" width="54" height="20" rx="3" class="heat" fill-opacity="0.31"/>
-<text x="521.0" y="2685.5" class="cell" text-anchor="end">1281</text>
-<rect x="588" y="2671.0" width="54" height="20" rx="3" class="heat" fill-opacity="0.31"/>
-<text x="637.0" y="2685.5" class="cell" text-anchor="end">1358</text>
-<rect x="646" y="2671.0" width="54" height="20" rx="3" class="heat" fill-opacity="0.32"/>
-<text x="695.0" y="2685.5" class="cell" text-anchor="end">530</text>
+<text x="521.0" y="2685.5" class="cell" text-anchor="end">1280</text>
+<rect x="588" y="2671.0" width="54" height="20" rx="3" class="heat" fill-opacity="0.32"/>
+<text x="637.0" y="2685.5" class="cell" text-anchor="end">1443</text>
+<text x="696.0" y="2685.0" class="cell-missing" text-anchor="end">FAIL</text>
 <line x1="40" y1="2694.0" x2="1398" y2="2694.0" class="rule"/>
 <text x="40" y="2711.5"><tspan class="lang">Python</tspan><tspan x="112" class="label">pysimdjson lazy</tspan><tspan class="repo" dx="7">TkTech/pysimdjson</tspan></text>
 <rect x="472" y="2697.0" width="54" height="20" rx="3" class="heat" fill-opacity="0.35"/>
@@ -2597,11 +2597,11 @@
 <rect x="40" y="2720.0" width="1358" height="26" class="row-ours"/>
 <text x="40" y="2737.5"><tspan class="lang">Beef</tspan><tspan x="112" class="label ours">JsonBeef JsonReader</tspan><tspan class="repo" dx="7"></tspan></text>
 <rect x="472" y="2723.0" width="54" height="20" rx="3" class="heat" fill-opacity="0.28"/>
-<text x="521.0" y="2737.5" class="cell ours" text-anchor="end">824</text>
+<text x="521.0" y="2737.5" class="cell ours" text-anchor="end">941</text>
 <rect x="588" y="2723.0" width="54" height="20" rx="3" class="heat" fill-opacity="0.31"/>
-<text x="637.0" y="2737.5" class="cell ours" text-anchor="end">1303</text>
+<text x="637.0" y="2737.5" class="cell ours" text-anchor="end">1318</text>
 <rect x="646" y="2723.0" width="54" height="20" rx="3" class="heat" fill-opacity="0.30"/>
-<text x="695.0" y="2737.5" class="cell ours" text-anchor="end">387</text>
+<text x="695.0" y="2737.5" class="cell ours" text-anchor="end">385</text>
 <line x1="40" y1="2746.0" x2="1398" y2="2746.0" class="rule"/>
 <text x="40" y="2763.5"><tspan class="lang">Python</tspan><tspan x="112" class="label">msgspec partial Struct</tspan><tspan class="repo" dx="7">jcrist/msgspec</tspan></text>
 <rect x="472" y="2749.0" width="54" height="20" rx="3" class="heat" fill-opacity="0.32"/>

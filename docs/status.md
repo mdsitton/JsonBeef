@@ -32,14 +32,17 @@ implementations that passed each input:
 
 | Track | twitter | twitterescaped | citm | canada | strings | floats | Rank, most inputs | Ahead of JsonBeef |
 |---|---:|---:|---:|---:|---:|---:|---|---|
-| DOM (`JsonBeef`) | 1,202 (2nd) | 627 (6th) | 1,621 (2nd) | 494 (4th) | 414 (20th) | 262 (8th) | 2nd–4th of 43–49 | simdjson DOM; yyjson and sonic-rs on most inputs |
-| Streaming (`JsonReader`) | 860 (3rd) | 456 (9th) | 988 (5th) | 359 (4th) | 351 (10th) | 237 (3rd) | 3rd–8th of 18–20 | simdjson On-Demand, jiter; RapidJSON SAX and serde_json on numeric and string-heavy inputs |
-| Typed (`[JsonObject]`) | 554 (7th) | | 752 (8th) | 259 (7th) | | | 7th–8th of 19–22 | glaze, sonic-rs, sonic, go-json, fastjson2, serde_json |
-| On-demand (`Find`) | 824 (8th) | | 1,303 (6th) | 387 (5th) | | | 5th–8th of 13–14 | simdjson On-Demand, jiter, serde_json partial, pysimdjson |
+| DOM (`JsonBeef`) | 1,309 (2nd) | 1,024 (4th) | 1,637 (2nd) | 485 (4th) | 828 (5th) | 263 (8th) | 2nd–5th of 43–49 | simdjson DOM; yyjson and sonic-rs on most inputs |
+| Streaming (`JsonReader`) | 853 (3rd) | 684 (2nd) | 991 (5th) | 361 (4th) | 661 (2nd) | 236 (3rd) | 2nd–8th of 18–20 | simdjson On-Demand, jiter; RapidJSON SAX and serde_json on numeric inputs |
+| Typed (`[JsonObject]`) | 545 (7th) | | 731 (8th) | 258 (7th) | | | 7th–8th of 19–22 | glaze, sonic-rs, sonic, go-json, fastjson2, serde_json |
+| On-demand (`Find`) | 941 (7th) | | 1,318 (6th) | 385 (5th) | | | 5th–7th of 13–14 | simdjson On-Demand, jiter, serde_json partial, pysimdjson |
 
-For reference, yyjson's DOM does 1,027 on twitter and 1,637 on twitterescaped; simdjson's 3,046 and
-1,947; jiter's streaming 940 and 469. The weak spots are escaped strings (strings, twitterescaped:
-P3E) and the on-demand query, which is no faster than the full streaming pass on twitter (P6Q).
+JsonBeef's columns were remeasured after the escaped-string work (`docs/architecture.md`, *Fast
+paths*): DOM strings 414 → 828 MB/s and twitterescaped 627 → 1,024, streaming strings 351 → 661 and
+twitterescaped 456 → 684, the twitter query 824 → 941; the other cells moved within ±3%. For
+reference, yyjson's DOM does 1,027 on twitter and 1,637 on twitterescaped; simdjson's 3,046 and
+1,947; jiter's streaming 940 and 469. The weak spots left are float-heavy files (fast_float, plan §9
+item 6), the typed track (P6T) and the on-demand query on canada (P6Q).
 
 The load-independent measure, user-space instructions per input byte of the Release `JsonTester`
 (`bench/instructions.sh`):
@@ -101,10 +104,9 @@ text): only twitter, citm_catalog and canada are in those tracks.
 
 | ID | Item | Size |
 |----|------|------|
-| P3E | Escaped strings are JsonBeef's weak spot: DOM strings 414 MB/s (20th; yyjson 945, sonic-rs 1,064), twitterescaped 627 (6th; yyjson 1,637). The decoding loop after the first `\` (escapes, `\u` pairs, the copy into the decode buffer) is the place to look; profile with `perf` on the Release `JsonTester -bench` | M |
-| P6Q | The on-demand query is no faster than the full streaming pass on twitter (824 MB/s against 860) and only 1.3× on citm_catalog (1,303 against 988), where simdjson's on-demand gains 1.6–1.8× over its streaming: skipped values pay for more than structure (SkipValue checks every string and number it skips, by design), but the gap says the skip loop or Find's member matching costs more than it should | M |
+| P6Q | The on-demand query on canada is no faster than the full streaming pass (385 MB/s against 361): to skip each pair's latitude the harness must call `Next` (which tokenizes and classifies the number) before `SkipValue`, since the reader has no call that skips the rest of the current array or object. A `SkipRest()` on the fast skip loop (validating as SkipValue does) would let it skip without tokenizing; it is new public API, so it waits for the author. (twitter's query, 824 → 941 MB/s after the string-skip work, now gains 1.1× over its streaming pass; its cost is the ~40 member names per user it reads token by token, and whitespace) | M |
 | P3S | The stream event pass costs 1.3–1.5× the memory one in instructions (XmlBeef got its to 1.1–1.3×): the reader's `Grow` checks in scans | S |
-| P6T | Typed binding's overhead over the event pass in instructions (twitter 19.9 per byte against 14.7; citm_catalog 19.0 against 13.4): the generated member matching (User's 40 fields: about 2 per byte), allocation (about 1), and the per-token calls through `JsonReader`'s memory/stream dispatch. The timed run puts the typed track 7th–8th (twitter 554 MB/s against glaze's 911 and sonic-rs's; citm_catalog 752 against glaze's 2,104), the furthest JsonBeef is from the front | M |
+| P6T | Typed binding's overhead over the event pass in instructions (twitter 19.9 per byte against 14.7; citm_catalog 19.0 against 13.4): the generated member matching (User's 40 fields: about 2 per byte), allocation (about 1), and the per-token calls through `JsonReader`'s memory/stream dispatch. The timed run puts the typed track 7th–8th (twitter 545 MB/s against glaze's 911 and go-json's 689; citm_catalog 731 against glaze's 2,104), the furthest JsonBeef is from the front. `perf` on the typed twitter column: 64% is the token reader itself (ReadString 23%, SkipSpaceRun 16%, ReadValue 13%, ReadNext 13%), the generated binding about 16%, allocation about 2%; so a faster token loop, not the generated code, is what would move it, and that is spread over branches with no single hot spot | M |
 | P6S | The on-demand fast loop serves memory input only; streams skip through the token loop | S |
 | P7S | json-patch-tests (github.com/json-patch/json-patch-tests: `tests.json`, `spec_tests.json`) could join `tests/fetch-suites.sh` as a pinned suite with a runner over `JsonTester -patch`; checked once by hand so far, when the author agrees to add a suite | S |
 | T | TomlTester's BJSON dependency could move to JsonBeef now that the document and writer exist (`plan.md` §9 open item 2): a separate step in TomlBeef, when the author asks | S |

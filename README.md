@@ -43,11 +43,11 @@ parsing into a generic document (DOM), every token without a tree (streaming), i
 
 <p align="center"><img src="docs/benchmark-table.svg" alt="Full benchmark results: MB/s for every implementation on every input in every track" width="880"></p>
 
-JsonBeef's document is second to fourth of 43–49 on most inputs, behind simdjson's DOM and level
-with or ahead of yyjson and sonic-rs on the real-world files (twitter 1,202 MB/s, citm_catalog 1,621),
-and its `JsonReader` is in jiter's class. Its weak spots are strings full of escapes, the typed
-mapping (7th–8th, behind glaze, sonic-rs and go-json) and the on-demand query; `docs/status.md`
-tracks them. JsonBeef checks everything as it reads (UTF-8, every escape, the number grammar) and
+JsonBeef's document is second to fifth of 43–49 on most inputs, behind simdjson's DOM and level
+with or ahead of yyjson and sonic-rs on the real-world files (twitter 1,309 MB/s, citm_catalog 1,637),
+and its `JsonReader` is in jiter's class (second only to simdjson on escape-heavy text). Its weak
+spots are float-heavy files, the typed mapping (7th–8th, behind glaze, sonic-rs and go-json) and
+some on-demand queries; `docs/status.md` tracks them. JsonBeef checks everything as it reads (UTF-8, every escape, the number grammar) and
 reads every number exactly, with no flags; several libraries in the tables round floats loosely or
 reject large integers unless configured (`bench/compare/results.md` notes which).
 
