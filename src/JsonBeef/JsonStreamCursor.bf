@@ -34,15 +34,15 @@ internal class JsonStreamState
 /// A stream read through a buffer (KdlBeef's KdlBufferedStreamCursor): the window is the buffered part
 /// of the input from the reader's current token on. A refill drops the bytes before that token and
 /// moves the rest to the front; a token longer than the buffer doubles it (bounded by MaxTokenBytes).
-/// Bytes are validated as they arrive; the window ends at the last complete, valid code point, so the
-/// reader never sees bytes that are not.
+/// The window is every byte read, up to an input error (I/O, MaxInputBytes); UTF-8 is the reader's to
+/// check (in strings), so memory and stream input report the same errors.
 internal struct JsonBufferedStreamCursor : IJsonCursor
 {
 	Stream mStream;
 	JsonStreamState mState;
 	/// Absolute offset of the buffer's first byte.
 	int mBase;
-	/// Bytes in the buffer, and how many of them are validated (the window).
+	/// Bytes in the buffer, and how many of them the window shows (all, up to an input error).
 	int mRaw;
 	int mValid;
 	/// The stream is exhausted, or failed (mState.mHasError).
@@ -99,8 +99,7 @@ internal struct JsonBufferedStreamCursor : IJsonCursor
 		mValid = start;
 		mLines = .(start);
 		mLocated = .(start);
-		// Finish the first buffer, and validate it: in-memory input is validated before reading, so a
-		// document that fits the buffer reports the same first error either way
+		// The first buffer
 		while (mRaw < mCapacity && !mDone)
 			ReadMore();
 		Validate();
@@ -207,23 +206,12 @@ internal struct JsonBufferedStreamCursor : IJsonCursor
 		}
 	}
 
-	/// Validates the newly read bytes up to the last complete code point (all of them at the end of the
-	/// input) and extends the window over them, or stops the stream at the first invalid one.
+	/// Extends the window over the newly read bytes (up to an input error's offset).
 	void Validate() mut
 	{
-		char8* text = Buffer - mBase;
-		int from = mBase + mValid;
-		int to = mDone ? mBase + mRaw : JsonChar.CompleteSequencesEnd(text, from, mBase + mRaw);
+		int to = mBase + mRaw;
 		if (mState.mHasError)
-			to = Math.Max(Math.Min(to, mState.mErrorOffset), from);
-		let message = scope String();
-		int bad = JsonChar.FindInvalid(text, from, to, message, let length);
-		if (bad >= 0)
-		{
-			mValid = bad - mBase;
-			SetError(.InvalidUtf8, message, bad, length);
-			return;
-		}
+			to = Math.Max(Math.Min(to, mState.mErrorOffset), mBase + mValid);
 		mValid = to - mBase;
 	}
 

@@ -123,6 +123,7 @@ DOM=(
 	"lua-cjson (LuaJIT)|Lua|luajit $LUA cjson"
 	"lua-cjson (Lua 5.5)|Lua|lua5.5 $LUA cjson"
 	"std.json Value|Zig|$B/zig-jsonbench value"
+	"JsonBeef|Beef|$B/beef-jsonbench jsonbeef"
 	"BJSON|Beef|$B/beef-jsonbench bjson"
 	"StructuredData|Beef|$B/beef-jsonbench structureddata"
 	"EinScott/json|Beef|$B/beef-jsonbench einscott-json"
@@ -169,6 +170,7 @@ STREAM=(
 	"Newtonsoft JsonTextReader|C#|$B/jsonbench-cs/JsonBench newtonsoft-reader"
 	"ijson|Python|$PY $C/python/bench.py ijson"
 	"std.json Scanner|Zig|$B/zig-jsonbench scanner"
+	"JsonBeef JsonReader|Beef|$B/beef-jsonbench jsonbeef-stream"
 	"BJSON JsonReader|Beef|$B/beef-jsonbench bjson-stream"
 )
 QUERY=(

@@ -40,6 +40,10 @@ class Program
 	{
 		if (args.Count > 0 && (args[0] == "-fxx" || args[0] == "-es6"))
 			return Numbers.Run(args);
+		if (args.Count > 0 && (args[0] == "-bench" || args[0] == "-bench-loop"))
+			return Bench.Run(args);
+		if (args.Count > 0 && args[0] == "-fuzz")
+			return Fuzz.Run(args);
 
 		var config = JsonReadConfig();
 		int streamBuffer = 0;

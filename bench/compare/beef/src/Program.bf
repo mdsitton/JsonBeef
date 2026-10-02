@@ -5,10 +5,17 @@ using System.IO;
 
 namespace JsonBeefBench;
 
-/// Benchmarks the existing Beef JSON libraries, built into one program (Release):
+/// Benchmarks JsonBeef and the existing Beef JSON libraries, built into one program (Release):
 ///
 ///   JsonBeefBench <variant> <input> <min-samples>
 ///
+///   jsonbeef       - DOM: JsonBeef's JsonDocument.Read(StringView) (RFC 8259, every check on; the
+///                    document copies the input once, strings without escapes are views of the copy,
+///                    numbers converted to int64/uint64/double), one document read again for every
+///                    run (it keeps its memory, as simdjson's parser is reused).
+///   jsonbeef-stream - streaming: JsonBeef's JsonReader over the text: every token, every key and string
+///                    decoded (the reader decodes escapes as it scans), every number converted to a
+///                    double (TryGetDouble).
 ///   bjson          - DOM: M0n7y5/BJSON's Json.Deserialize(StringView) into its JsonValue tree (a
 ///                    Deserializer per call, as Json.Deserialize does; keys in its bump allocator),
 ///                    then Dispose. Defaults (duplicate keys: the last one wins).
@@ -128,7 +135,7 @@ class Program
 	{
 		if (args.Count < 3)
 		{
-			Console.Error.WriteLine("usage: JsonBeefBench <bjson|bjson-stream|bjson-typed|structureddata|einscott-json> <input> <min-samples>");
+			Console.Error.WriteLine("usage: JsonBeefBench <jsonbeef|jsonbeef-stream|bjson|bjson-stream|bjson-typed|structureddata|einscott-json> <input> <min-samples>");
 			return 2;
 		}
 		let variant = args[0];
@@ -171,6 +178,20 @@ class Program
 					return 1;
 			}
 			op = scope:: () => { for (let d in docs) if (!BJSONBench.Dom(d, null)) failed = true; };
+		case "jsonbeef":
+			for (let d in docs)
+			{
+				if (!JsonBeefBench.Dom(d, &check))
+					return 1;
+			}
+			op = scope:: () => { for (let d in docs) if (!JsonBeefBench.Dom(d, null)) failed = true; };
+		case "jsonbeef-stream":
+			for (let d in docs)
+			{
+				if (!JsonBeefBench.Stream(d, &check, true))
+					return 1;
+			}
+			op = scope:: () => { Check c = default; for (let d in docs) if (!JsonBeefBench.Stream(d, &c, false)) failed = true; };
 		case "bjson-stream":
 			for (let d in docs)
 			{

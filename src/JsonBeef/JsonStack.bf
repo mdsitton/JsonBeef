@@ -31,6 +31,13 @@ internal class JsonStack<T> where T : struct
 		get => mCount == 0;
 	}
 
+	/// The number of items the array holds before it grows.
+	public int Capacity
+	{
+		[Inline]
+		get => mItems.Count;
+	}
+
 	[Inline]
 	public void Add(T item)
 	{

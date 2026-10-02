@@ -3,6 +3,52 @@ using internal JsonBeef;
 
 namespace JsonBeef;
 
+/// 16 comparison results (0 or 1 per byte): a vector LLVM keeps in an SSE register.
+[UnderlyingArray(typeof(bool), 16, true)]
+internal struct JsonMask16
+{
+	// The layout as two words (without fields the compiler crashes emitting debug info for a local)
+	public uint64 mLow;
+	public uint64 mHigh;
+
+	[Intrinsic("or")]
+	public static extern JsonMask16 operator|(JsonMask16 a, JsonMask16 b);
+}
+
+/// 16 bytes as signed lanes (SSE2's byte compare is signed: bytes ≥ 0x80 are below 0x20 too, which
+/// the string scan wants), compared lane by lane with pcmpeqb/pcmpgtb. Beef reaches no movemask or
+/// trailing-zero count, so the mask is read back as two words (phase 3 measured this against SWAR).
+[UnderlyingArray(typeof(int8), 16, true)]
+internal struct JsonBytes16
+{
+	public int64 mLow;
+	public int64 mHigh;
+
+	[Intrinsic("eq")]
+	public static extern JsonMask16 operator==(JsonBytes16 a, JsonBytes16 b);
+	[Intrinsic("lt")]
+	public static extern JsonMask16 operator<(JsonBytes16 a, JsonBytes16 b);
+
+	/// 16 copies of `value`.
+	[Inline]
+	public static JsonBytes16 Splat(uint8 value)
+	{
+		uint64[2] words = .((uint64)value * 0x0101010101010101UL, (uint64)value * 0x0101010101010101UL);
+		JsonBytes16 result = ?;
+		Internal.MemCpy(&result, &words, 16);
+		return result;
+	}
+
+	/// The 16 bytes at `p` (unaligned).
+	[Inline]
+	public static JsonBytes16 Load(char8* p)
+	{
+		JsonBytes16 result = ?;
+		Internal.MemCpy(&result, p, 16);
+		return result;
+	}
+}
+
 /// Byte-level helpers shared by the reader, the cursors and the writers: word-at-a-time (SWAR) tests,
 /// UTF-8 validation and decoding, line and column counting, hex digits. Ported from XmlBeef's XmlChar and
 /// KdlBeef's KdlChar with JSON's rules: only UTF-8 well-formedness is checked up front (every code point
@@ -116,6 +162,51 @@ internal static class JsonChar
 	public static uint64 StringStops(uint64 word)
 	{
 		return BytesEqual(word, (uint8)'"') | BytesEqual(word, (uint8)'\\') | BytesBelowSpace(word);
+	}
+
+	/// @brief Whether the 8 bytes of `word` are all ASCII digits.
+	[Inline]
+	public static bool AllDigits(uint64 word)
+	{
+		return ((word & 0xF0F0F0F0F0F0F0F0UL) | (((word + 0x0606060606060606UL) & 0xF0F0F0F0F0F0F0F0UL) >> 4)) == 0x3333333333333333UL;
+	}
+
+	/// @brief The value of 8 ASCII digits loaded little-endian (the first digit in the lowest byte):
+	/// pairs, then quads, then the whole, in three multiplies (simdjson's parse_eight_digits_unrolled).
+	[Inline]
+	public static uint64 ParseEightDigits(uint64 word)
+	{
+		uint64 value = word - 0x3030303030303030UL;
+		value = (value * 10) + (value >> 8);
+		value = (((value & 0x000000FF000000FFUL) * (100 + (1000000UL << 32))) +
+			(((value >> 16) & 0x000000FF000000FFUL) * (1 + (10000UL << 32)))) >> 32;
+		return value & 0xFFFFFFFFUL;
+	}
+
+	/// @brief The high bit of each byte of `word` that is not JSON whitespace (space, tab, LF, CR).
+	[Inline]
+	public static uint64 NonSpaceBytes(uint64 word)
+	{
+		return ~(BytesEqual(word, (uint8)' ') | BytesEqual(word, (uint8)'\n') | BytesEqual(word, (uint8)'\r') | BytesEqual(word, (uint8)'\t')) & cHigh;
+	}
+
+	/// @brief The index (0-15) of the first byte of `p[0 ..< 16]` that ends a string's plain ASCII run
+	/// (`"`, `\`, a control character or a non-ASCII byte), or 16 when there is none: one 16-byte vector
+	/// compare (SSE2, no movemask needed until a stop is found).
+	[Inline]
+	public static int FirstStringStop16(char8* p)
+	{
+		let bytes = JsonBytes16.Load(p);
+		var mask = (bytes == JsonBytes16.Splat((uint8)'"')) | (bytes == JsonBytes16.Splat((uint8)'\\')) | (bytes < JsonBytes16.Splat((uint8)' '));
+		uint64* words = (uint64*)&mask;
+		uint64 low = words[0];
+		uint64 high = words[1];
+		if ((low | high) == 0)
+			return 16;
+		// Lanes are 0 or 1: moved to each byte's high bit for FirstByte
+		if (low != 0)
+			return FirstByte(low << 7);
+		return 8 + FirstByte(high << 7);
 	}
 
 	/// @brief The index (0-7) of the lowest byte whose high bit is set in `mask` (which must be nonzero
@@ -385,6 +476,44 @@ internal static class JsonChar
 			message.AppendF("The bytes 0x{:X2} 0x{:X2} encode a code point above U+10FFFF, which is not valid UTF-8", lead, next);
 		else
 			message.AppendF("The bytes 0x{:X2} 0x{:X2} are an overlong UTF-8 encoding", lead, next);
+	}
+
+	/// @brief The length of the well-formed UTF-8 sequence at `p[i]` (a lead byte ≥ 0x80) within
+	/// `p[i ..< length]`, or 0 if it is ill-formed or cut off (Unicode §3.9 table 3-7).
+	[Inline]
+	public static int ValidSequenceLength(char8* p, int i, int length)
+	{
+		uint8 b = (uint8)p[i];
+		if (i + 4 <= length)
+		{
+			// The common sequences from one word: the lead's length, the continuation bytes' tags, and the
+			// second byte's range for the leads that restrict it (overlongs, surrogates, > U+10FFFF)
+			uint32 word = Load32(p + i);
+			if (b >= 0xC2 && b < 0xE0)
+				return (word & 0xC000) == 0x8000 ? 2 : 0;
+			if (b >= 0xE1 && b < 0xF0 && b != 0xED)
+				return (word & 0xC0C000) == 0x808000 ? 3 : 0;
+		}
+		if (b < 0xC2 || b > 0xF4)
+			return 0;
+		int seqLength = b < 0xE0 ? 2 : b < 0xF0 ? 3 : 4;
+		if (i + seqLength > length)
+			return 0;
+		uint8 low = 0x80;
+		uint8 high = 0xBF;
+		if (b == 0xE0) low = 0xA0;
+		else if (b == 0xED) high = 0x9F;
+		else if (b == 0xF0) low = 0x90;
+		else if (b == 0xF4) high = 0x8F;
+		uint8 b1 = (uint8)p[i + 1];
+		if (b1 < low || b1 > high)
+			return 0;
+		for (int j = 2; j < seqLength; j++)
+		{
+			if (((uint8)p[i + j] & 0xC0) != 0x80)
+				return 0;
+		}
+		return seqLength;
 	}
 
 	/// @brief The end of the complete UTF-8 sequences in `text[from ..< to]`: `to`, or the start of a

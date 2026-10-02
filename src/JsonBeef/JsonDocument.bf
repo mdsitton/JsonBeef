@@ -241,8 +241,18 @@ public class JsonDocument
 	{
 		mSource = owned.Ptr;
 		mSourceLength = owned.Length;
-		mReader.Reset(owned, readerConfig);
 		mNodes.Reserve(owned.Length / 8 + 16);
+		// The fast build first (JsonDocument.Fast.bf); at any problem, the reader reads again and reports it
+		if (config.DuplicateNames == .KeepAll && (config.MaxInputBytes <= 0 || owned.Length <= config.MaxInputBytes))
+		{
+			if (JsonInputStart.Check(owned.Ptr, owned.Length, config.AllowBom) case .Ok(let start) && FastBuild(owned.Ptr, start, owned.Length, config))
+				return .Ok;
+			mNodes.Clear();
+			mNodes.Add(default);
+			mStrings.Clear();
+			mRoot = 0;
+		}
+		mReader.Reset(owned, readerConfig);
 		return EndRead(Build(mReader, mReader.mBytes, true, config));
 	}
 

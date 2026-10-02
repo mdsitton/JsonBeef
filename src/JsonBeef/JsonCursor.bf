@@ -6,12 +6,13 @@ namespace JsonBeef;
 /// Where JsonReaderCore's bytes come from (KdlBeef's IKdlCursor, XmlBeef's IXmlCursor). The reader reads
 /// a window of the input through a pointer `data` indexed by absolute offsets (`data[offset]`, valid for
 /// `windowStart <= offset < end`), so offsets it keeps stay valid when a stream moves or grows its
-/// buffer; only `data`, `windowStart` and `end` change. The bytes in the window are well-formed UTF-8.
+/// buffer; only `data`, `windowStart` and `end` change. The bytes are not validated here: only strings
+/// may hold non-ASCII bytes, so the reader checks UTF-8 as it scans them (and reports a non-ASCII byte
+/// anywhere else by whether it is well-formed).
 internal interface IJsonCursor
 {
-	/// Checks the encoding, validates what it can up front (all of an in-memory input; a stream's first
-	/// buffer) and sets up the window. @return The offset of the first content byte (after a BOM), or
-	/// the input's error.
+	/// Checks the start of the input (a UTF-16/32 encoding, a BOM) and sets up the window.
+	/// @return The offset of the first content byte (after a BOM), or the input's error.
 	Result<int, JsonParseError> Begin(ref char8* data, ref int windowStart, ref int end) mut;
 
 	/// Makes the input up to `pos + count` available if there is that much, keeping every byte from
@@ -158,7 +159,7 @@ internal static class JsonInputStart
 	}
 }
 
-/// An in-memory input: the window is the whole input, validated up front; Fill never has more.
+/// An in-memory input: the window is the whole input; Fill never has more.
 internal struct JsonByteCursor : IJsonCursor
 {
 	StringView mInput;
@@ -183,13 +184,6 @@ internal struct JsonByteCursor : IJsonCursor
 			return .Err(JsonParseError(.ResourceLimitExceeded, scope $"The input ({mInput.Length} bytes) exceeds MaxInputBytes ({mMaxInputBytes})", 1, 1, 0, 0));
 		int start = Try!(JsonInputStart.Check(mInput.Ptr, mInput.Length, mAllowBom));
 		mLines = .(start);
-		let message = scope String();
-		int bad = JsonChar.FindInvalid(mInput.Ptr, start, mInput.Length, message, let length);
-		if (bad >= 0)
-		{
-			Locate(bad, let line, let column);
-			return .Err(JsonParseError(.InvalidUtf8, message, line, column, bad, length));
-		}
 		return start;
 	}
 

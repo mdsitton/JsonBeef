@@ -51,7 +51,7 @@ public static class JsonNumber
 	}
 
 	/// The general path: corlib's fast_float (correctly rounded for any length) on the unsigned text.
-	static bool ParseDoubleSlow(StringView token, out double value)
+	internal static bool ParseDoubleSlow(StringView token, out double value)
 	{
 		bool negative = token[0] == '-';
 		char8* text = token.Ptr + (negative ? 1 : 0);
@@ -131,6 +131,16 @@ public static class JsonNumber
 				return false;
 			exponent += negativeExponent ? -expValue : expValue;
 		}
+		return TryClinger(mantissa, exponent, ptr[0] == '-', out value);
+	}
+
+	/// Clinger's fast path on a mantissa and decimal exponent (value = ±mantissa × 10^exponent): exact
+	/// when the mantissa is at most 2^53 and the power of ten is an exact double (|exponent| ≤ 22), or
+	/// when a larger exponent's excess can be multiplied into the mantissa exactly. Otherwise false.
+	[Inline]
+	internal static bool TryClinger(uint64 mantissa, int exponent, bool negative, out double value)
+	{
+		value = 0;
 		if (mantissa > (1UL << 53))
 			return false;
 		double result = (double)mantissa;
@@ -156,7 +166,7 @@ public static class JsonNumber
 			}
 			result = (double)scaled * 1e22;
 		}
-		value = ptr[0] == '-' ? -result : result;
+		value = negative ? -result : result;
 		return true;
 	}
 

@@ -1,9 +1,9 @@
 FileVersion = 1
 
-# The existing Beef JSON libraries in one program, built by the same compiler with the same settings
-# (beefbuild -config=Release, see ../build.sh beef): BJSON and EinScott/json (the pinned clones in
-# ../deps, their own project files) and Beef's built-in Beefy.utils.StructuredData (copied into
-# src/beefy by ../fetch.sh).
+# JsonBeef and the existing Beef JSON libraries in one program, built by the same compiler with the
+# same settings (beefbuild -config=Release, see ../build.sh beef): JsonBeef (this repository), BJSON and
+# EinScott/json (the pinned clones in ../deps, their own project files) and Beef's built-in
+# Beefy.utils.StructuredData (copied into src/beefy by ../fetch.sh).
 [Workspace]
 StartupProject = "JsonBeefBench"
 
@@ -11,3 +11,4 @@ StartupProject = "JsonBeefBench"
 JsonBeefBench = {Path = "."}
 BJSON = {Path = "../deps/BJSON/BJSON"}
 json = {Path = "../deps/EinScott-json"}
+JsonBeef = {Path = "../../.."}

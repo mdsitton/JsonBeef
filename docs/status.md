@@ -15,9 +15,31 @@ Last reviewed: 2026-10-02 (phase 2 done).
 | `bash ./test-leaks.sh` | No leaks (LeakSanitizer over the TestRelease `[Test]`s) |
 | `beefbuild-win -test`, `beefbuild-win -test -config=TestRelease` (`~/development/beef-proton`) | 167/167 pass |
 | `tests/fetch-suites.sh` | Pinned suites in `tests/suites/` (`docs/test-suites.md`) |
-| `bench/compare/run.sh` | The existing implementations, four tracks; refuses to run above load average 2. No timed run yet (the machine has stayed loaded); JsonBeef joins in phase 3 |
+| `bash ./test-json-fuzz.sh` (and with the Release `BIN`) | 2 seeds × 50 rounds of every suite input (57,200 runs) and 3 rounds of the 14 real-world files: fast build, reader and 1-byte stream agree on every mutation. Run with `SEEDS=3 ROUNDS=200` (343,000 runs, Release) at the end of phase 3: 0 disagreements |
+| `bench/compare/run.sh` | The existing implementations and JsonBeef's `JsonBeef` (DOM) and `JsonBeef JsonReader` (streaming) columns, four tracks; refuses to run above load average 2. JsonBeef's check lines equal the reference on all 16 inputs in both tracks (`./build.sh beef`). No timed run yet (P3T): there is no `results.md`, so the first timed run is the full one, then `ONLY='JsonBeef.*'` |
+| `bash bench/instructions.sh` (after `beefbuild -config=Release`) | The instruction counts below |
 
 Any change to `.bf` files must keep these green in both Debug and Release.
+
+## Performance baseline
+
+No timed figures yet (P3T: the load average has stayed between 7 and 27). The load-independent
+measure, user-space instructions per input byte of the Release `JsonTester` (`bench/instructions.sh`):
+the event pass (`JsonReader` from memory, every string decoded and number converted), the document
+read, and at the end of phase 3 also the event pass from a `Stream` (64 KiB buffer) and the compact
+write:
+
+| | twitter | twitterescaped | citm | canada | github | gsoc | mesh | numbers | marine_ik | tiny | rest | records | strings | integers | floats | events |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| Events, phase 2 | 17.50 | 25.34 | 16.30 | 51.10 | 12.30 | 7.21 | 42.10 | 36.36 | 37.79 | 33.49 | 19.00 | 26.76 | 27.49 | 48.53 | 51.31 | 25.79 |
+| Events, phase 3 | 13.39 | 23.87 | 12.07 | 43.67 | 10.57 | 4.93 | 39.23 | 27.00 | 35.53 | 30.35 | 15.81 | 23.79 | 26.77 | 35.55 | 46.63 | 23.39 |
+| Document, phase 2 | 19.08 | 27.19 | 17.76 | 55.84 | 13.80 | 7.88 | 47.17 | 40.66 | 42.63 | 40.98 | 21.85 | 31.02 | 27.89 | 35.03 | 53.56 | 31.03 |
+| Document, phase 3 | 11.85 | 19.55 | 9.39 | 39.09 | 9.22 | 5.03 | 31.19 | 23.63 | 28.76 | 27.44 | 14.12 | 20.70 | 22.23 | 20.80 | 45.42 | 20.79 |
+| Stream events, phase 3 | 19.32 | 30.34 | 18.45 | 48.32 | 12.32 | 7.40 | 48.40 | 31.22 | 42.36 | 37.76 | 17.84 | 27.84 | 32.71 | 41.22 | 48.81 | 27.19 |
+| Compact write, phase 3 | 17.60 | 19.76 | 10.67 | 47.16 | 13.95 | 7.66 | 49.11 | 52.17 | 43.17 | | | 35.97 | 4.82 | 28.83 | 35.90 | |
+
+About a third of canada's, floats' and numbers' document instructions are corlib's fast_float (17-digit
+mantissas are past Clinger's fast path; plan §9 item 6 keeps fast_float).
 
 ## Feature status
 
@@ -39,6 +61,8 @@ Any change to `.bf` files must keep these green in both Debug and Release.
 
 | ID | Item | Size |
 |----|------|------|
-| P3 | Phase 3: speed: JsonBeef columns in the four benchmark tracks, profile, fast paths; the timed run needs a quiet machine (load average under 2) | L |
+| P3T | Phase 3's timed run: on a quiet machine (load average under 2), `bash bench/compare/run.sh > results.md` (the first, full run), then `./plot.py`; compare JsonBeef with yyjson/sonic-rs (DOM) and jiter (streaming); decide from it whether the 32-byte record, a closer stream path or a flat read-only document (plan §9 open item 3) are worth doing. Never commit figures taken under load | M |
+| P3S | The stream event pass costs 1.3–1.5× the memory one in instructions (XmlBeef got its to 1.1–1.3×): the reader's `Grow` checks in scans | S |
+| P4 | Phase 4: errors, positions, limits, streams, collect-errors (`plan.md` §6) | L |
 | T | TomlTester's BJSON dependency could move to JsonBeef now that the document and writer exist (`plan.md` §9 open item 2): a separate step in TomlBeef, when the author asks | S |
 | Q | Open questions (`plan.md` §9): the proposals are in use (floats keep `.0`, JCS separate; TomlTester moves later; a flat document only if phase 3 asks for one) | — |

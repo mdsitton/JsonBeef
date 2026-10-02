@@ -153,7 +153,7 @@ if want zig; then
 	(cd "$C/zig" && "$ZIG" build-exe -O ReleaseFast -femit-bin="$B/zig-jsonbench" "${ZC[@]}" main.zig)
 fi
 if want beef; then
-	step "beef (BJSON, EinScott/json, StructuredData)"
+	step "beef (JsonBeef, BJSON, EinScott/json, StructuredData)"
 	(cd "$C/beef" && beefbuild -config=Release > /dev/null)
 	cp "$C/beef/build/Release_Linux64/JsonBeefBench/JsonBeefBench" "$B/beef-jsonbench"
 fi

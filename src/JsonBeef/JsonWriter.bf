@@ -509,7 +509,7 @@ public class JsonWriter
 			uint8 b = (uint8)c;
 			if (b >= 0x80)
 			{
-				int seqLength = ValidSequenceLength(p, i, length);
+				int seqLength = JsonChar.ValidSequenceLength(p, i, length);
 				if (seqLength == 0)
 				{
 					valid = false;
@@ -572,29 +572,5 @@ public class JsonWriter
 		output.Append(hex[(cp >> 8) & 0xF]);
 		output.Append(hex[(cp >> 4) & 0xF]);
 		output.Append(hex[cp & 0xF]);
-	}
-
-	/// The length of the well-formed UTF-8 sequence at `p[i]` (a lead byte ≥ 0x80), or 0.
-	static int ValidSequenceLength(char8* p, int i, int length)
-	{
-		uint8 b = (uint8)p[i];
-		int seqLength = JsonChar.Utf8SequenceLength((char8)b);
-		if (seqLength < 2 || b == 0xC0 || b == 0xC1 || b > 0xF4 || i + seqLength > length)
-			return 0;
-		uint8 low = 0x80;
-		uint8 high = 0xBF;
-		if (b == 0xE0) low = 0xA0;
-		else if (b == 0xED) high = 0x9F;
-		else if (b == 0xF0) low = 0x90;
-		else if (b == 0xF4) high = 0x8F;
-		uint8 b1 = (uint8)p[i + 1];
-		if (b1 < low || b1 > high)
-			return 0;
-		for (int j = 2; j < seqLength; j++)
-		{
-			if (((uint8)p[i + j] & 0xC0) != 0x80)
-				return 0;
-		}
-		return seqLength;
 	}
 }

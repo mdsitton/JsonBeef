@@ -147,7 +147,7 @@ public class JsonReader
 
 	/// @brief The token's depth: the number of containers around it (0 for the document's value and its
 	/// StartObject/EndObject or StartArray/EndArray, 1 for the members or elements inside it).
-	public int Depth => mStreaming ? mStream.mTokenDepth : mBytes.mTokenDepth;
+	public int Depth => mStreaming ? mStream.TokenDepth : mBytes.TokenDepth;
 
 	/// @brief The number of containers open after the token (StartArray opens one, EndArray closes it).
 	public int CurrentDepth => mStreaming ? mStream.CurrentDepth : mBytes.CurrentDepth;

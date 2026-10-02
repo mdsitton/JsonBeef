@@ -56,11 +56,11 @@ writers), with `JsonTestUtil` (the trace helpers and a trickling test stream). T
 `JsonInputStart.Check` runs first, on the first four bytes: a UTF-16 or UTF-32 byte order mark, or the
 zero bytes of ASCII characters in 16- or 32-bit units (RFC 4627 §3's patterns, checked on four bytes
 so that `[`, NUL, `]` stays a syntax error), is `UnsupportedEncoding` (RFC 8259 §8.1: transcode first);
-one UTF-8 BOM is skipped unless `AllowBom` is off (`plan.md` §9 item 2). Then `JsonChar.FindInvalid`
-checks UTF-8 well-formedness (Unicode §3.9 table 3-7: overlongs, encoded surrogates and code points
-above U+10FFFF are errors), 32 and 8 bytes of ASCII at a time: once for in-memory input, per refill
-for a stream. Every code point is then legal inside a string; what may appear outside strings is the
-grammar's business, so no other character check exists.
+one UTF-8 BOM is skipped unless `AllowBom` is off (`plan.md` §9 item 2). UTF-8 well-formedness
+(Unicode §3.9 table 3-7: overlongs, encoded surrogates and code points above U+10FFFF are errors) is
+checked where non-ASCII bytes can be: inside strings, by the string scan (see Fast paths). Anywhere
+else a non-ASCII byte is a syntax error, reported as `InvalidUtf8` when it is ill-formed. Every code
+point is legal inside a string, so no other character check exists.
 
 ### The window and the cursor
 
@@ -72,11 +72,9 @@ end. `JsonByteCursor`'s `Fill` is an inlined `false`, so for memory input the he
 `JsonBufferedStreamCursor` reads a `Stream` through a buffer of `StreamBufferBytes` (default 64 KiB,
 at least 16). `Fill` drops the bytes before the current token (`mRetain`, kept until the next call so
 the token's views stay valid), reads more, and doubles the buffer only when one token does not fit,
-up to `MaxTokenBytes`. It never splits a CRLF or a UTF-8 sequence at the window's end; new bytes are
-validated as they arrive, so an invalid byte is reported where it is, after the tokens before it. The
-first buffer is validated whole before the first token, so a document that fits it reports the same
-first error as from memory (the suite's stream modes compare every error with the golden one). When
-the window moves the core rebases the token's views (`RebaseViews`). Lines are counted forward
+up to `MaxTokenBytes`. The reader asks for a UTF-8 sequence's bytes before it checks one, so errors
+are the same from memory and from a stream (the suite's stream modes compare every error with the
+golden one). When the window moves the core rebases the token's views (`RebaseViews`). Lines are counted forward
 (`JsonLineCounter`, XmlBeef's: newlines found 8 bytes at a time, columns counted only when asked from a
 base on the current line); LF, CR and CRLF are one newline each.
 
@@ -135,6 +133,46 @@ comma, `'` strings, `+1`, `.5`, `NaN`, `True`, leading zeros, a number running i
 - Verified against the whole parse-number-fxx corpus (1,414,116 numbers bit for bit in f64 and f32,
   30,700 overflows, the 169 non-JSON strings rejected by the reader) and the first 100,000 lines of the
   RFC 8785 number file (both directions), in Debug and Release.
+
+### Fast paths
+
+Phase 3 measured with instruction counts (`bench/instructions.sh`, which load does not distort; it
+is not speed: branch misses and memory stalls are not in it) and `perf record -e instructions`. What
+paid:
+
+- **UTF-8 in the string scan.** The input is no longer validated in a separate pass before reading:
+  only strings may hold non-ASCII bytes, so the string scan stops at bytes ≥ 0x80 and checks each
+  sequence (`JsonChar.ValidSequenceLength`: two- and three-byte forms from one 32-bit load), and the
+  error paths that describe a byte elsewhere report an ill-formed one as `InvalidUtf8`. Errors now
+  come in document order, the same from memory and from a stream (one golden error changed:
+  `[a` + E5 `]` reports the `a`). twitter: 17.5 → 15.3 instructions per byte.
+- **Whitespace**: one compare inline when there is none (minified JSON), a byte or two out of line,
+  and indentation 8 bytes at a time (`JsonChar.NonSpaceBytes`) from the second whitespace byte on.
+- **Numbers**: the reader gathers a float's first 19 significant digits and decimal exponent during
+  its one scan (`mFloatMantissa`, `mFloatExponent`), so Clinger's fast path needs no second pass over
+  the text; digits are read 8 at a time where they fit (`AllDigits`, `ParseEightDigits`, simdjson's
+  trick). Longer mantissas (canada's 17-digit coordinates) still go to corlib's fast_float, a third of
+  canada's instructions: plan §9 item 6 keeps it (no ported Eisel–Lemire).
+- **Strings**: 16 bytes at a time with SSE2 compares (`JsonChar.FirstStringStop16`, `JsonBytes16`:
+  two `pcmpeqb` and a signed `pcmpgtb`, which also catches bytes ≥ 0x80; LLVM tests the mask with
+  `movmskps`, and the first stop is found from the mask's two words), then 8-byte SWAR and bytes for
+  the tail; the fast build enters them only when the next byte continues a plain run, since escapes
+  and non-ASCII text come in clusters. gsoc-2018: 6.6 → 4.9 per byte.
+- **The fast build** (`JsonDocument.Fast.bf`): the document from memory input is built by one loop
+  with the position, depth, current container and the node table's pointer in locals (stores through
+  `this` made the compiler reload them after every record), writing records directly instead of going
+  token by token through the reader. It checks everything the reader does but reports nothing: at any
+  problem it returns false and `Read` reads again with the reader, which reports the error exactly
+  (messages and positions are the reader's by construction). It serves the default duplicate policy;
+  streams and the other policies use the reader's builder, so both builders run in the suite.
+  `test-json-fuzz.sh` reads random mutations of every suite input three ways (fast build, reader,
+  1-byte stream) and requires the same canonical form or the same error.
+- **Reader bookkeeping for streams** (`Retain`) folds away for memory input; the token depth is
+  computed on request; literals compare as one 32-bit word.
+
+Not done: Eisel–Lemire (decided against), a stream path as close to memory as XmlBeef's (the stream
+column is 1.3–1.5× the event pass), a 32-byte record (its gain is memory traffic, which only a timed
+run shows).
 
 ## 4. Document
 

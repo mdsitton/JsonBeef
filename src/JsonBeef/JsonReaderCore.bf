@@ -71,7 +71,12 @@ internal class JsonReaderCore<TCursor> where TCursor : IJsonCursor
 	internal JsonToken mToken;
 	internal int mTokenStart;
 	internal int mTokenEnd;
-	internal int mTokenDepth;
+	/// The token's depth: the open containers around it (a Start token's own is not around it).
+	internal int TokenDepth
+	{
+		[Inline]
+		get => mToken == .StartObject || mToken == .StartArray ? mDepth - 1 : mDepth;
+	}
 	/// String, PropertyName: the decoded text. Number, literals: the token's text.
 	internal StringView mValue;
 	/// String, PropertyName: the text between the quotes, escapes as written. Number, literals: the
@@ -81,6 +86,11 @@ internal class JsonReaderCore<TCursor> where TCursor : IJsonCursor
 	internal JsonNumberKind mNumberKind;
 	/// Integer: the value. UInteger: the value's bits.
 	internal int64 mInteger;
+	/// Float: the first 19 significant digits as an integer, the decimal exponent that goes with them,
+	/// and whether those are all the digits (Clinger's fast path then applies).
+	internal uint64 mFloatMantissa;
+	internal int32 mFloatExponent;
+	internal bool mFloatExact;
 
 	public this()
 	{
@@ -104,7 +114,6 @@ internal class JsonReaderCore<TCursor> where TCursor : IJsonCursor
 		mToken = .None;
 		mTokenStart = 0;
 		mTokenEnd = 0;
-		mTokenDepth = 0;
 		mValue = default;
 		mRaw = default;
 		mEscaped = false;
@@ -133,7 +142,7 @@ internal class JsonReaderCore<TCursor> where TCursor : IJsonCursor
 
 	Result<JsonToken, JsonFailure> ReadNext()
 	{
-		mRetain = int.MaxValue;
+		Retain(int.MaxValue);
 		switch (mState)
 		{
 		case .Start:
@@ -186,6 +195,7 @@ internal class JsonReaderCore<TCursor> where TCursor : IJsonCursor
 	}
 
 	/// After a value: `,` or the container's end; at depth 0, nothing but whitespace.
+	[Inline]
 	Result<JsonToken, JsonFailure> ReadAfterValue()
 	{
 		SkipSpace();
@@ -197,7 +207,6 @@ internal class JsonReaderCore<TCursor> where TCursor : IJsonCursor
 			mToken = .EndOfDocument;
 			mTokenStart = mPos;
 			mTokenEnd = mPos;
-			mTokenDepth = 0;
 			return .Ok(.EndOfDocument);
 		}
 		bool inObject = InObject;
@@ -218,6 +227,7 @@ internal class JsonReaderCore<TCursor> where TCursor : IJsonCursor
 	}
 
 	/// After `,` in an object: the next member's name.
+	[Inline]
 	Result<JsonToken, JsonFailure> ReadNameAfterComma()
 	{
 		mState = .Name;
@@ -306,7 +316,6 @@ internal class JsonReaderCore<TCursor> where TCursor : IJsonCursor
 		mToken = isObject ? .StartObject : .StartArray;
 		mTokenStart = mPos;
 		mTokenEnd = mPos + 1;
-		mTokenDepth = mDepth;
 		mDepth++;
 		mPos++;
 		mState = isObject ? .ObjectStart : .ArrayStart;
@@ -319,7 +328,6 @@ internal class JsonReaderCore<TCursor> where TCursor : IJsonCursor
 		mToken = mData[mPos] == '}' ? .EndObject : .EndArray;
 		mTokenStart = mPos;
 		mTokenEnd = mPos + 1;
-		mTokenDepth = mDepth;
 		mPos++;
 		mState = .AfterValue;
 		return .Ok(mToken);
@@ -341,12 +349,15 @@ internal class JsonReaderCore<TCursor> where TCursor : IJsonCursor
 	Result<JsonToken, JsonFailure> ReadLiteral()
 	{
 		int start = mPos;
-		mRetain = start;
+		Retain(start);
 		char8 c = mData[start];
-		StringView literal = c == 't' ? "true" : c == 'f' ? "false" : "null";
-		int length = literal.Length;
-		if (!AvailN(start, length) || !JsonChar.EqualBytes(mData + start, literal.Ptr, length) || (Avail(start + length) && IsWordByte(mData[start + length])))
+		// The literal's first four bytes as a little-endian word (and `false`'s `e`)
+		uint32 expected = c == 't' ? 0x65757274 : c == 'f' ? 0x736C6166 : 0x6C6C756E;
+		int length = c == 'f' ? 5 : 4;
+		if (!AvailN(start, length) || JsonChar.Load32(mData + start) != expected || (length == 5 && mData[start + 4] != 'e') ||
+			(Avail(start + length) && IsWordByte(mData[start + length])))
 		{
+			StringView literal = c == 't' ? "true" : c == 'f' ? "false" : "null";
 			int end = WordEnd(start);
 			StringView word = View(start, end - start);
 			if (word.Length < length && literal.StartsWith(word))
@@ -360,7 +371,6 @@ internal class JsonReaderCore<TCursor> where TCursor : IJsonCursor
 		mToken = c == 't' ? .True : c == 'f' ? .False : .Null;
 		mTokenStart = start;
 		mTokenEnd = start + length;
-		mTokenDepth = mDepth;
 		mValue = View(start, length);
 		mRaw = mValue;
 		mEscaped = false;
@@ -390,7 +400,7 @@ internal class JsonReaderCore<TCursor> where TCursor : IJsonCursor
 	Result<JsonToken, JsonFailure> ReadNumber()
 	{
 		int start = mPos;
-		mRetain = start;
+		Retain(start);
 		int p = start;
 		bool negative = false;
 		if (mData[p] == '-')
@@ -415,6 +425,16 @@ internal class JsonReaderCore<TCursor> where TCursor : IJsonCursor
 			// 19 digits always fit; the 20th may overflow; more make a big integer
 			while (true)
 			{
+				// Eight digits at a time while they fit
+				while (digits <= 11 && p + 8 <= mEnd)
+				{
+					uint64 word = JsonChar.Load64(mData + p);
+					if (!JsonChar.AllDigits(word))
+						break;
+					magnitude = magnitude * 100000000 + JsonChar.ParseEightDigits(word);
+					digits += 8;
+					p += 8;
+				}
 				while (p < mEnd && JsonChar.IsDigit(mData[p]))
 				{
 					uint64 digit = (uint8)mData[p] - (uint8)'0';
@@ -432,22 +452,71 @@ internal class JsonReaderCore<TCursor> where TCursor : IJsonCursor
 			}
 		}
 		bool isFloat = false;
+		// For a float, Clinger's fast path in GetDouble: the first 19 digits as a mantissa (exact when
+		// there are no more) and the decimal exponent, gathered in this one scan
+		uint64 mantissa = magnitude;
+		int mantissaDigits = digits;
+		bool exact = digits <= 19;
+		int exponent = 0;
 		if (Avail(p) && mData[p] == '.')
 		{
 			p++;
 			if (!Avail(p) || !JsonChar.IsDigit(mData[p]))
 				return .Err(NumberError("Expected a digit after the decimal point", p));
-			p = SkipDigits(p);
+			while (true)
+			{
+				while (mantissaDigits <= 11 && p + 8 <= mEnd)
+				{
+					uint64 word = JsonChar.Load64(mData + p);
+					if (!JsonChar.AllDigits(word))
+						break;
+					mantissa = mantissa * 100000000 + JsonChar.ParseEightDigits(word);
+					mantissaDigits += 8;
+					exponent -= 8;
+					p += 8;
+				}
+				while (p < mEnd && JsonChar.IsDigit(mData[p]))
+				{
+					if (mantissaDigits < 19)
+					{
+						mantissa = mantissa * 10 + (uint64)((uint8)mData[p] - (uint8)'0');
+						mantissaDigits++;
+						exponent--;
+					}
+					else
+						exact = false;
+					p++;
+				}
+				if (p < mEnd || !Grow(p, 1))
+					break;
+			}
 			isFloat = true;
 		}
 		if (Avail(p) && (mData[p] == 'e' || mData[p] == 'E'))
 		{
 			p++;
+			bool negativeExponent = false;
 			if (Avail(p) && (mData[p] == '+' || mData[p] == '-'))
+			{
+				negativeExponent = mData[p] == '-';
 				p++;
+			}
 			if (!Avail(p) || !JsonChar.IsDigit(mData[p]))
 				return .Err(NumberError("Expected a digit in the exponent", p));
-			p = SkipDigits(p);
+			// Saturating: any exponent this large already means 0 or overflow (or the fast path is off)
+			int explicitExponent = 0;
+			while (true)
+			{
+				while (p < mEnd && JsonChar.IsDigit(mData[p]))
+				{
+					if (explicitExponent < 100000)
+						explicitExponent = explicitExponent * 10 + ((uint8)mData[p] - (uint8)'0');
+					p++;
+				}
+				if (p < mEnd || !Grow(p, 1))
+					break;
+			}
+			exponent += negativeExponent ? -explicitExponent : explicitExponent;
 			isFloat = true;
 		}
 		int length = p - start;
@@ -463,7 +532,12 @@ internal class JsonReaderCore<TCursor> where TCursor : IJsonCursor
 			return .Err(Fail(.InvalidNumber, message, p, charLength));
 		}
 		if (isFloat)
+		{
 			mNumberKind = .Float;
+			mFloatMantissa = mantissa;
+			mFloatExponent = (int32)exponent;
+			mFloatExact = exact && !big;
+		}
 		else if (big)
 			mNumberKind = .BigInteger;
 		else if (negative)
@@ -489,7 +563,6 @@ internal class JsonReaderCore<TCursor> where TCursor : IJsonCursor
 		mToken = .Number;
 		mTokenStart = start;
 		mTokenEnd = p;
-		mTokenDepth = mDepth;
 		mValue = View(start, length);
 		mRaw = mValue;
 		mEscaped = false;
@@ -523,6 +596,8 @@ internal class JsonReaderCore<TCursor> where TCursor : IJsonCursor
 			message.Append("the end of the input");
 			return Fail(.InvalidNumber, message, p, 0);
 		}
+		if (IsInvalidUtf8At(p))
+			return InvalidUtf8(p);
 		JsonChar.AppendCharDescription(message, mData, p, mEnd, let length);
 		return Fail(.InvalidNumber, message, p, length);
 	}
@@ -533,16 +608,8 @@ internal class JsonReaderCore<TCursor> where TCursor : IJsonCursor
 	Result<JsonToken, JsonFailure> ReadString(bool isName)
 	{
 		int start = mPos;
-		mRetain = start;
-		int p = start + 1;
-		while (true)
-		{
-			p = ScanStringRun(p);
-			if (p < mEnd)
-				break;
-			if (!Grow(p, 1))
-				return .Err(UnterminatedString(start, p));
-		}
+		Retain(start);
+		int p = Try!(ScanStringText(start, start + 1));
 		char8 c = mData[p];
 		if (c == '"')
 		{
@@ -564,21 +631,28 @@ internal class JsonReaderCore<TCursor> where TCursor : IJsonCursor
 		mToken = isName ? .PropertyName : .String;
 		mTokenStart = start;
 		mTokenEnd = p + 1;
-		mTokenDepth = mDepth;
 		mPos = p + 1;
 		mState = isName ? .Colon : .AfterValue;
 		return .Ok(mToken);
 	}
 
-	/// The first byte from `p` in the window that ends a string's plain run (`"`, `\` or a control
-	/// character), or mEnd: 8 bytes at a time, then byte by byte at the window's end.
+	/// The first byte from `p` in the window that ends a string's plain ASCII run (`"`, `\`, a control
+	/// character or a non-ASCII byte), or mEnd: 8 bytes at a time, then byte by byte at the window's end.
 	[Inline]
 	int ScanStringRun(int p)
 	{
 		var p;
+		while (p + 16 <= mEnd)
+		{
+			int stop = JsonChar.FirstStringStop16(mData + p);
+			if (stop < 16)
+				return p + stop;
+			p += 16;
+		}
 		while (p + 8 <= mEnd)
 		{
-			uint64 stops = JsonChar.StringStops(JsonChar.Load64(mData + p));
+			uint64 word = JsonChar.Load64(mData + p);
+			uint64 stops = JsonChar.StringStops(word) | (word & JsonChar.cHigh);
 			if (stops != 0)
 				return p + JsonChar.FirstByte(stops);
 			p += 8;
@@ -586,11 +660,67 @@ internal class JsonReaderCore<TCursor> where TCursor : IJsonCursor
 		while (p < mEnd)
 		{
 			char8 c = mData[p];
-			if (c == '"' || c == '\\' || (uint8)c < 0x20)
+			if (c == '"' || c == '\\' || (uint8)c < 0x20 || (uint8)c >= 0x80)
 				return p;
 			p++;
 		}
 		return p;
+	}
+
+	/// From `p` inside the string that starts at `start`, past plain text and well-formed UTF-8 to the
+	/// next `"`, `\` or control character, which is then in the window. UTF-8 is checked here, the one
+	/// place non-ASCII text can be (the input is not validated before the reader).
+	[Inline]
+	Result<int, JsonFailure> ScanStringText(int start, int p)
+	{
+		var p;
+		while (true)
+		{
+			p = ScanStringRun(p);
+			if (p < mEnd)
+			{
+				if ((uint8)mData[p] < 0x80)
+					return p;
+				// Non-ASCII: as many well-formed sequences as follow
+				repeat
+				{
+					int length = Utf8At(p);
+					if (length == 0)
+						return .Err(InvalidUtf8(p));
+					p += length;
+				}
+				while (p < mEnd && (uint8)mData[p] >= 0x80);
+				continue;
+			}
+			if (!Grow(p, 1))
+				return .Err(UnterminatedString(start, p));
+		}
+	}
+
+	/// The length of the well-formed UTF-8 sequence at `p` (a byte ≥ 0x80 in the window), or 0.
+	[Inline]
+	int Utf8At(int p)
+	{
+		if (p + 4 > mEnd)
+			Grow(p, 4);
+		return JsonChar.ValidSequenceLength(mData, p, mEnd);
+	}
+
+	/// Whether the byte at `p` (in the window) starts an ill-formed UTF-8 sequence.
+	[Inline]
+	bool IsInvalidUtf8At(int p)
+	{
+		return (uint8)mData[p] >= 0x80 && Utf8At(p) == 0;
+	}
+
+	/// The error for the ill-formed UTF-8 sequence at `p`.
+	JsonFailure InvalidUtf8(int p)
+	{
+		if (p + 4 > mEnd)
+			Grow(p, 4);
+		let message = scope String();
+		JsonChar.FindInvalid(mData, p, Math.Min(p + 4, mEnd), message, let length);
+		return Fail(.InvalidUtf8, message, p, length);
 	}
 
 	/// Decodes a string with escapes into mStringBuffer, from its opening quote at `start`; `p` is at its
@@ -622,23 +752,18 @@ internal class JsonReaderCore<TCursor> where TCursor : IJsonCursor
 			case 't': mStringBuffer.Append('\t'); p += 2;
 			case 'u': Try!(DecodeUnicodeEscape(ref p));
 			default:
+				if (IsInvalidUtf8At(p + 1))
+					return .Err(InvalidUtf8(p + 1));
 				let message = scope String();
 				message.Append("Invalid escape: `\\` followed by ");
 				JsonChar.AppendCharDescription(message, mData, p + 1, mEnd, let length);
 				message.Append(" (JSON's escapes are `\\\"` `\\\\` `\\/` `\\b` `\\f` `\\n` `\\r` `\\t` and `\\uXXXX`)");
 				return .Err(Fail(.InvalidEscape, message, p, 1 + length));
 			}
-			// The plain run up to the next stop
-			while (true)
-			{
-				int q = ScanStringRun(p);
-				mStringBuffer.Append(mData + p, q - p);
-				p = q;
-				if (p < mEnd)
-					break;
-				if (!Grow(p, 1))
-					return .Err(UnterminatedString(start, p));
-			}
+			// The text up to the next stop
+			int q = Try!(ScanStringText(start, p));
+			mStringBuffer.Append(mData + p, q - p);
+			p = q;
 		}
 	}
 
@@ -680,6 +805,8 @@ internal class JsonReaderCore<TCursor> where TCursor : IJsonCursor
 			uint8 digit = JsonChar.HexDigitValue(mData[q]);
 			if (digit == 255)
 			{
+				if (IsInvalidUtf8At(q))
+					return .Err(InvalidUtf8(q));
 				let message = scope String();
 				message.Append("The escape `\\u` needs four hex digits, found ");
 				JsonChar.AppendCharDescription(message, mData, q, mEnd, let length);
@@ -706,19 +833,55 @@ internal class JsonReaderCore<TCursor> where TCursor : IJsonCursor
 
 	// Whitespace
 
+	/// Past whitespace. Most gaps in minified JSON are empty: one compare decides that inline.
 	[Inline]
 	void SkipSpace()
 	{
+		if (mPos < mEnd && (uint8)mData[mPos] > (uint8)' ')
+			return;
+		SkipSpaceRun();
+	}
+
+	/// Past a run of whitespace: a byte or two (a space after `:`, a newline), then indentation 8 bytes
+	/// at a time.
+	void SkipSpaceRun()
+	{
 		while (true)
 		{
-			while (mPos < mEnd && JsonChar.IsSpace(mData[mPos]))
+			while (mPos < mEnd)
+			{
+				if (!JsonChar.IsSpace(mData[mPos]))
+					return;
 				mPos++;
-			if (mPos < mEnd || !Grow(mPos, 1))
+				if (mPos >= mEnd || !JsonChar.IsSpace(mData[mPos]))
+					continue;
+				mPos++;
+				while (mPos + 8 <= mEnd)
+				{
+					uint64 nonSpace = JsonChar.NonSpaceBytes(JsonChar.Load64(mData + mPos));
+					if (nonSpace != 0)
+					{
+						mPos += JsonChar.FirstByte(nonSpace);
+						return;
+					}
+					mPos += 8;
+				}
+			}
+			if (!Grow(mPos, 1))
 				return;
 		}
 	}
 
 	// The window
+
+	/// Keeps the window from `pos` on (the token being read; int.MaxValue: nothing). Memory input keeps
+	/// everything anyway, so this folds away there.
+	[Inline]
+	void Retain(int pos)
+	{
+		if (!mCursor.IsWhole)
+			mRetain = pos;
+	}
 
 	/// Whether the byte at `pos` is available, reading more of a stream if needed.
 	[Inline]
@@ -810,6 +973,8 @@ internal class JsonReaderCore<TCursor> where TCursor : IJsonCursor
 	/// "Expected X, found Y" at mPos (which must be available).
 	JsonFailure Unexpected(JsonErrorKind kind, StringView expected)
 	{
+		if (IsInvalidUtf8At(mPos))
+			return InvalidUtf8(mPos);
 		let message = scope String();
 		message.Append("Expected ");
 		message.Append(expected);
@@ -823,16 +988,21 @@ internal class JsonReaderCore<TCursor> where TCursor : IJsonCursor
 	/// The current number token's double (correctly rounded); false if it overflows (the value is ±∞).
 	public bool GetDouble(out double value)
 	{
-		if (mNumberKind == .Integer && mInteger != 0)
+		switch (mNumberKind)
 		{
-			// Exact below 2^53; beyond, the conversion rounds as the text would
-			if (mInteger > -((int64)1 << 53) && mInteger < ((int64)1 << 53))
+		case .Integer:
+			// Exact below 2^53 (`-0` is −0.0); beyond, the conversion rounds as the text would
+			if (mInteger != 0 && mInteger > -((int64)1 << 53) && mInteger < ((int64)1 << 53))
 			{
 				value = (double)mInteger;
 				return true;
 			}
+		case .Float:
+			if (mFloatExact && JsonNumber.TryClinger(mFloatMantissa, mFloatExponent, mRaw[0] == '-', out value))
+				return true;
+		default:
 		}
-		return JsonNumber.ParseDouble(mRaw, out value);
+		return JsonNumber.ParseDoubleSlow(mRaw, out value);
 	}
 
 	/// Locates `offset` for an error made outside the reader (a value conversion).

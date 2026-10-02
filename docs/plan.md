@@ -240,7 +240,16 @@ Windows tests, committed (`AGENTS.md`).
    (`test-json-corpus.sh`). Mutation stays in phase 5.*
    Store, nodes, members, the builder, compact/pretty/JCS writers, lookups,
    JSON Pointer.
-3. **Speed.** Join the four benchmark tracks (`JsonBeef` columns), profile, fast paths; measure the
+3. **Speed.** *Code done, timed run pending (2026-10-02): `JsonBeef` and `JsonBeef JsonReader` join
+   the DOM and streaming tracks with check lines equal to the reference on all 16 inputs (typed and
+   on-demand follow `[JsonObject]` in phase 6); UTF-8 is checked in the string scan instead of a pass
+   before reading; a fast document build for memory input that falls back to the reader to report
+   errors; SWAR whitespace and digits; floats' mantissas gathered in the one scan; the `u8x16` string
+   scan (SSE2 compares, kept: fewer instructions on long strings, neutral on short ones). Document
+   reads went from 17.8 to 9.4 instructions per byte on citm_catalog, 19.1 to 11.9 on twitter
+   (`docs/status.md`). The machine stayed loaded (load average 7–27), so the timed run, and with it
+   the 32-byte record's measurement and the comparison with the §2.3 targets, waits for a quiet one.*
+   Join the four benchmark tracks (`JsonBeef` columns), profile, fast paths; measure the
    `u8x16` scan and the 32-byte record. Targets from §2.3.
 4. **Errors, positions, limits, streams, collect-errors.**
 5. **JSONC and PreserveStyle, mutation.** Byte-exact round trips of every accepted suite input and of
