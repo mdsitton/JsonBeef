@@ -648,6 +648,7 @@ internal class JsonReaderCore<TCursor> where TCursor : IJsonCursor
 				return .Err(Unexpected(.InvalidStructure, "`:` after the member name"));
 			}
 			mPos++;
+			SkipOneSpace();
 			mState = .Value;
 			return ReadValue(false);
 		case .AfterValue:
@@ -1494,6 +1495,16 @@ internal class JsonReaderCore<TCursor> where TCursor : IJsonCursor
 		SkipSpaceRun();
 	}
 
+	/// Past the one space that follows `:` in pretty-printed JSON (half of its whitespace runs) when a
+	/// token follows it: inline here, where it is common, and not in every SkipSpace, so that minified
+	/// input's paths do not grow. (After `,` too measured worse: canada's hot code moved.)
+	[Inline]
+	void SkipOneSpace()
+	{
+		if (mPos + 1 < mEnd && mData[mPos] == ' ' && (uint8)mData[mPos + 1] > (uint8)' ' && mData[mPos + 1] != '/')
+			mPos++;
+	}
+
 	/// Past a run of whitespace: a byte or two (a space after `:`, a newline), then indentation 8 bytes
 	/// at a time; and comments. A malformed comment is left where it starts, for the error that follows.
 	void SkipSpaceRun()
@@ -1512,23 +1523,47 @@ internal class JsonReaderCore<TCursor> where TCursor : IJsonCursor
 				if (mPos >= mEnd || !JsonChar.IsSpace(mData[mPos]))
 					continue;
 				mPos++;
-				while (mPos + 8 <= mEnd)
-				{
-					uint64 nonSpace = JsonChar.NonSpaceBytes(JsonChar.Load64(mData + mPos));
-					if (nonSpace != 0)
-					{
-						// The byte that ends the run; a comment goes on in the loop
-						mPos += JsonChar.FirstByte(nonSpace);
-						if (mData[mPos] != '/')
-							return;
-						break;
-					}
-					mPos += 8;
-				}
+				if (SkipIndentation())
+					return;
 			}
 			if (!Grow(mPos, 1))
 				return;
 		}
+	}
+
+	/// The rest of a run of whitespace from its third byte (indentation), 8 bytes at a time, in locals
+	/// (stores through `this` would be reloaded). Out of line, so that the one- and two-byte runs
+	/// SkipSpaceRun ends itself pay nothing for the loop's setup.
+	/// @return Whether the run ended at a byte that is not `/` (else, at a comment or the window's end,
+	/// SkipSpaceRun goes on).
+	[NoInline]
+	bool SkipIndentation()
+	{
+		char8* data = mData;
+		int end = mEnd;
+		int pos = mPos;
+		while (pos + 8 <= end)
+		{
+			uint64 word = JsonChar.Load64(data + pos);
+			// The byte that ends a run is almost always above 0x20 and the bytes before it spaces: the
+			// exact test (tabs, line breaks, control characters) only when a byte below 0x20 comes first
+			uint64 above = JsonChar.BytesAboveSpace(word);
+			uint64 below = JsonChar.BytesBelowSpace(word);
+			uint64 nonSpace;
+			if (below == 0 || (above != 0 && (below & ((above & (~above + 1)) - 1)) == 0))
+				nonSpace = above;
+			else
+				nonSpace = JsonChar.NonSpaceBytes(word);
+			if (nonSpace != 0)
+			{
+				pos += JsonChar.FirstByte(nonSpace);
+				mPos = pos;
+				return data[pos] != '/';
+			}
+			pos += 8;
+		}
+		mPos = pos;
+		return false;
 	}
 
 	// Comments (JsonReadConfig.Comments)

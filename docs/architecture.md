@@ -358,6 +358,19 @@ paid:
   870 MB/s; the events pass 351 → 733 MB/s; twitterescaped 19.6 → 15.9; twitter 11.9 → 11.2; the
   twitter on-demand query +10%.
 
+- **Whitespace in pretty-printed input** (`perf` on twitter's events pass: `SkipSpaceRun` was 18% of
+  the instructions, about 54 per run of 5 bytes on average): the one space after `:` is taken inline
+  (`SkipOneSpace`, in the Colon state only; half of pretty-printed JSON's runs); indentation from the
+  run's third byte goes to `SkipIndentation`, out of line so that one- and two-byte runs keep
+  `SkipSpaceRun`'s small entry, with the position in locals and a cheaper word test: the byte that
+  ends a run is almost always above 0x20 and the bytes before it spaces (`BytesAboveSpace`, a few
+  operations), the exact test (`NonSpaceBytes`) only when a byte below 0x20 comes first. Measured
+  against the previous build, alternating the two under the same load: the events pass +4–10% on
+  twitter, citm_catalog, github_events and mesh; the benchmark's streaming column +4–7% and query
+  column +6–15% on twitter and citm_catalog; minified number-heavy files within ±2%. Taking the one
+  space after `,` inline too cost canada 11% more cycles for the same instructions (its hot code
+  moved), so it stays out.
+
 Tried and dropped after the timed run: digits 4 at a time after the 8-at-a-time steps (fewer
 instructions on numbers.json, more on integers and floats, none saved on canada) and whitespace 16
 bytes at a time (more instructions on twitter and mesh than the 8-byte loop: most runs are one space

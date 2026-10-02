@@ -156,6 +156,15 @@ internal static class JsonChar
 		return ~((word & ~cHigh) + 0x6060606060606060UL) & ~word & cHigh;
 	}
 
+	/// @brief The high bit of each byte of `word` above 0x20 (a space), exactly: the bytes that end a
+	/// run of whitespace, short of the control characters.
+	[Inline]
+	public static uint64 BytesAboveSpace(uint64 word)
+	{
+		// Adding 0x5F to a byte below 0x80 sets its high bit when it is at least 0x21
+		return (word | ((word & ~cHigh) + 0x5F5F5F5F5F5F5F5FUL)) & cHigh;
+	}
+
 	/// @brief The high bit of each byte that ends a string's plain run: `"`, `\` or a byte below 0x20
 	/// (a control character, an error). Bytes ≥ 0x80 are UTF-8 validated up front and pass.
 	[Inline]
