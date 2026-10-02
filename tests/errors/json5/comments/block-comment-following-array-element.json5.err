@@ -1,1 +1,1 @@
-3:5: InvalidStructure: Expected `,` or `]` after an array element, found `/`
+3:5: UnexpectedChar: Unexpected `/`: comments are not JSON (JsonReadConfig.Comments allows them)

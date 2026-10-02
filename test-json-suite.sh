@@ -29,6 +29,10 @@
 # and stream-collect read with JsonReadConfig.CollectErrors from memory and from 1-byte stream reads
 # (the first error must still be the golden one, and recovery must finish).
 #
+# The extension modes of EXTENSIONS (default "comments jsonc") run once each: every y_ case stays
+# accepted, and exactly the cases listed in tests/nst/accept-<mode>.txt and tests/json5/accept-<mode>.txt
+# are accepted among the nst n_ cases and json5-tests (docs/test-suites.md §1.5, §4.1).
+#
 # Two more checks run once: every nativejson round-trip file written by the compact writer must equal
 # the file byte for byte (JsonFloatFormat.Plain keeps `0.0`, `-0.0`, `1.7976931348623157e308`), and
 # every RFC 8785 test vector (json-canonicalization testdata) written with -jcs must equal its output
@@ -288,6 +292,54 @@ for mode in $MODES; do
 		failed=1
 	fi
 	first_mode=0
+done
+
+# Extension modes: every y_ case stays accepted, and exactly the n_ cases of tests/nst/accept-<mode>.txt
+# and the json5-tests files of tests/json5/accept-<mode>.txt are accepted (docs/test-suites.md §1.5,
+# §4.1)
+read_list() { # file
+	grep -v '^#' "$1" | grep -v '^$' | sort
+}
+for ext in ${EXTENSIONS:-comments jsonc}; do
+	: > "$tmpdir/nst-accepted"
+	y_rejected=()
+	for f in "$SUITES"/JSONTestSuite/test_parsing/[yn]_*.json; do
+		name=$(basename "$f" .json)
+		if timeout 10 "$BIN" "-$ext" "$f" > /dev/null 2>&1; then
+			[[ "$name" == n_* ]] && echo "$name" >> "$tmpdir/nst-accepted"
+		else
+			[[ "$name" == y_* ]] && y_rejected+=("$name")
+		fi
+	done
+	: > "$tmpdir/json5-accepted"
+	for f in "$SUITES"/json5-tests/*/*; do
+		rel="${f#"$SUITES"/json5-tests/}"
+		case "$rel" in
+		*.json|*.json5|*.js|*.txt)
+			timeout 10 "$BIN" "-$ext" "$f" > /dev/null 2>&1 && echo "$rel" >> "$tmpdir/json5-accepted"
+			;;
+		esac
+	done
+	ok=1
+	if [ ${#y_rejected[@]} -gt 0 ]; then
+		echo "[-$ext] y_ cases rejected: ${y_rejected[*]}"
+		ok=0
+	fi
+	if ! diff <(read_list "tests/nst/accept-$ext.txt") <(sort "$tmpdir/nst-accepted") > "$tmpdir/diff"; then
+		echo "[-$ext] nst n_ cases accepted differ from tests/nst/accept-$ext.txt:"
+		sed 's/^/  /' "$tmpdir/diff"
+		ok=0
+	fi
+	if ! diff <(read_list "tests/json5/accept-$ext.txt") <(sort "$tmpdir/json5-accepted") > "$tmpdir/diff"; then
+		echo "[-$ext] json5-tests accepted differ from tests/json5/accept-$ext.txt:"
+		sed 's/^/  /' "$tmpdir/diff"
+		ok=0
+	fi
+	if [ $ok -eq 1 ]; then
+		echo "[-$ext] nst: 95 y_ accepted, n_ accepted as listed ($(wc -l < "$tmpdir/nst-accepted")); json5-tests accepted as listed ($(wc -l < "$tmpdir/json5-accepted"))"
+	else
+		failed=1
+	fi
 done
 
 # The compact writer reproduces the nativejson round-trip files

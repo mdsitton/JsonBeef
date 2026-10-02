@@ -1,0 +1,5 @@
+# The nst n_ cases JsonBeef accepts with JsonReadConfig.Comments (docs/test-suites.md §1.5); every
+# other n_ case must stay rejected and every y_ case accepted.
+n_object_trailing_comment
+n_object_trailing_comment_slash_open
+n_structure_object_with_comment

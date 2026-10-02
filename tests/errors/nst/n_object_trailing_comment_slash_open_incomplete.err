@@ -1,1 +1,1 @@
-1:10: InvalidStructure: Expected the end of the input after the JSON value (a document holds one value), found `/`
+1:10: UnexpectedChar: Unexpected `/`: comments are not JSON (JsonReadConfig.Comments allows them)

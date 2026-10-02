@@ -1,1 +1,1 @@
-1:6: UnexpectedChar: Expected a value, found `/`
+1:6: UnexpectedChar: Unexpected `/`: comments are not JSON (JsonReadConfig.Comments allows them)

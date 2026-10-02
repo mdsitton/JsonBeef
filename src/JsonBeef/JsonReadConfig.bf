@@ -52,6 +52,12 @@ public struct JsonReadConfig
 	/// @brief Skip one leading UTF-8 byte order mark (RFC 8259 §8.1 lets parsers ignore it). Off: a BOM
 	/// is an error.
 	public bool AllowBom = true;
+	/// @brief JSONC: `//` line comments and `/* */` block comments (not nested) wherever whitespace may
+	/// be, as VS Code's jsonc-parser reads them. A document of only comments is still an error.
+	public bool Comments = false;
+	/// @brief JSONC: one comma after the last element of an array or member of an object (`[1,]`,
+	/// `{"a":1,}`). `[,]`, `[1,,]` and `{,}` stay errors.
+	public bool TrailingCommas = false;
 	/// @brief JsonDocument: what to do with duplicate member names. JsonReader reports every member.
 	public JsonDuplicateNames DuplicateNames = .KeepAll;
 
@@ -81,6 +87,31 @@ public struct JsonReadConfig
 
 	/// @brief The defaults: RFC 8259, a leading BOM skipped, MaxDepth 1024.
 	public static Self Default => .();
+
+	/// @brief JSON with comments as configuration files mean it (VS Code's settings, tsconfig.json):
+	/// comments and trailing commas.
+	public static Self Jsonc
+	{
+		get
+		{
+			Self config = .();
+			config.Comments = true;
+			config.TrailingCommas = true;
+			return config;
+		}
+	}
+
+	/// @brief RFC 8259 with nothing extra: a byte order mark and duplicate member names are errors.
+	public static Self Strict
+	{
+		get
+		{
+			Self config = .();
+			config.AllowBom = false;
+			config.DuplicateNames = .Error;
+			return config;
+		}
+	}
 
 	/// @brief Finite limits for input from untrusted sources: depth 128, 64 MiB of input, 16 MiB strings,
 	/// 4,096-byte numbers, 8 million values, 1 million members per object, 16 MiB stream tokens, and

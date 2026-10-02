@@ -263,7 +263,11 @@ internal class JsonReaderCore<TCursor> where TCursor : IJsonCursor
 		if (c == '"')
 			return ReadString(true);
 		if (c == '}')
+		{
+			if (mConfig.TrailingCommas)
+				return EndContainer();
 			return .Err(Fail(.InvalidStructure, "Expected a member name after `,`, found `}` (a trailing comma is not allowed)", mPos));
+		}
 		return .Err(Unexpected(.InvalidStructure, "a member name (a string in double quotes) after `,`"));
 	}
 
@@ -293,7 +297,11 @@ internal class JsonReaderCore<TCursor> where TCursor : IJsonCursor
 			if (c == '{')
 				return StartContainer(true);
 			if (c == ']' && afterComma && mDepth > 0 && !InObject)
+			{
+				if (mConfig.TrailingCommas)
+					return EndContainer();
 				return .Err(Fail(.InvalidStructure, "Expected a value after `,`, found `]` (a trailing comma is not allowed)", mPos));
+			}
 			return .Err(Unexpected(.InvalidStructure, "a value"));
 		default:
 			return .Err(UnexpectedInValue());
@@ -861,17 +869,18 @@ internal class JsonReaderCore<TCursor> where TCursor : IJsonCursor
 
 	// Whitespace
 
-	/// Past whitespace. Most gaps in minified JSON are empty: one compare decides that inline.
+	/// Past whitespace (and comments, with JsonReadConfig.Comments). Most gaps in minified JSON are
+	/// empty: two compares decide that inline.
 	[Inline]
 	void SkipSpace()
 	{
-		if (mPos < mEnd && (uint8)mData[mPos] > (uint8)' ')
+		if (mPos < mEnd && (uint8)mData[mPos] > (uint8)' ' && mData[mPos] != '/')
 			return;
 		SkipSpaceRun();
 	}
 
 	/// Past a run of whitespace: a byte or two (a space after `:`, a newline), then indentation 8 bytes
-	/// at a time.
+	/// at a time; and comments. A malformed comment is left where it starts, for the error that follows.
 	void SkipSpaceRun()
 	{
 		while (true)
@@ -879,7 +888,11 @@ internal class JsonReaderCore<TCursor> where TCursor : IJsonCursor
 			while (mPos < mEnd)
 			{
 				if (!JsonChar.IsSpace(mData[mPos]))
+				{
+					if (mData[mPos] == '/' && mConfig.Comments && SkipComment())
+						continue;
 					return;
+				}
 				mPos++;
 				if (mPos >= mEnd || !JsonChar.IsSpace(mData[mPos]))
 					continue;
@@ -889,8 +902,11 @@ internal class JsonReaderCore<TCursor> where TCursor : IJsonCursor
 					uint64 nonSpace = JsonChar.NonSpaceBytes(JsonChar.Load64(mData + mPos));
 					if (nonSpace != 0)
 					{
+						// The byte that ends the run; a comment goes on in the loop
 						mPos += JsonChar.FirstByte(nonSpace);
-						return;
+						if (mData[mPos] != '/')
+							return;
+						break;
 					}
 					mPos += 8;
 				}
@@ -898,6 +914,79 @@ internal class JsonReaderCore<TCursor> where TCursor : IJsonCursor
 			if (!Grow(mPos, 1))
 				return;
 		}
+	}
+
+	// Comments (JsonReadConfig.Comments)
+
+	/// Past the comment at mPos (a `/`): `//` to the end of its line (before the CR or LF), `/* */`
+	/// through its `*/` (not nested), UTF-8 checked inside. @return False, leaving mPos, when it is not a
+	/// well-formed comment: CommentError reports it. (Out of line: the whitespace loop stays small.)
+	[NoInline]
+	bool SkipComment()
+	{
+		int p = CommentEnd(mPos);
+		if (p < 0)
+			return false;
+		mPos = p;
+		return true;
+	}
+
+	/// The end of the comment at `start`, or -1 when it is not a complete, well-formed one.
+	int CommentEnd(int start)
+	{
+		if (!Avail(start + 1))
+			return -1;
+		char8 kind = mData[start + 1];
+		if (kind != '/' && kind != '*')
+			return -1;
+		int p = start + 2;
+		while (true)
+		{
+			if (!Avail(p))
+				return kind == '/' ? p : -1;
+			char8 c = mData[p];
+			if ((uint8)c >= 0x80)
+			{
+				int length = Utf8At(p);
+				if (length == 0)
+					return -1;
+				p += length;
+				continue;
+			}
+			if (kind == '/')
+			{
+				if (c == '\n' || c == '\r')
+					return p;
+			}
+			else if (c == '*' && Avail(p + 1) && mData[p + 1] == '/')
+				return p + 2;
+			p++;
+		}
+	}
+
+	/// The error for the `/` at `p` that starts no well-formed comment.
+	JsonFailure CommentError(int p)
+	{
+		if (!mConfig.Comments)
+			return Fail(.UnexpectedChar, "Unexpected `/`: comments are not JSON (JsonReadConfig.Comments allows them)", p);
+		if (Avail(p + 1) && (mData[p + 1] == '/' || mData[p + 1] == '*'))
+		{
+			// Inside it: an ill-formed UTF-8 sequence, or the end of the input before `*/`
+			int q = p + 2;
+			while (Avail(q))
+			{
+				if ((uint8)mData[q] >= 0x80)
+				{
+					if (IsInvalidUtf8At(q))
+						return InvalidUtf8(q);
+					q += Utf8At(q);
+					continue;
+				}
+				q++;
+			}
+			return Fail(.UnterminatedComment, "The input ends inside a comment: expected `*/`", p, 2);
+		}
+		return Fail(.UnexpectedChar, "Unexpected `/`: a comment starts with `//` or `/*`", p);
 	}
 
 	// The window
@@ -1003,6 +1092,8 @@ internal class JsonReaderCore<TCursor> where TCursor : IJsonCursor
 	{
 		if (IsInvalidUtf8At(mPos))
 			return InvalidUtf8(mPos);
+		if (mData[mPos] == '/')
+			return CommentError(mPos);
 		let message = scope String();
 		message.Append("Expected ");
 		message.Append(expected);
@@ -1049,8 +1140,9 @@ internal class JsonReaderCore<TCursor> where TCursor : IJsonCursor
 			CloseIfAtEnd();
 			return;
 		}
-		if (!Avail(mPos))
+		if (!Avail(mPos) || mError.mKind == .UnterminatedComment)
 		{
+			// (A comment not closed runs to the end of the input)
 			mClosingAtEnd = true;
 			mState = .Closing;
 			return;

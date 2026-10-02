@@ -29,6 +29,8 @@ public enum JsonErrorKind : uint8
 	InvalidSurrogate,
 	/// @brief A control character (U+0000-U+001F) written raw inside a string.
 	ControlCharacterInString,
+	/// @brief A `/*` comment without its `*/` (JsonReadConfig.Comments).
+	UnterminatedComment,
 
 	// Structure
 	/// @brief A `,`, `:`, `]` or `}` missing, doubled or misplaced, or anything after the document's value.

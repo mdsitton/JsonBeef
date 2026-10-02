@@ -1,1 +1,1 @@
-2:5: InvalidStructure: Expected a member name (a string in double quotes) or `}`, found `/`
+2:5: UnexpectedChar: Unexpected `/`: comments are not JSON (JsonReadConfig.Comments allows them)

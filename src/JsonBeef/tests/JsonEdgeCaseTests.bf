@@ -896,6 +896,107 @@ static class JsonEdgeCaseTests
 		Rejects("\"abc", .UnterminatedString, 1, 5);
 	}
 
+	// JSONC (Comments, TrailingCommas)
+
+	static JsonReadConfig CommentsOnly()
+	{
+		var config = JsonReadConfig();
+		config.Comments = true;
+		return config;
+	}
+
+	[Test]
+	public static void E123_LineCommentBeforeValue()
+	{
+		Accepts("// c\n{}", "{ }", CommentsOnly());
+		Rejects("// c\n{}", .UnexpectedChar, 1, 1);
+	}
+
+	[Test]
+	public static void E124_LineCommentAtEnd()
+	{
+		Accepts("{} // c", "{ }", CommentsOnly());
+	}
+
+	[Test]
+	public static void E125_BlockCommentBetweenTokens()
+	{
+		Accepts("[1 /* x */, 2]", "[ 1 2 ]", CommentsOnly());
+		Accepts("[1,\r\n/* a\r\n b */\r\n2]", "[ 1 2 ]", CommentsOnly());
+	}
+
+	[Test]
+	public static void E126_CommentBetweenColonAndValue()
+	{
+		Rejects("{\"a\":/*c*/\"b\"}", .UnexpectedChar, 1, 6);
+		Accepts("{\"a\":/*c*/\"b\"}", "{ a: \"b\" }", CommentsOnly());
+	}
+
+	[Test]
+	public static void E127_CommentsDoNotNest()
+	{
+		Rejects("/* /* */ */ 1", .UnexpectedChar, 1, 10, -1, CommentsOnly());
+	}
+
+	[Test]
+	public static void E128_UnterminatedComment()
+	{
+		Rejects("/* unterminated 1", .UnterminatedComment, 1, 1, 0, CommentsOnly());
+		Rejects("[1, /* x", .UnterminatedComment, 1, 5, 4, CommentsOnly());
+	}
+
+	[Test]
+	public static void E129_SlashAfterValue()
+	{
+		Accepts("{\"a\":\"b\"}/**/", "{ a: \"b\" }", CommentsOnly());
+		Rejects("{\"a\":\"b\"}/**//", .UnexpectedChar, 1, 14, -1, CommentsOnly());
+		Rejects("{\"a\":\"b\"}/", .UnexpectedChar, 1, 10, -1, CommentsOnly());
+	}
+
+	[Test]
+	public static void E130_CommentMarkersInStrings()
+	{
+		Accepts("{\"a\":\"// not a comment\"}", "{ a: \"// not a comment\" }");
+		Accepts("{\"a\":\"/* nor this */\"}", "{ a: \"/* nor this */\" }", CommentsOnly());
+	}
+
+	[Test]
+	public static void E131_HashIsNotAComment()
+	{
+		Rejects("# c\n{}", .UnexpectedChar, 1, 1);
+		Rejects("# c\n{}", .UnexpectedChar, 1, 1, -1, JsonReadConfig.Jsonc);
+	}
+
+	[Test]
+	public static void E132_OnlyAComment()
+	{
+		Rejects("// only a comment", .UnexpectedEndOfInput, 1, 18, -1, CommentsOnly());
+	}
+
+	[Test]
+	public static void E133_TrailingCommasSeparately()
+	{
+		Rejects("{\"a\":1,}", .InvalidStructure, 1, 8, -1, CommentsOnly());
+		Accepts("{\"a\":1,}", "{ a: 1 }", JsonReadConfig.Jsonc);
+		Accepts("[1,2,]", "[ 1 2 ]", JsonReadConfig.Jsonc);
+		// One comma only, and never alone
+		Rejects("[1,,]", .InvalidStructure, JsonReadConfig.Jsonc);
+		Rejects("[,]", .InvalidStructure, JsonReadConfig.Jsonc);
+		Rejects("{,}", .InvalidStructure, JsonReadConfig.Jsonc);
+		var trailingOnly = JsonReadConfig();
+		trailingOnly.TrailingCommas = true;
+		Accepts("[1,]", "[ 1 ]", trailingOnly);
+		Rejects("[1,/**/]", .UnexpectedChar, trailingOnly);
+	}
+
+	[Test]
+	public static void E133b_CommentsHoldUtf8()
+	{
+		Accepts("[1 /* é 🎉 */, 2] // ünï", "[ 1 2 ]", CommentsOnly());
+		Rejects("[1 /* \xFF */]", .InvalidUtf8, 1, 7, 6, CommentsOnly());
+		Rejects("[1] // \xC3", .InvalidUtf8, 1, 8, 7, CommentsOnly());
+	}
+
 	// Writer
 
 	/// The compact output of `text` read into a document.

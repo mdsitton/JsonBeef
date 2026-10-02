@@ -20,6 +20,7 @@ namespace JsonTester;
 /// -pretty (print the writer's output as is), -jcs (RFC 8785), -pointer P (the canonical form of the
 /// value at JSON Pointer P; a pointer error exits 1), -strings (every member name and string in order,
 /// one per line).
+/// Dialect: -comments, -trailing-commas, -jsonc (both).
 /// Options: -no-bom, -max-depth N, -dup=keep|last|first|error, -collect (JsonReadConfig.CollectErrors:
 /// every error is printed, the first one first, and the exit status is 1 if there was any); for the
 /// batch modes -every K and -limit N.
@@ -88,6 +89,15 @@ class Program
 				config.AllowBom = false;
 			else if (arg == "-collect")
 				config.CollectErrors = true;
+			else if (arg == "-comments")
+				config.Comments = true;
+			else if (arg == "-trailing-commas")
+				config.TrailingCommas = true;
+			else if (arg == "-jsonc")
+			{
+				config.Comments = true;
+				config.TrailingCommas = true;
+			}
 			else if (arg == "-max-depth" && i + 1 < args.Count && int.Parse(args[i + 1]) case .Ok(let depth))
 			{
 				config.MaxDepth = depth;
