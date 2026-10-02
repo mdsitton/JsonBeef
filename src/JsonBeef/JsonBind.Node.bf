@@ -392,7 +392,7 @@ extension JsonBind
 			case .String:
 				slot.SetString(reader.StringValue);
 			case .Number:
-				slot.SetNumberText(reader.RawValue);
+				slot.SetNumberText(reader.StringValue);
 			case .True:
 				slot.SetBool(true);
 			case .False:

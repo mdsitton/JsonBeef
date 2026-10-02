@@ -304,7 +304,7 @@ done
 read_list() { # file
 	grep -v '^#' "$1" | grep -v '^$' | sort
 }
-for ext in ${EXTENSIONS:-comments jsonc nonfinite ijson}; do
+for ext in ${EXTENSIONS:-comments jsonc nonfinite ijson json5}; do
 	: > "$tmpdir/nst-accepted"
 	y_rejected=()
 	for f in "$SUITES"/JSONTestSuite/test_parsing/[yn]_*.json; do
@@ -388,6 +388,37 @@ for opts in "-utf8=replace -surrogates=replace" "-surrogates=wtf8"; do
 		failed=1
 	fi
 done
+
+# JSON5 (-json5): every nst parsing case and json5-tests file, as a document from memory, as tokens and
+# as tokens from 1-byte stream reads, accepted with the canonical form of tests/tools/json5-canonical.py
+# (an independent JSON5 reader, checked against json5 2.2.3), or rejected by both
+ls "$SUITES"/JSONTestSuite/test_parsing/*.json "$SUITES"/json5-tests/*/*.json "$SUITES"/json5-tests/*/*.json5 \
+	"$SUITES"/json5-tests/*/*.js "$SUITES"/json5-tests/*/*.txt | awk '{ print NR "\t" $0 }' > "$tmpdir/json5cases"
+rm -rf "$tmpdir/json5"
+mkdir -p "$tmpdir/json5"
+python3 tests/tools/json5-canonical.py -batch "$tmpdir/json5" < "$tmpdir/json5cases" || { echo "ERROR: the JSON5 oracle failed"; exit 1; }
+accepted=0
+rejected=0
+bad=()
+while IFS=$'\t' read -r n f; do
+	if [ -f "$tmpdir/json5/$n.out" ]; then accepted=$((accepted + 1)); else rejected=$((rejected + 1)); fi
+	for flag in "" "-events" "-events -stream 1"; do
+		timeout 10 "$BIN" -json5 $flag "$f" > "$tmpdir/out" 2> /dev/null
+		status=$?
+		if [ -f "$tmpdir/json5/$n.out" ]; then
+			{ [ $status -eq 0 ] && cmp -s "$tmpdir/out" "$tmpdir/json5/$n.out"; } || bad+=("${f#"$SUITES"/} [$flag] exit $status")
+		elif [ $status -ne 1 ]; then
+			bad+=("${f#"$SUITES"/} [$flag] exit $status, the oracle rejects it")
+		fi
+	done
+done < "$tmpdir/json5cases"
+if [ ${#bad[@]} -eq 0 ]; then
+	echo "[-json5] nst and json5-tests: $accepted accepted with the oracle's canonical form, $rejected rejected by both"
+else
+	echo "[-json5] ${#bad[@]} disagreements with the JSON5 oracle:"
+	printf '  %s\n' "${bad[@]:0:20}"
+	failed=1
+fi
 
 # The compact writer reproduces the nativejson round-trip files
 pass=0; total=0; bad=()

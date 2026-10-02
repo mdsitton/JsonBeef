@@ -7,8 +7,8 @@ sibling of [TomlBeef](https://github.com/mdsitton/TomlBeef), KdlBeef and XmlBeef
 **Status: in development.** Done: the pull reader (`JsonReader`, memory and streams, with on-demand
 `SkipValue`, `ReadRaw` and `Find`), which passes every conformance suite; the document (`JsonDocument`:
 lookups, JSON Pointer, mutation, positions, PreserveStyle round trips); the writers (compact, indented,
-RFC 8785); JSONC; collect-errors; and typed mapping. Sequences, JSON5 and the other extras are next
-(`docs/status.md`).
+RFC 8785); JSONC, JSON5, non-finite numbers, I-JSON and replacement modes; collect-errors; and typed
+mapping. Sequences, push streaming and Patch are next (`docs/status.md`).
 
 ```beef
 [JsonObject(Naming = .CamelCase)]

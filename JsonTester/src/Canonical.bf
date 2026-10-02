@@ -258,7 +258,7 @@ static class Canonical
 		switch (reader.NumberKind)
 		{
 		case .Integer:
-			if (reader.RawValue == "-0")
+			if (reader.StringValue == "-0")
 			{
 				output.Append("-0");
 				return;
@@ -269,7 +269,8 @@ static class Canonical
 			reader.TryGetUInt64(let value);
 			output.AppendF("{}", value);
 		case .Float, .BigInteger:
-			AppendDouble(output, reader.RawValue);
+			// The number's JSON text (a JSON5 number's, normalized)
+			AppendDouble(output, reader.StringValue);
 		case .NonFinite:
 			reader.TryGetDouble(let value);
 			AppendNonFinite(output, value);

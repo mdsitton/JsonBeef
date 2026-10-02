@@ -66,6 +66,8 @@ internal class JsonReaderCore<TCursor> where TCursor : IJsonCursor
 	State mState;
 	internal JsonParseError mError;
 	JsonReadConfig mConfig;
+	/// mConfig.Dialect is Json5 (JsonReaderCore.Json5.bf).
+	bool mJson5;
 
 	/// The open containers: bit d is set when the container at depth d (0-based) is an object.
 	uint64[] mBits ~ delete _;
@@ -123,13 +125,21 @@ internal class JsonReaderCore<TCursor> where TCursor : IJsonCursor
 	{
 		mCursor = cursor;
 		mConfig = config;
+		if (config.Dialect == .Json5)
+		{
+			mConfig.Comments = true;
+			mConfig.TrailingCommas = true;
+			mConfig.AllowNonFiniteNumbers = true;
+		}
 		if (config.IJson)
 		{
-			// I-JSON is UTF-8 Unicode text with finite numbers: no leniency
+			// I-JSON is UTF-8 Unicode text with finite numbers, in JSON's grammar: no leniency
+			mConfig.Dialect = .Json;
 			mConfig.AllowNonFiniteNumbers = false;
 			mConfig.InvalidUtf8 = .Error;
 			mConfig.InvalidSurrogates = .Error;
 		}
+		mJson5 = mConfig.Dialect == .Json5;
 		mData = null;
 		mBase = 0;
 		mPos = 0;
@@ -528,10 +538,12 @@ internal class JsonReaderCore<TCursor> where TCursor : IJsonCursor
 			SkipSpace();
 			if (!Avail(mPos))
 				return .Err(EndOfInput("The input ends inside an object: expected a member name or `}`"));
-			if (mData[mPos] == '"')
-				return ReadString(true);
 			if (mData[mPos] == '}')
 				return EndContainer();
+			if (mJson5)
+				return ReadName5();
+			if (mData[mPos] == '"')
+				return ReadString(true);
 			return .Err(Unexpected(.InvalidStructure, "a member name (a string in double quotes) or `}`"));
 		case .Name:
 			return ReadNameAfterComma();
@@ -540,7 +552,11 @@ internal class JsonReaderCore<TCursor> where TCursor : IJsonCursor
 			if (!Avail(mPos))
 				return .Err(EndOfInput("The input ends inside an object: expected `:` after the member name"));
 			if (mData[mPos] != ':')
+			{
+				if (SkipJson5Space())
+					return ReadNext();
 				return .Err(Unexpected(.InvalidStructure, "`:` after the member name"));
+			}
 			mPos++;
 			mState = .Value;
 			return ReadValue(false);
@@ -563,7 +579,7 @@ internal class JsonReaderCore<TCursor> where TCursor : IJsonCursor
 		if (mDepth == 0)
 		{
 			if (Avail(mPos))
-				return .Err(Unexpected(.InvalidStructure, "the end of the input after the JSON value (a document holds one value)"));
+				return UnexpectedAfterValue();
 			mState = .End;
 			mToken = .EndOfDocument;
 			mTokenStart = mPos;
@@ -584,7 +600,20 @@ internal class JsonReaderCore<TCursor> where TCursor : IJsonCursor
 		}
 		if (c == (inObject ? '}' : ']'))
 			return EndContainer();
-		return .Err(Unexpected(.InvalidStructure, inObject ? "`,` or `}` after a member's value" : "`,` or `]` after an array element"));
+		return UnexpectedAfterValue();
+	}
+
+	/// After a value, something that is neither `,` nor the container's end (nor, at depth 0, the end of
+	/// the input): JSON5's other whitespace, after which the state reads again, or the error. Out of
+	/// line, so that ReadAfterValue stays small and inlined.
+	[NoInline]
+	Result<JsonToken, JsonFailure> UnexpectedAfterValue()
+	{
+		if (SkipJson5Space())
+			return ReadAfterValue();
+		if (mDepth == 0)
+			return .Err(Unexpected(.InvalidStructure, "the end of the input after the JSON value (a document holds one value)"));
+		return .Err(Unexpected(.InvalidStructure, InObject ? "`,` or `}` after a member's value" : "`,` or `]` after an array element"));
 	}
 
 	/// After `,` in an object: the next member's name.
@@ -596,7 +625,7 @@ internal class JsonReaderCore<TCursor> where TCursor : IJsonCursor
 		if (!Avail(mPos))
 			return .Err(EndOfInput("The input ends inside an object: expected a member name after `,`"));
 		char8 c = mData[mPos];
-		if (c == '"')
+		if (c == '"' && !mJson5)
 			return ReadString(true);
 		if (c == '}')
 		{
@@ -604,6 +633,8 @@ internal class JsonReaderCore<TCursor> where TCursor : IJsonCursor
 				return EndContainer();
 			return .Err(Fail(.InvalidStructure, "Expected a member name after `,`, found `}` (a trailing comma is not allowed)", mPos));
 		}
+		if (mJson5)
+			return ReadName5();
 		return .Err(Unexpected(.InvalidStructure, "a member name (a string in double quotes) after `,`"));
 	}
 
@@ -622,8 +653,12 @@ internal class JsonReaderCore<TCursor> where TCursor : IJsonCursor
 		switch (JsonChar.sByteClass[(uint8)c])
 		{
 		case .Quote:
+			if (mJson5)
+				return ReadString5(false);
 			return ReadString(false);
 		case .Number:
+			if (mJson5)
+				return ReadNumber5();
 			return ReadNumber();
 		case .Literal:
 			return ReadLiteral();
@@ -640,6 +675,16 @@ internal class JsonReaderCore<TCursor> where TCursor : IJsonCursor
 			}
 			return .Err(Unexpected(.InvalidStructure, "a value"));
 		default:
+			if (mJson5)
+			{
+				if (c == '\'')
+					return ReadString5(false);
+				if (c == '+' || c == '.' || c == 'N' || c == 'I')
+					return ReadNumber5();
+				// (After `[` the state reads again: the array may be empty)
+				if (SkipJson5Space())
+					return mState == .ArrayStart ? ReadNext() : ReadValue(afterComma);
+			}
 			if ((c == 'N' || c == 'I') && mConfig.AllowNonFiniteNumbers)
 				return ReadNonFinite(mPos);
 			return .Err(UnexpectedInValue());
@@ -1319,6 +1364,8 @@ internal class JsonReaderCore<TCursor> where TCursor : IJsonCursor
 	[Inline]
 	void SkipSpace()
 	{
+		// (JSON5's other spaces, VT, FF and non-ASCII ones, are taken where JSON's error for them would be
+		// reported: SkipJson5Space. The token path pays nothing for them.)
 		if (mPos < mEnd && (uint8)mData[mPos] > (uint8)' ' && mData[mPos] != '/')
 			return;
 		SkipSpaceRun();
@@ -1395,6 +1442,9 @@ internal class JsonReaderCore<TCursor> where TCursor : IJsonCursor
 				int length = Utf8At(p);
 				if (length == 0)
 					return -1;
+				// JSON5's line terminators include U+2028 and U+2029
+				if (mJson5 && kind == '/' && length == 3 && (uint8)c == 0xE2 && (uint8)mData[p + 1] == 0x80 && ((uint8)mData[p + 2] & 0xFE) == 0xA8)
+					return p;
 				p += length;
 				continue;
 			}
@@ -1824,14 +1874,15 @@ internal class JsonReaderCore<TCursor> where TCursor : IJsonCursor
 				return true;
 			}
 		case .Float:
-			if (mFloatExact && JsonNumber.TryClinger(mFloatMantissa, mFloatExponent, mRaw[0] == '-', out value))
+			if (mFloatExact && JsonNumber.TryClinger(mFloatMantissa, mFloatExponent, mValue[0] == '-', out value))
 				return true;
 		case .NonFinite:
 			value = JsonNumber.NonFiniteValue(mRaw);
 			return true;
 		default:
 		}
-		return JsonNumber.ParseDoubleSlow(mRaw, out value);
+		// The number's JSON text (a JSON5 number's, normalized: `.5` is `0.5`)
+		return JsonNumber.ParseDoubleSlow(mValue, out value);
 	}
 
 	/// Locates `offset` for an error made outside the reader (a value conversion).

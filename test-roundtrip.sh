@@ -5,7 +5,8 @@
 #
 # Every accepted input: the nst y_ and accepted i_ cases, JSON_checker's and simdjson-data's accepted
 # files, the nativejson round-trip files and json5-tests' .json files (strict), the json5-tests files
-# JSONC accepts (with -jsonc: comments and trailing commas), and the real-world corpora.
+# JSONC accepts (with -jsonc: comments and trailing commas), the other JSON5 ones (with -json5), and
+# the real-world corpora.
 #   - read with PreserveStyle and written back (-preserve -echo), from memory and from a stream fed 16
 #     bytes per read, it must equal the input byte for byte;
 #   - edited at random (-mutate SEED, for each of SEEDS seeds: values set, members renamed, values
@@ -50,6 +51,12 @@ while read -r rel; do
 	[[ -z "$rel" || "$rel" == \#* ]] && continue
 	printf '%s\t-jsonc\n' "$SUITES/json5-tests/$rel" >> "$inputs"
 done < tests/json5/accept-jsonc.txt
+# The JSON5-only ones, as JSON5 (single quotes, unquoted names, hex and the rest written back as they are)
+while read -r rel; do
+	[[ -z "$rel" || "$rel" == \#* ]] && continue
+	grep -qxF "$rel" tests/json5/accept-jsonc.txt && continue
+	printf '%s\t-json5\n' "$SUITES/json5-tests/$rel" >> "$inputs"
+done < tests/json5/accept-json5.txt
 
 total=0
 echo_fail=0

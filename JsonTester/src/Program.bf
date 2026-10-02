@@ -127,6 +127,13 @@ class Program
 				config.AllowNonFiniteNumbers = true;
 			else if (arg == "-ijson")
 				config.IJson = true;
+			else if (arg == "-json5")
+			{
+				config.Dialect = .Json5;
+				config.Comments = true;
+				config.TrailingCommas = true;
+				config.AllowNonFiniteNumbers = true;
+			}
 			else if (arg.StartsWith("-utf8="))
 			{
 				switch (arg.Substring(6))

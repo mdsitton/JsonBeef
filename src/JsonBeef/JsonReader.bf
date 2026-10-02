@@ -160,16 +160,18 @@ public class JsonReader
 	/// @brief Byte offset just past the token (after a string's closing quote).
 	public int EndOffset => mStreaming ? mStream.mTokenEnd : mBytes.mTokenEnd;
 
-	/// @brief String, PropertyName: the decoded text (it may hold U+0000). Number, True, False, Null:
-	/// the token's text.
+	/// @brief String, PropertyName: the decoded text (it may hold U+0000). Number: its text as a JSON
+	/// number (as written, but JSON5's normalized: `0x1F` is `31`, `.5` is `0.5`, `+1` is `1`, `5.`
+	/// is `5.0`). True, False, Null: the literal.
 	public StringView StringValue => mStreaming ? mStream.mValue : mBytes.mValue;
 
-	/// @brief String, PropertyName: the text between the quotes with escapes as written. Number: its
-	/// text exactly as written (`1.50e+03`). True, False, Null: the literal.
+	/// @brief String, PropertyName: the text between the quotes with escapes as written (a JSON5
+	/// unquoted name: the name as written). Number: its text exactly as written (`1.50e+03`, `0x1F`).
+	/// True, False, Null: the literal.
 	public StringView RawValue => mStreaming ? mStream.mRaw : mBytes.mRaw;
 
 	/// @brief String, PropertyName: whether the text has escapes (StringValue then differs from
-	/// RawValue).
+	/// RawValue). Number: whether it is a JSON5 number written otherwise than as JSON.
 	public bool ValueIsEscaped => mStreaming ? mStream.mEscaped : mBytes.mEscaped;
 
 	/// @brief Number: what the token holds (an int64, a uint64, a float or a big integer).

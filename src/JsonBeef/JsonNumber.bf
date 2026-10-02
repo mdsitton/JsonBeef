@@ -229,6 +229,32 @@ public static class JsonNumber
 		return true;
 	}
 
+	/// Appends the decimal digits of the hexadecimal integer `hex` (digits only, any length: JSON5's
+	/// `0x…` beyond 64 bits), by base-10^9 limbs.
+	internal static void AppendHexAsDecimal(String output, StringView hex)
+	{
+		let limbs = scope System.Collections.List<uint64>();
+		limbs.Add(0);
+		for (let c in hex)
+		{
+			uint64 carry = JsonChar.HexDigitValue(c);
+			for (int i < limbs.Count)
+			{
+				uint64 v = limbs[i] * 16 + carry;
+				limbs[i] = v % 1000000000;
+				carry = v / 1000000000;
+			}
+			if (carry != 0)
+				limbs.Add(carry);
+		}
+		int top = limbs.Count - 1;
+		while (top > 0 && limbs[top] == 0)
+			top--;
+		limbs[top].ToString(output);
+		for (int i = top - 1; i >= 0; i--)
+			output.AppendF("{0:D9}", limbs[i]);
+	}
+
 	/// The double of a NonFinite token: `NaN` (any sign) or `Infinity` with an optional sign.
 	internal static double NonFiniteValue(StringView token)
 	{

@@ -1167,6 +1167,194 @@ static class JsonEdgeCaseTests
 		Rejects("[1] // \xC3", .InvalidUtf8, 1, 8, 7, CommentsOnly());
 	}
 
+	// JSON5 (JsonDialect.Json5)
+
+	/// The tokens of a JSON5 text from memory and through 1-byte stream reads (which must agree), with
+	/// names and strings decoded and numbers as their JSON text (StringValue).
+	static String Json5Trace(StringView text, String trace)
+	{
+		for (int chunk < 2)
+		{
+			let reader = scope JsonReader();
+			// (The stream lives as long as the reader reads it: not scoped to the `else` below)
+			let stream = scope JsonTestStream(text, 1);
+			if (chunk == 0)
+				reader.Reset(text, JsonReadConfig.Json5);
+			else
+			{
+				var config = JsonReadConfig.Json5;
+				config.StreamBufferBytes = 16;
+				reader.Reset(stream, config);
+			}
+			let own = scope String();
+			while (true)
+			{
+				JsonToken token;
+				switch (reader.Next())
+				{
+				case .Ok(let read):
+					token = read;
+				case .Err(let error):
+					Test.FatalError(scope $"`{text}`: {error}");
+					return trace;
+				}
+				if (token == .EndOfDocument)
+					break;
+				if (!own.IsEmpty)
+					own.Append(' ');
+				switch (token)
+				{
+				case .StartObject: own.Append('{');
+				case .EndObject: own.Append('}');
+				case .StartArray: own.Append('[');
+				case .EndArray: own.Append(']');
+				case .PropertyName: own.AppendF("{}:", reader.StringValue);
+				case .String: own.AppendF("\"{}\"", reader.StringValue);
+				default: own.Append(reader.StringValue);
+				}
+			}
+			if (chunk == 0)
+				trace.Append(own);
+			else
+				Test.Assert(own == trace, scope $"`{text}`: the stream read gives `{own}`, memory `{trace}`");
+		}
+		return trace;
+	}
+
+	static void Json5Rejects(StringView text, JsonErrorKind kind, int line = Compiler.CallerLineNum)
+	{
+		let reader = scope JsonReader(text, JsonReadConfig.Json5);
+		while (true)
+		{
+			switch (reader.Next())
+			{
+			case .Ok(let token):
+				if (token == .EndOfDocument)
+				{
+					Test.FatalError(scope $"line {line}: `{text}` was accepted");
+					return;
+				}
+			case .Err(let error):
+				Test.Assert(error.mKind == kind, scope $"line {line}: `{text}`: {error.mKind} ({error.mMessage}), expected {kind}");
+				return;
+			}
+		}
+	}
+
+	[Test]
+	public static void E134_Json5IdentifierNames()
+	{
+		Test.Assert(Json5Trace("{while: true, $_a1: 1, ünï: 2}", scope .()) == "{ while: true $_a1: 1 ünï: 2 }");
+		// Escapes of identifier characters, ZWNJ inside, digits after the first
+		Test.Assert(Json5Trace("{\\u0061b: 1, a\u{200C}b2: 2, null: null}", scope .()) == "{ ab: 1 a\u{200C}b2: 2 null: null }");
+	}
+
+	[Test]
+	public static void E135_Json5BadIdentifiers()
+	{
+		Json5Rejects("{a-b: 1}", .InvalidStructure);
+		Json5Rejects("{10twenty: 1}", .InvalidStructure);
+		Json5Rejects("{\\u002D: 1}", .InvalidEscape);
+		Json5Rejects("{a\\x41: 1}", .InvalidEscape);
+	}
+
+	[Test]
+	public static void E136_Json5UnicodeIdentifier()
+	{
+		Test.Assert(Json5Trace("{sigΣma: 1, \\u03A3: 2}", scope .()) == "{ sigΣma: 1 Σ: 2 }");
+	}
+
+	[Test]
+	public static void E137_Json5SingleQuotes()
+	{
+		Test.Assert(Json5Trace("['I can\\'t', \"a'b\", 'say \"hi\"']", scope .()) == "[ \"I can't\" \"a'b\" \"say \"hi\"\" ]");
+		Test.Assert(Json5Trace("{'key': 'v'}", scope .()) == "{ key: \"v\" }");
+	}
+
+	[Test]
+	public static void E138_Json5LineContinuations()
+	{
+		Test.Assert(Json5Trace("'line 1 \\\nline 2'", scope .()) == "\"line 1 line 2\"");
+		Test.Assert(Json5Trace("'line 1 \\\rline 2'", scope .()) == "\"line 1 line 2\"");
+		Test.Assert(Json5Trace("'line 1 \\\r\nline 2'", scope .()) == "\"line 1 line 2\"");
+		Test.Assert(Json5Trace("'line 1 \\\u{2028}line 2'", scope .()) == "\"line 1 line 2\"");
+		// A raw line break is still an error; a raw U+2028 and a raw TAB are text
+		Json5Rejects("'a\nb'", .ControlCharacterInString);
+		Test.Assert(Json5Trace("'a\u{2028}b\tc'", scope .()) == "\"a\u{2028}b\tc\"");
+	}
+
+	[Test]
+	public static void E139_Json5Escapes()
+	{
+		Test.Assert(Json5Trace("'\\A\\C\\/\\D\\C'", scope .()) == "\"AC/DC\"");
+		Test.Assert(Json5Trace("'\\x41\\xe9\\v\\0'", scope .()) == "\"A\u{E9}\v\0\"");
+		Json5Rejects("'\\1'", .InvalidEscape);
+		Json5Rejects("'\\01'", .InvalidEscape);
+		Json5Rejects("'\\x4'", .InvalidEscape);
+	}
+
+	[Test]
+	public static void E140_Json5Hexadecimal()
+	{
+		Test.Assert(Json5Trace("[0xC8, 0XC8, -0xC8, +0xC8, 0xC8e4, -0x0]", scope .()) == "[ 200 200 -200 200 51428 -0 ]");
+		// Beyond 64 bits: an exact big integer
+		Test.Assert(Json5Trace("0x10000000000000000", scope .()) == "18446744073709551616");
+		let doc = scope JsonDocument();
+		Test.Assert(doc.Read("[0xFFFFFFFFFFFFFFFF, -0x8000000000000000]", JsonReadConfig.Json5) case .Ok);
+		Test.Assert(doc.Root[0].NumberKind == .UInteger && doc.Root[0].GetUInt64() == uint64.MaxValue);
+		Test.Assert(doc.Root[1].GetInt64() == int64.MinValue);
+		Json5Rejects("0x", .InvalidNumber);
+		Json5Rejects("0x1G", .InvalidNumber);
+	}
+
+	[Test]
+	public static void E141_Json5DecimalPoints()
+	{
+		Test.Assert(Json5Trace("[.5, 5., +.5, -.0, 5.e4, +1]", scope .()) == "[ 0.5 5.0 0.5 -0.0 5.0e4 1 ]");
+		let doc = scope JsonDocument();
+		Test.Assert(doc.Read("[.5, 5., -.0, 5.e4]", JsonReadConfig.Json5) case .Ok);
+		Test.Assert(doc.Root[0].GetDouble() == 0.5 && doc.Root[1].GetDouble() == 5 && JsonNumber.IsNegative(doc.Root[2].GetDouble()) && doc.Root[3].GetDouble() == 50000);
+		Json5Rejects(".", .InvalidNumber);
+		Json5Rejects("+", .InvalidNumber);
+		Json5Rejects("1..2", .InvalidNumber);
+	}
+
+	[Test]
+	public static void E142_Json5NoLeadingZeros()
+	{
+		for (let text in StringView[]("010", "00", "-00", "+0123", "080"))
+			Json5Rejects(text, .InvalidNumber);
+	}
+
+	[Test]
+	public static void E143_Json5NonFinite()
+	{
+		Test.Assert(Json5Trace("[Infinity, +Infinity, -Infinity, NaN, +NaN, -NaN]", scope .()) == "[ Infinity +Infinity -Infinity NaN +NaN -NaN ]");
+		let reader = scope JsonReader("-NaN", JsonReadConfig.Json5);
+		Test.Assert(reader.Next() case .Ok(.Number));
+		double value = 0;
+		Test.Assert(reader.NumberKind == .NonFinite && reader.TryGetDouble(out value) && value.IsNaN);
+		Json5Rejects("Infinit", .InvalidNumber);
+		Json5Rejects("inf", .InvalidLiteral);
+	}
+
+	[Test]
+	public static void E144_Json5Whitespace()
+	{
+		Test.Assert(Json5Trace("[\v\f\u{A0}\u{FEFF}1\u{2028}\u{2029}\u{3000}\u{202F}]", scope .()) == "[ 1 ]");
+		Test.Assert(Json5Trace("[1, // to U+2028\u{2028}2]", scope .()) == "[ 1 2 ]");
+		// Before the end of an empty container, a name, a colon, a comma, after the document
+		Test.Assert(Json5Trace("[\f]", scope .()) == "[ ]");
+		Test.Assert(Json5Trace("{\u{A0}}", scope .()) == "{ }");
+		Test.Assert(Json5Trace("{\v'a'\u{2029}:\u{3000}1\f, b\u{A0}:2\u{FEFF}}\u{A0}", scope .()) == "{ a: 1 b: 2 }");
+	}
+
+	[Test]
+	public static void E145_Json5CommentOnly()
+	{
+		Json5Rejects("/* comment only */", .UnexpectedEndOfInput);
+	}
+
 	// Writer
 
 	/// The compact output of `text` read into a document.

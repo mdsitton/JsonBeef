@@ -11,8 +11,8 @@ the suites in [test-suites.md](test-suites.md). Code conventions and Beef gotcha
   formatting (`JsonNumber`); a **document** built on the reader (`JsonDocument` with `JsonNode`
   handles, lookups, JSON Pointer, mutation, positions, PreserveStyle); **writers**: the streaming
   `JsonWriter` (compact or indented) and the document's `Write`, also in RFC 8785 canonical form;
-  JSONC; and **typed mapping** (`[JsonObject]`, `JsonSerializer`) bound straight from the reader.
-  Sequences, JSON5 and the rest follow `plan.md` §6.
+  JSONC and JSON5; and **typed mapping** (`[JsonObject]`, `JsonSerializer`) bound straight from the
+  reader. Sequences and the rest follow `plan.md` §6.
 - **Strict and complete.** Every token is validated when it is read: UTF-8, the grammar, escapes,
   surrogate pairs, the number grammar. Nothing is skipped for speed. The first error stops the read
   with a located `JsonParseError` (kind, message, line, column in code points, byte offset, length,
@@ -37,6 +37,7 @@ the suites in [test-suites.md](test-suites.md). Code conventions and Beef gotcha
 | `JsonTextArena.bf`, `JsonStack.bf` | Internal: XmlBeef's chunked byte arena (kept across reads) and growable array with inlined `Add` |
 | `JsonReader.bf` | `JsonToken`; `JsonReader` (public: tokens, depth, offsets, strings, number conversions, `SkipValue`, `ReadRaw`, `Find`), dispatching to one core per cursor type |
 | `JsonReaderCore.bf` | `JsonFailure`; `JsonReaderCore<TCursor>`: the state machine, the container bit stack, literals, numbers, strings and escapes, whitespace, the window helpers, `Fail`; on demand: `SkipValue` and its fast loop, `ReadRaw`, `PeekMember` |
+| `JsonReaderCore.Json5.bf`, `JsonIdentifierTables.bf` | JSON5's whitespace, strings, member names and numbers; the generated identifier ranges |
 | `JsonCursor.bf` | `IJsonCursor`, `JsonLineCounter`, `JsonInputStart` (UTF-16/32 detection, the BOM), `JsonByteCursor` (in memory) |
 | `JsonStreamCursor.bf` | `JsonBufferedStreamCursor` (a `Stream` through a bounded buffer) and its `JsonStreamState` |
 | `JsonNumber.bf` | `JsonNumberKind`, `JsonFloatFormat`; `JsonNumber`: double/float parsing (Clinger, then corlib's fast_float), int64/uint64 parsing, grammar check and classification, shortest round-trip output of doubles and floats in the plain and ECMAScript layouts |
@@ -119,6 +120,38 @@ strict JSON a `/` says that comments are not JSON. The fast build does not take 
 commas: it falls back to the reader at the first one. The suite checks that each mode accepts exactly
 the nst `n_` cases and json5-tests files jsonc-parser does (`tests/nst/accept-*.txt`,
 `tests/json5/accept-*.txt`).
+
+### JSON5
+
+`JsonDialect.Json5` (spec-reference §12.2; `JsonReaderCore.Json5.bf`) reuses the reader's state
+machine, comments and trailing commas, and swaps in its own token readers where JSON5 differs:
+
+- **Whitespace**: JSON's whitespace loop is unchanged; JSON5's other spaces (VT, FF, NBSP, U+FEFF,
+  U+2028, U+2029 and the other Zs spaces: `Json5SpaceLength`) are taken where JSON would report the
+  byte as unexpected (`SkipJson5Space`, in the value, name, colon and after-value paths, out of line),
+  and the state reads again. `//` comments also end at U+2028 and U+2029. The dialect checks left on
+  the token path (which reader a value or name goes to) cost about 1% of the event pass on twitter
+  and citm_catalog (14.68 to 14.85 instructions per byte; canada and the document unchanged).
+- **Strings** in either quote: a plain run is a view of the input; at a backslash (or an ill-formed
+  sequence with `InvalidUtf8.Replace`) the decoder takes JSON5's escapes: `\'`, `\v`, `\0` (not
+  before a digit), `\xHH`, line continuations, and any other character after `\` standing for itself
+  except `1`-`9`. Raw control characters other than CR and LF are text.
+- **Member names**: either quote, or an ECMAScript 5.1 identifier (`$`, `_`, letters, then digits,
+  marks, connector punctuation, ZWNJ, ZWJ; `\uXXXX` escapes of those), from range tables generated
+  from Unicode 16.0 (`JsonIdentifierTables.bf`, `tests/tools/gen-json5-tables.py`).
+- **Numbers**: signs, `.5`, `5.`, hexadecimal integers of any length, `Infinity` and `NaN` with
+  signs; no leading zeros. A token's `RawValue` is what was written and its `StringValue` the JSON
+  number it is (`0x1F` → `31`, `.5` → `0.5`, `5.` → `5.0`, hex beyond 64 bits converted to decimal):
+  conversions and documents use that text, so nothing downstream sees JSON5 syntax. `ValueIsEscaped`
+  says when the two differ.
+
+The fast build and SkipValue's fast loop read JSON's grammar, a subset with the same meanings, and
+hand JSON5's tokens to the token loop. PreserveStyle keeps JSON5 text as written (single quotes,
+unquoted names, hex), and edits are written in JSON syntax, which JSON5 reads. `test-json-suite.sh`
+compares every nst case and json5-tests file read with `-json5` (document, tokens, 1-byte stream)
+with `tests/tools/json5-canonical.py`, an independent JSON5 reader that agrees with json5 2.2.3 on the
+suites but where JavaScript cannot (duplicate names, ill-formed UTF-8); the acceptance lists are
+json5 2.2.3's (36 nst `n_` cases, 83 json5-tests files).
 
 ### Non-finite numbers, replacement, I-JSON
 

@@ -17,6 +17,20 @@ public enum JsonDuplicateNames : uint8
 	Error
 }
 
+/// @brief The grammar the reader reads.
+public enum JsonDialect : uint8
+{
+	/// @brief RFC 8259 JSON (with what Comments, TrailingCommas and AllowNonFiniteNumbers add).
+	Json,
+	/// @brief JSON5 1.0.0 (spec.json5.org): unquoted (identifier) and single-quoted member names,
+	/// single-quoted strings with JSON5's escapes and line continuations, raw control characters other
+	/// than line breaks in strings, hexadecimal numbers, `+`, leading and trailing decimal points,
+	/// `Infinity` and `NaN` with signs, comments, trailing commas and JSON5's extra whitespace (VT, FF,
+	/// NBSP, U+2028, U+2029, U+FEFF, the Zs spaces). Tokens report JSON values: a number's StringValue
+	/// is its JSON text (`0x1F` is `31`, `.5` is `0.5`), RawValue the text as written.
+	Json5
+}
+
 /// @brief What the reader does with bytes inside a string or member name that are not well-formed UTF-8.
 public enum JsonInvalidUtf8 : uint8
 {
@@ -77,6 +91,9 @@ public struct JsonReadConfig
 	/// @brief With CollectErrors: stop after this many errors. 0 = no limit.
 	public int MaxErrors = 100;
 
+	/// @brief The grammar: JSON (the default) or JSON5, which implies Comments, TrailingCommas and
+	/// AllowNonFiniteNumbers.
+	public JsonDialect Dialect = .Json;
 	/// @brief Skip one leading UTF-8 byte order mark (RFC 8259 §8.1 lets parsers ignore it). Off: a BOM
 	/// is an error.
 	public bool AllowBom = true;
@@ -139,6 +156,20 @@ public struct JsonReadConfig
 			Self config = .();
 			config.Comments = true;
 			config.TrailingCommas = true;
+			return config;
+		}
+	}
+
+	/// @brief JSON5 1.0.0 (Dialect.Json5, with its comments, trailing commas and non-finite numbers).
+	public static Self Json5
+	{
+		get
+		{
+			Self config = .();
+			config.Dialect = .Json5;
+			config.Comments = true;
+			config.TrailingCommas = true;
+			config.AllowNonFiniteNumbers = true;
 			return config;
 		}
 	}

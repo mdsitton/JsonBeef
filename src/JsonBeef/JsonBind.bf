@@ -427,7 +427,7 @@ public static class JsonBind
 			value = (float)JsonNumber.NonFiniteValue(reader.RawValue);
 			return true;
 		}
-		if (JsonNumber.ParseFloat(reader.RawValue, out value))
+		if (JsonNumber.ParseFloat(reader.StringValue, out value))
 			return true;
 		reader.mBindError = At(reader, .NumberOutOfRange, scope $"The number {reader.RawValue} is beyond the range of a float (±3.4028235e38)");
 		return false;

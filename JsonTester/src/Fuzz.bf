@@ -16,7 +16,7 @@ namespace JsonTester;
 /// runs and disagreements (with the input of the first ones) and exits 1 on any.
 static class Fuzz
 {
-	const String cInteresting = "{}[],:\"\\/-+.0123456789eEtrufalsn \t\r\nbx\u{E9}";
+	const String cInteresting = "{}[],:\"\\/-+.0123456789eEtrufalsn \t\r\nbx\u{E9}'INv\u{A0}\u{2028}*";
 
 	public static int Run(String[] args)
 	{
@@ -185,7 +185,32 @@ static class Fuzz
 		if (!lenientAgrees)
 			Console.WriteLine($"  replace/wtf8: document {f.Substring(0, Math.Min(f.Length, 200))} / stream {g.Substring(0, Math.Min(g.Length, 200))} / reader {h.Substring(0, Math.Min(h.Length, 200))}");
 
-		if (a == b && b == c && d == e && firstAgrees && skipsAgree && lenientAgrees)
+		// JSON5: a document from memory and from 1-byte stream reads, the reader's tokens, and SkipValue
+		// from memory (its fast loop hands JSON5's own tokens to the token loop) agree
+		let json5 = JsonReadConfig.Json5;
+		let json5Doc = scope JsonDocument();
+		let i5 = scope String();
+		Outcome(json5Doc.Read(text, json5), json5Doc, i5);
+		let json5Stream = scope TrickleStream(scope FixedMemoryStream(Span<uint8>((uint8*)text.Ptr, text.Length)), 1);
+		var json5StreamConfig = json5;
+		json5StreamConfig.StreamBufferBytes = 16;
+		let json5Streamed = scope JsonDocument();
+		let j5 = scope String();
+		Outcome(json5Streamed.Read(json5Stream, json5StreamConfig), json5Streamed, j5);
+		let json5Reader = scope JsonReader(text, json5);
+		let k5 = scope String();
+		if (Canonical.Write(json5Reader, k5) case .Err(let json5Error))
+		{
+			k5.Clear();
+			k5.AppendF("error {} {}:{} @{}", json5Error.mKind, json5Error.mLine, json5Error.mColumn, json5Error.mOffset);
+		}
+		let l5 = scope String();
+		SkipOutcome(scope JsonReader(text, json5), false, l5);
+		bool json5Agrees = i5 == j5 && j5 == k5 && l5 == (k5.StartsWith("error") ? k5 : "ok");
+		if (!json5Agrees)
+			Console.WriteLine($"  json5: document {i5.Substring(0, Math.Min(i5.Length, 200))} / stream {j5.Substring(0, Math.Min(j5.Length, 200))} / reader {k5.Substring(0, Math.Min(k5.Length, 200))} / skip {l5}");
+
+		if (a == b && b == c && d == e && firstAgrees && skipsAgree && lenientAgrees && json5Agrees)
 			return true;
 		Console.WriteLine($"  document: {a.Substring(0, Math.Min(a.Length, 200))}");
 		Console.WriteLine($"  reader:   {b.Substring(0, Math.Min(b.Length, 200))}");
