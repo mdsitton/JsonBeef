@@ -336,6 +336,32 @@ internal static class JsonChar
 		result.Append(&buffer, count);
 	}
 
+	/// Hex digit values by byte, 255 for anything else.
+	static uint8[256] sHexValues = MakeHexValues();
+
+	static uint8[256] MakeHexValues()
+	{
+		uint8[256] table = ?;
+		for (int i < 256)
+			table[i] = HexDigitValue((char8)i);
+		return table;
+	}
+
+	/// The value of the four hex digits at `p` (which must be readable), or a value above 0xFFFF if one
+	/// is not a hex digit: four table loads and one test, where a digit at a time branches twice per
+	/// digit (`\u` escapes are most of escape-heavy text).
+	[Inline]
+	public static uint32 Hex4(char8* p)
+	{
+		uint32 a = sHexValues[(uint8)p[0]];
+		uint32 b = sHexValues[(uint8)p[1]];
+		uint32 c = sHexValues[(uint8)p[2]];
+		uint32 d = sHexValues[(uint8)p[3]];
+		if ((a | b | c | d) > 15)
+			return 0x10000;
+		return (a << 12) | (b << 8) | (c << 4) | d;
+	}
+
 	/// @brief The value of a hex digit, or 255 if `c` is not one.
 	[Inline]
 	public static uint8 HexDigitValue(char8 c)

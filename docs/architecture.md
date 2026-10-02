@@ -37,6 +37,7 @@ the suites in [test-suites.md](test-suites.md). Code conventions and Beef gotcha
 | `JsonWriter.bf` | `JsonWriteOptions`, `JsonNonFiniteNumbers`, `JsonWriteError`; `JsonWriter`: the streaming writer, escaping, number output |
 | `JsonValueKind.bf` | `JsonValueKind` |
 | `JsonTextArena.bf`, `JsonStack.bf` | Internal: XmlBeef's chunked byte arena (kept across reads) and growable array with inlined `Add` |
+| `JsonDecodeBuffer.bf` | Internal: the bytes strings with escapes decode to, written through a raw pointer |
 | `JsonReader.bf` | `JsonToken`; `JsonReader` (public: tokens, depth, offsets, strings, number conversions, `SkipValue`, `ReadRaw`, `Find`), dispatching to one core per cursor type |
 | `JsonReaderCore.bf` | `JsonFailure`; `JsonReaderCore<TCursor>`: the state machine, the container bit stack, literals, numbers, strings and escapes, whitespace, the window helpers, `Fail`; on demand: `SkipValue` and its fast loop, `ReadRaw`, `PeekMember` |
 | `JsonReaderCore.Json5.bf`, `JsonIdentifierTables.bf` | JSON5's whitespace, strings, member names and numbers; the generated identifier ranges |
@@ -342,6 +343,26 @@ paid:
   1-byte stream) and requires the same canonical form or the same error.
 - **Reader bookkeeping for streams** (`Retain`) folds away for memory input; the token depth is
   computed on request; literals compare as one 32-bit word.
+- **Escaped strings** (after the timed run, from `perf record` on strings.json, where corlib's
+  `String.Append` and memcpy took 43% of the document read): strings with escapes decode into a
+  `JsonDecodeBuffer` through a raw pointer. Each run of plain text between escapes is copied with
+  room for it and 16 bytes more made first (two 8-byte words when the run is at most 16 bytes and the
+  source may be read that far, else memcpy), and each escape writes its at most 4 bytes into that
+  slack; the buffer grows out of line. The reader's decoded value views the buffer; the fast build
+  copies it into the string table once. `\u` escapes, two thirds of strings.json's bytes, take their
+  four hex digits from a 256-entry table with one test for a bad digit (`JsonChar.Hex4`), where a digit
+  at a time branched twice per digit, and the reader decodes one that names no surrogate inline. Runs
+  of non-ASCII characters (CJK text) are validated in an inner loop, without going back through the
+  vector and word scans for each character, in the fast build and in SkipValue's string skip as the
+  reader's scan already did. strings.json: document 22.2 → 14.3 instructions per byte, 426 → about
+  870 MB/s; the events pass 351 → 733 MB/s; twitterescaped 19.6 → 15.9; twitter 11.9 → 11.2; the
+  twitter on-demand query +10%.
+
+Tried and dropped after the timed run: digits 4 at a time after the 8-at-a-time steps (fewer
+instructions on numbers.json, more on integers and floats, none saved on canada) and whitespace 16
+bytes at a time (more instructions on twitter and mesh than the 8-byte loop: most runs are one space
+or a newline and under 16 spaces). Beef reaches no trailing-zero count, so `FirstByte` stays a
+multiply.
 
 Not done: Eisel–Lemire (decided against), a stream path as close to memory as XmlBeef's (the stream
 column is 1.3–1.5× the event pass), a 32-byte record (its gain is memory traffic, which only a timed

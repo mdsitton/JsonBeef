@@ -6,7 +6,7 @@ namespace JsonBeef;
 extension JsonDocument
 {
 	/// Scratch for strings with escapes in FastBuild.
-	String mDecodeBuffer = new .() ~ delete _;
+	JsonDecodeBuffer mDecodeBuffer = new .() ~ delete _;
 
 	/// The fast build for input in memory (the document's copy of it, `data[start ..< end]`): one loop,
 	/// with the position, depth and current container in locals, writing records directly (yyjson's
@@ -250,10 +250,16 @@ extension JsonDocument
 				break;
 			if ((uint8)c >= 0x80)
 			{
-				int length = JsonChar.ValidSequenceLength(data, q, end);
-				if (length == 0)
-					return -1;
-				q += length;
+				// As many well-formed sequences as follow (CJK text is one non-ASCII character after
+				// another), without going back through the scans for each
+				repeat
+				{
+					int length = JsonChar.ValidSequenceLength(data, q, end);
+					if (length == 0)
+						return -1;
+					q += length;
+				}
+				while (q < end && (uint8)data[q] >= 0x80);
 				continue;
 			}
 			if (c == '\\')
@@ -269,14 +275,21 @@ extension JsonDocument
 	}
 
 	/// A string with escapes, from its text's start to its closing quote, `q` at its first backslash:
-	/// decoded (and checked) into mDecodeBuffer, then copied into the string table.
+	/// decoded (and checked) into mDecodeBuffer through a raw pointer, then copied into the string table.
 	int FastEscapedString(char8* data, int start, int q, int end, int maxBytes, out uint64 textRef, out bool inTable)
 	{
 		textRef = 0;
 		inTable = false;
 		let buffer = mDecodeBuffer;
-		buffer.Clear();
-		buffer.Append(data + start, q - start);
+		char8* dest = buffer.Ptr;
+		char8* limit = buffer.Limit;
+		// Every write below is a run of plain text, with room for it and 16 bytes more made first, or an
+		// escape's at most 4 bytes, which that slack covers
+		int count = q - start;
+		if (dest + count + 16 > limit)
+			buffer.Grow(ref dest, ref limit, count + 16);
+		JsonDecodeBuffer.CopyRun(dest, data + start, count, start + 16 <= end);
+		dest += count;
 		var q;
 		int run = q;
 		while (true)
@@ -307,10 +320,14 @@ extension JsonDocument
 				break;
 			if ((uint8)c >= 0x80)
 			{
-				int length = JsonChar.ValidSequenceLength(data, q, end);
-				if (length == 0)
-					return -1;
-				q += length;
+				repeat
+				{
+					int length = JsonChar.ValidSequenceLength(data, q, end);
+					if (length == 0)
+						return -1;
+					q += length;
+				}
+				while (q < end && (uint8)data[q] >= 0x80);
 				continue;
 			}
 			if ((uint8)c < 0x20)
@@ -320,19 +337,23 @@ extension JsonDocument
 				q++;
 				continue;
 			}
-			buffer.Append(data + run, q - run);
+			count = q - run;
+			if (dest + count + 16 > limit)
+				buffer.Grow(ref dest, ref limit, count + 16);
+			JsonDecodeBuffer.CopyRun(dest, data + run, count, run + 16 <= end);
+			dest += count;
 			if (q + 1 >= end)
 				return -1;
 			switch (data[q + 1])
 			{
-			case '"': buffer.Append('"'); q += 2;
-			case '\\': buffer.Append('\\'); q += 2;
-			case '/': buffer.Append('/'); q += 2;
-			case 'b': buffer.Append('\b'); q += 2;
-			case 'f': buffer.Append('\f'); q += 2;
-			case 'n': buffer.Append('\n'); q += 2;
-			case 'r': buffer.Append('\r'); q += 2;
-			case 't': buffer.Append('\t'); q += 2;
+			case '"': *(dest++) = '"'; q += 2;
+			case '\\': *(dest++) = '\\'; q += 2;
+			case '/': *(dest++) = '/'; q += 2;
+			case 'b': *(dest++) = '\b'; q += 2;
+			case 'f': *(dest++) = '\f'; q += 2;
+			case 'n': *(dest++) = '\n'; q += 2;
+			case 'r': *(dest++) = '\r'; q += 2;
+			case 't': *(dest++) = '\t'; q += 2;
 			case 'u':
 				uint32 cp = Hex4(data, q + 2, end);
 				if (cp > 0xFFFF)
@@ -350,17 +371,21 @@ extension JsonDocument
 				}
 				else
 					q += 6;
-				char8[4] utf8 = ?;
-				buffer.Append(&utf8, JsonChar.EncodeUtf8(&utf8, cp));
+				dest += JsonChar.EncodeUtf8(dest, cp);
 			default:
 				return -1;
 			}
 			run = q;
 		}
-		buffer.Append(data + run, q - run);
-		if (maxBytes > 0 && buffer.Length > maxBytes)
+		count = q - run;
+		if (dest + count + 16 > limit)
+			buffer.Grow(ref dest, ref limit, count + 16);
+		JsonDecodeBuffer.CopyRun(dest, data + run, count, run + 16 <= end);
+		dest += count;
+		int length = dest - buffer.Ptr;
+		if (maxBytes > 0 && length > maxBytes)
 			return -1;
-		textRef = AddText(buffer);
+		textRef = AddText(StringView(buffer.Ptr, length));
 		inTable = true;
 		return q + 1;
 	}
@@ -371,15 +396,7 @@ extension JsonDocument
 	{
 		if (p + 4 > end)
 			return 0x10000;
-		uint32 value = 0;
-		for (int i < 4)
-		{
-			uint8 digit = JsonChar.HexDigitValue(data[p + i]);
-			if (digit == 255)
-				return 0x10000;
-			value = (value << 4) | digit;
-		}
-		return value;
+		return JsonChar.Hex4(data + p);
 	}
 
 	/// The number at `p` into `node` (kind, value or text reference), as the reader classifies and

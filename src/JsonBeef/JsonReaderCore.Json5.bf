@@ -199,7 +199,10 @@ extension JsonReaderCore<TCursor> where TCursor : IJsonCursor
 				mStringBuffer.Append(&utf8, JsonChar.EncodeUtf8(&utf8, (uint32)value));
 				p += 4;
 			case 'u':
-				Try!(DecodeUnicodeEscape(ref p));
+				char8[4] decoded = ?;
+				char8* dest = &decoded;
+				Try!(DecodeUnicodeEscape(ref p, ref dest));
+				mStringBuffer.Append(&decoded, dest - (char8*)&decoded);
 			case '\n':
 				p += 2;
 			case '\r':

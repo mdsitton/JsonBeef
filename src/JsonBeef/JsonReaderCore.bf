@@ -76,7 +76,10 @@ internal class JsonReaderCore<TCursor> where TCursor : IJsonCursor
 	uint64[] mBits ~ delete _;
 	int mDepth;
 
+	/// JSON5's decoded strings and normalized numbers
 	String mStringBuffer ~ delete _;
+	/// JSON's decoded strings (DecodeEscaped)
+	JsonDecodeBuffer mDecodeBuffer ~ delete _;
 
 	// The current token
 	internal JsonToken mToken;
@@ -121,6 +124,7 @@ internal class JsonReaderCore<TCursor> where TCursor : IJsonCursor
 	{
 		mBits = new uint64[16];
 		mStringBuffer = new .();
+		mDecodeBuffer = new .();
 		mConfig = .();
 	}
 
@@ -429,11 +433,15 @@ internal class JsonReaderCore<TCursor> where TCursor : IJsonCursor
 			}
 			if ((uint8)c < 0x20)
 				return -1;
-			// Non-ASCII
-			int length = JsonChar.ValidSequenceLength(mData, p, mEnd);
-			if (length == 0)
-				return -1;
-			p += length;
+			// Non-ASCII: as many well-formed sequences as follow
+			repeat
+			{
+				int length = JsonChar.ValidSequenceLength(mData, p, mEnd);
+				if (length == 0)
+					return -1;
+				p += length;
+			}
+			while (p < mEnd && (uint8)mData[p] >= 0x80);
 		}
 	}
 
@@ -442,15 +450,8 @@ internal class JsonReaderCore<TCursor> where TCursor : IJsonCursor
 	{
 		if (p + 6 > mEnd)
 			return -1;
-		int value = 0;
-		for (int i = 2; i < 6; i++)
-		{
-			uint8 digit = JsonChar.HexDigitValue(mData[p + i]);
-			if (digit == 255)
-				return -1;
-			value = (value << 4) | digit;
-		}
-		return value;
+		uint32 value = JsonChar.Hex4(mData + p + 2);
+		return value <= 0xFFFF ? (int)value : -1;
 	}
 
 	/// The end of the well-formed number at `start` (followed by nothing that would continue it), or -1.
@@ -1171,8 +1172,7 @@ internal class JsonReaderCore<TCursor> where TCursor : IJsonCursor
 		else if (c == '\\' || (uint8)c >= 0x80)
 		{
 			// Escapes, or (InvalidUtf8.Replace) an ill-formed sequence: decoded
-			Try!(DecodeEscaped(start, ref p));
-			mValue = mStringBuffer;
+			mValue = Try!(DecodeEscaped(start, ref p));
 			mRaw = View(start + 1, p - start - 1);
 			mEscaped = true;
 		}
@@ -1293,18 +1293,26 @@ internal class JsonReaderCore<TCursor> where TCursor : IJsonCursor
 		return Fail(.InvalidUtf8, message, p, length);
 	}
 
-	/// Decodes a string with escapes (or, with InvalidUtf8.Replace, ill-formed UTF-8) into mStringBuffer,
+	/// Decodes a string with escapes (or, with InvalidUtf8.Replace, ill-formed UTF-8) into mDecodeBuffer,
 	/// from its opening quote at `start`; `p` is at its first backslash or ill-formed byte and ends at
-	/// its closing quote.
-	Result<void, JsonFailure> DecodeEscaped(int start, ref int p)
+	/// its closing quote. Writes go through a raw pointer: a run of plain text with room for it and 16
+	/// bytes more made first, or an escape's at most 4 bytes, which that slack covers.
+	/// @return The decoded text (valid until the next string).
+	Result<StringView, JsonFailure> DecodeEscaped(int start, ref int p)
 	{
-		mStringBuffer.Clear();
-		mStringBuffer.Append(mData + start + 1, p - start - 1);
+		let buffer = mDecodeBuffer;
+		char8* dest = buffer.Ptr;
+		char8* limit = buffer.Limit;
+		int count = p - start - 1;
+		if (dest + count + 16 > limit)
+			buffer.Grow(ref dest, ref limit, count + 16);
+		JsonDecodeBuffer.CopyRun(dest, mData + start + 1, count, start + 17 <= mEnd);
+		dest += count;
 		while (true)
 		{
 			char8 c = mData[p];
 			if (c == '"')
-				return .Ok;
+				return StringView(buffer.Ptr, dest - buffer.Ptr);
 			if ((uint8)c < 0x20)
 				return .Err(ControlCharacter(p));
 			if ((uint8)c >= 0x80)
@@ -1312,47 +1320,67 @@ internal class JsonReaderCore<TCursor> where TCursor : IJsonCursor
 				// InvalidUtf8.Replace: the scan stopped at an ill-formed sequence
 				if (p + 4 > mEnd)
 					Grow(p, 4);
-				mStringBuffer.Append("\u{FFFD}");
+				*(dest++) = (char8)0xEF;
+				*(dest++) = (char8)0xBF;
+				*(dest++) = (char8)0xBD;
 				p += JsonChar.MaximalSubpartLength(mData, p, mEnd);
-				int q = Try!(ScanStringText(start, p));
-				mStringBuffer.Append(mData + p, q - p);
-				p = q;
-				continue;
 			}
-			// A backslash
-			if (!Avail(p + 1))
-				return .Err(UnterminatedString(start, p + 1));
-			char8 e = mData[p + 1];
-			switch (e)
+			else
 			{
-			case '"': mStringBuffer.Append('"'); p += 2;
-			case '\\': mStringBuffer.Append('\\'); p += 2;
-			case '/': mStringBuffer.Append('/'); p += 2;
-			case 'b': mStringBuffer.Append('\b'); p += 2;
-			case 'f': mStringBuffer.Append('\f'); p += 2;
-			case 'n': mStringBuffer.Append('\n'); p += 2;
-			case 'r': mStringBuffer.Append('\r'); p += 2;
-			case 't': mStringBuffer.Append('\t'); p += 2;
-			case 'u': Try!(DecodeUnicodeEscape(ref p));
-			default:
-				if (IsInvalidUtf8At(p + 1))
-					return .Err(InvalidUtf8(p + 1));
-				let message = scope String();
-				message.Append("Invalid escape: `\\` followed by ");
-				JsonChar.AppendCharDescription(message, mData, p + 1, mEnd, let length);
-				message.Append(" (JSON's escapes are `\\\"` `\\\\` `\\/` `\\b` `\\f` `\\n` `\\r` `\\t` and `\\uXXXX`)");
-				return .Err(Fail(.InvalidEscape, message, p, 1 + length));
+				// A backslash
+				if (!Avail(p + 1))
+					return .Err(UnterminatedString(start, p + 1));
+				char8 e = mData[p + 1];
+				switch (e)
+				{
+				case '"': *(dest++) = '"'; p += 2;
+				case '\\': *(dest++) = '\\'; p += 2;
+				case '/': *(dest++) = '/'; p += 2;
+				case 'b': *(dest++) = '\b'; p += 2;
+				case 'f': *(dest++) = '\f'; p += 2;
+				case 'n': *(dest++) = '\n'; p += 2;
+				case 'r': *(dest++) = '\r'; p += 2;
+				case 't': *(dest++) = '\t'; p += 2;
+				case 'u':
+					// The common case inline: four hex digits in the window naming no surrogate
+					uint32 cp = (p + 6 <= mEnd) ? JsonChar.Hex4(mData + p + 2) : 0x10000;
+					if (cp < 0xD800 || (cp > 0xDFFF && cp <= 0xFFFF))
+					{
+						dest += JsonChar.EncodeUtf8(dest, cp);
+						p += 6;
+					}
+					else
+						Try!(DecodeUnicodeEscape(ref p, ref dest));
+				default:
+					return .Err(InvalidEscape(p));
+				}
 			}
 			// The text up to the next stop
 			int q = Try!(ScanStringText(start, p));
-			mStringBuffer.Append(mData + p, q - p);
+			count = q - p;
+			if (dest + count + 16 > limit)
+				buffer.Grow(ref dest, ref limit, count + 16);
+			JsonDecodeBuffer.CopyRun(dest, mData + p, count, p + 16 <= mEnd);
+			dest += count;
 			p = q;
 		}
 	}
 
-	/// A `\uXXXX` escape at `p` (and the low surrogate's escape after a high one): appends the code
-	/// point's UTF-8 and moves `p` past the escape(s).
-	Result<void, JsonFailure> DecodeUnicodeEscape(ref int p)
+	/// The error for the backslash at `p`, which starts no escape.
+	JsonFailure InvalidEscape(int p)
+	{
+		if (IsInvalidUtf8At(p + 1))
+			return InvalidUtf8(p + 1);
+		let message = scope String();
+		message.Append("Invalid escape: `\\` followed by ");
+		JsonChar.AppendCharDescription(message, mData, p + 1, mEnd, let length);
+		message.Append(" (JSON's escapes are `\\\"` `\\\\` `\\/` `\\b` `\\f` `\\n` `\\r` `\\t` and `\\uXXXX`)");
+		return Fail(.InvalidEscape, message, p, 1 + length);
+	}
+
+	/// A `\uXXXX` escape at `p` (and the low surrogate's escape after a high one): writes the code
+	/// point's UTF-8 (at most 4 bytes) at `dest` and moves `p` and `dest` past it.
+	Result<void, JsonFailure> DecodeUnicodeEscape(ref int p, ref char8* dest)
 	{
 		uint32 cp = Try!(ReadHex4(p));
 		if (cp >= 0xD800 && cp <= 0xDFFF && mConfig.InvalidSurrogates != .Error)
@@ -1368,12 +1396,12 @@ internal class JsonReaderCore<TCursor> where TCursor : IJsonCursor
 			{
 				p += 6;
 				if (mConfig.InvalidSurrogates == .Replace)
-					mStringBuffer.Append("\u{FFFD}");
+					dest += JsonChar.EncodeUtf8(dest, 0xFFFD);
 				else
 				{
-					mStringBuffer.Append((char8)(0xE0 | (cp >> 12)));
-					mStringBuffer.Append((char8)(0x80 | ((cp >> 6) & 0x3F)));
-					mStringBuffer.Append((char8)(0x80 | (cp & 0x3F)));
+					*(dest++) = (char8)(0xE0 | (cp >> 12));
+					*(dest++) = (char8)(0x80 | ((cp >> 6) & 0x3F));
+					*(dest++) = (char8)(0x80 | (cp & 0x3F));
 				}
 				return .Ok;
 			}
@@ -1393,9 +1421,7 @@ internal class JsonReaderCore<TCursor> where TCursor : IJsonCursor
 		}
 		else
 			p += 6;
-		char8[4] utf8 = ?;
-		int count = JsonChar.EncodeUtf8(&utf8, cp);
-		mStringBuffer.Append(&utf8, count);
+		dest += JsonChar.EncodeUtf8(dest, cp);
 		return .Ok;
 	}
 
