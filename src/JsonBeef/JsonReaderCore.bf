@@ -58,6 +58,9 @@ internal class JsonReaderCore<TCursor> where TCursor : IJsonCursor
 	int mEnd;
 	/// The start of the token being read (int.MaxValue: none).
 	int mRetain;
+	/// ReadRaw: the start of the value being skipped, kept in the window with everything after it until
+	/// the next public NextToken (int.MaxValue: none).
+	int mHold = int.MaxValue;
 	/// The cursor stopped on an error of the input; the reader's next error is replaced by it.
 	bool mInputFailed;
 	State mState;
@@ -125,6 +128,7 @@ internal class JsonReaderCore<TCursor> where TCursor : IJsonCursor
 		mPos = 0;
 		mEnd = 0;
 		mRetain = int.MaxValue;
+		mHold = int.MaxValue;
 		mInputFailed = false;
 		mState = .Start;
 		mDepth = 0;
@@ -151,6 +155,9 @@ internal class JsonReaderCore<TCursor> where TCursor : IJsonCursor
 	{
 		if (mState == .Failed)
 			return .Err(.());
+		// A value ReadRaw kept is released (memory input keeps everything anyway)
+		if (!mCursor.IsWhole)
+			mHold = int.MaxValue;
 		let result = ReadNext();
 		if (result case .Err)
 			AfterError();
@@ -162,6 +169,327 @@ internal class JsonReaderCore<TCursor> where TCursor : IJsonCursor
 
 	/// The current depth: the number of open containers.
 	public int CurrentDepth => mDepth;
+
+	/// The config the reader was reset with.
+	public JsonReadConfig Config => mConfig;
+
+	// On-demand
+
+	/// Past the value the current token starts, checking every token as NextToken does (strings,
+	/// escapes, UTF-8, numbers, structure), to its last token: a container's End token; a scalar is its
+	/// own. At a PropertyName, the member's value; before the first token, the document's value. At an
+	/// End token or the end of the document there is nothing to skip.
+	public Result<void, JsonFailure> SkipValue()
+	{
+		if (mState == .Failed)
+			return .Err(.());
+		if (mToken == .None || mToken == .PropertyName)
+			Try!(Step());
+		if (mToken != .StartObject && mToken != .StartArray)
+			return .Ok;
+		int depth = mDepth - 1;
+		if (SkipFast(depth))
+			return .Ok;
+		repeat
+		{
+			Try!(Step());
+		}
+		while (mDepth > depth);
+		return .Ok;
+	}
+
+	/// SkipValue's loop for memory input: the container from mPos to its end, checked as the token loop
+	/// checks it (structure, strings with their escapes and UTF-8, numbers, literals, depth and length
+	/// limits), but without making tokens or decoding strings. Anything it does not take (an error, a
+	/// comment, a trailing comma, a string or number past its limit) is handed to the token loop where it
+	/// is, in the equivalent state, which reports the exact error or reads on: as FastBuild hands over to
+	/// the reader.
+	/// @return Whether it reached the end of the container at `depth` (mToken its End token).
+	bool SkipFast(int depth)
+	{
+		if (!mCursor.IsWhole || mConfig.CollectErrors)
+			return false;
+		while (true)
+		{
+			SkipSpace();
+			if (mPos >= mEnd)
+				return false;
+			char8 c = mData[mPos];
+			switch (mState)
+			{
+			case .ObjectStart, .Name:
+				if (c == '}' && mState == .ObjectStart)
+				{
+					EndContainer();
+					if (mDepth == depth)
+						return true;
+					continue;
+				}
+				if (c != '"')
+					return false;
+				int end = StringEnd(mPos);
+				if (end < 0 || (mConfig.MaxStringBytes > 0 && end - mPos - 1 > mConfig.MaxStringBytes))
+					return false;
+				mPos = end + 1;
+				mState = .Colon;
+			case .Colon:
+				if (c != ':')
+					return false;
+				mPos++;
+				mState = .Value;
+			case .ArrayStart, .Value:
+				if (c == ']' && mState == .ArrayStart)
+				{
+					EndContainer();
+					if (mDepth == depth)
+						return true;
+					continue;
+				}
+				switch (JsonChar.sByteClass[(uint8)c])
+				{
+				case .Quote:
+					int end = StringEnd(mPos);
+					if (end < 0 || (mConfig.MaxStringBytes > 0 && end - mPos - 1 > mConfig.MaxStringBytes))
+						return false;
+					mPos = end + 1;
+				case .Number:
+					int end = NumberEnd(mPos);
+					if (end < 0 || (mConfig.MaxNumberLength > 0 && end - mPos > mConfig.MaxNumberLength))
+						return false;
+					mPos = end;
+				case .Literal:
+					int end = LiteralEnd(mPos);
+					if (end < 0)
+						return false;
+					mPos = end;
+				case .Punct:
+					if (c != '[' && c != '{')
+						return false;
+					if (mConfig.MaxDepth > 0 && mDepth >= mConfig.MaxDepth)
+						return false;
+					StartContainer(c == '{');
+					continue;
+				default:
+					return false;
+				}
+				mState = .AfterValue;
+			case .AfterValue:
+				bool inObject = InObject;
+				if (c == ',')
+				{
+					mPos++;
+					mState = inObject ? .Name : .Value;
+				}
+				else if (c == (inObject ? '}' : ']'))
+				{
+					EndContainer();
+					if (mDepth == depth)
+						return true;
+				}
+				else
+					return false;
+			default:
+				return false;
+			}
+		}
+	}
+
+	/// The closing quote of the well-formed string whose opening quote is at `start` (escapes and
+	/// surrogate pairs checked, UTF-8 checked), or -1 for anything else. Memory input.
+	int StringEnd(int start)
+	{
+		int p = start + 1;
+		while (true)
+		{
+			p = ScanStringRun(p);
+			if (p >= mEnd)
+				return -1;
+			char8 c = mData[p];
+			if (c == '"')
+				return p;
+			if (c == '\\')
+			{
+				if (p + 1 >= mEnd)
+					return -1;
+				switch (mData[p + 1])
+				{
+				case '"', '\\', '/', 'b', 'f', 'n', 'r', 't':
+					p += 2;
+				case 'u':
+					int cp = Hex4At(p);
+					if (cp < 0)
+						return -1;
+					if (cp < 0xD800 || cp > 0xDFFF)
+						p += 6;
+					else
+					{
+						// A high surrogate, and its escaped low one
+						if (cp >= 0xDC00 || p + 7 >= mEnd || mData[p + 6] != '\\' || mData[p + 7] != 'u')
+							return -1;
+						int low = Hex4At(p + 6);
+						if (low < 0xDC00 || low > 0xDFFF)
+							return -1;
+						p += 12;
+					}
+				default:
+					return -1;
+				}
+				continue;
+			}
+			if ((uint8)c < 0x20)
+				return -1;
+			// Non-ASCII
+			int length = JsonChar.ValidSequenceLength(mData, p, mEnd);
+			if (length == 0)
+				return -1;
+			p += length;
+		}
+	}
+
+	/// The value of the `\u` escape at `p` (its backslash), or -1. Memory input.
+	int Hex4At(int p)
+	{
+		if (p + 6 > mEnd)
+			return -1;
+		int value = 0;
+		for (int i = 2; i < 6; i++)
+		{
+			uint8 digit = JsonChar.HexDigitValue(mData[p + i]);
+			if (digit == 255)
+				return -1;
+			value = (value << 4) | digit;
+		}
+		return value;
+	}
+
+	/// The end of the well-formed number at `start` (followed by nothing that would continue it), or -1.
+	/// Memory input.
+	int NumberEnd(int start)
+	{
+		int p = start;
+		if (mData[p] == '-')
+			p++;
+		if (p >= mEnd || !JsonChar.IsDigit(mData[p]))
+			return -1;
+		if (mData[p] == '0')
+		{
+			p++;
+			if (p < mEnd && JsonChar.IsDigit(mData[p]))
+				return -1;
+		}
+		else
+		{
+			while (p < mEnd && JsonChar.IsDigit(mData[p]))
+				p++;
+		}
+		if (p < mEnd && mData[p] == '.')
+		{
+			p++;
+			if (p >= mEnd || !JsonChar.IsDigit(mData[p]))
+				return -1;
+			while (p < mEnd && JsonChar.IsDigit(mData[p]))
+				p++;
+		}
+		if (p < mEnd && (mData[p] == 'e' || mData[p] == 'E'))
+		{
+			p++;
+			if (p < mEnd && (mData[p] == '+' || mData[p] == '-'))
+				p++;
+			if (p >= mEnd || !JsonChar.IsDigit(mData[p]))
+				return -1;
+			while (p < mEnd && JsonChar.IsDigit(mData[p]))
+				p++;
+		}
+		if (p < mEnd && (IsWordByte(mData[p]) || mData[p] == '.' || mData[p] == '+' || mData[p] == '-'))
+			return -1;
+		return p;
+	}
+
+	/// The end of the literal `true`, `false` or `null` at `start`, or -1. Memory input.
+	int LiteralEnd(int start)
+	{
+		char8 c = mData[start];
+		uint32 expected = c == 't' ? 0x65757274 : c == 'f' ? 0x736C6166 : 0x6C6C756E;
+		int length = c == 'f' ? 5 : 4;
+		if (start + length > mEnd || JsonChar.Load32(mData + start) != expected || (length == 5 && mData[start + 4] != 'e') ||
+			(start + length < mEnd && IsWordByte(mData[start + length])))
+			return -1;
+		return start + length;
+	}
+
+	/// The source text of the value the current token starts (as SkipValue, which moves the reader to
+	/// its last token): a string with its quotes, a container from bracket to bracket. A stream keeps
+	/// the text in its window until the next NextToken, so it is bounded by MaxTokenBytes there.
+	public Result<StringView, JsonFailure> ReadRaw()
+	{
+		if (mState == .Failed)
+			return .Err(.());
+		if (mToken == .None || mToken == .PropertyName)
+			Try!(Step());
+		int start = mTokenStart;
+		if (mToken == .StartObject || mToken == .StartArray)
+		{
+			if (!mCursor.IsWhole)
+				mHold = start;
+			Try!(SkipValue());
+		}
+		else if (mToken == .EndObject || mToken == .EndArray || mToken == .EndOfDocument)
+			return View(mTokenStart, 0);
+		return View(start, mTokenEnd - start);
+	}
+
+	/// At a StartObject: looks ahead for the member `name` (its value's first token in `token`, a string's
+	/// text appended to `text`), then goes back to just after the `{` as if nothing was read. Members
+	/// passed are checked as SkipValue checks them. A stream keeps the object in its window meanwhile.
+	/// @return Whether the member is there.
+	public Result<bool, JsonFailure> PeekMember(StringView name, out JsonToken token, String text)
+	{
+		token = .None;
+		int pos = mPos;
+		State state = mState;
+		int depth = mDepth;
+		int tokenStart = mTokenStart;
+		int tokenEnd = mTokenEnd;
+		if (!mCursor.IsWhole)
+			mHold = tokenStart;
+		bool found = false;
+		while (true)
+		{
+			if (Try!(Step()) != .PropertyName)
+				break;
+			bool match = mValue == name;
+			Try!(Step());
+			if (match)
+			{
+				found = true;
+				token = mToken;
+				if (mToken == .String)
+					text.Append(mValue);
+				break;
+			}
+			Try!(SkipValue());
+		}
+		// Back to the start: the open containers' bits below this object did not change
+		mPos = pos;
+		mState = state;
+		mDepth = depth;
+		mToken = .StartObject;
+		mTokenStart = tokenStart;
+		mTokenEnd = tokenEnd;
+		mValue = default;
+		mRaw = default;
+		return found;
+	}
+
+	/// One token for SkipValue and ReadRaw: as NextToken, keeping what ReadRaw holds.
+	[Inline]
+	Result<JsonToken, JsonFailure> Step()
+	{
+		let result = ReadNext();
+		if (result case .Err)
+			AfterError();
+		return result;
+	}
 
 	Result<JsonToken, JsonFailure> ReadNext()
 	{
@@ -1023,7 +1351,7 @@ internal class JsonReaderCore<TCursor> where TCursor : IJsonCursor
 		char8* oldData = mData;
 		int oldBase = mBase;
 		int oldEnd = mEnd;
-		bool grew = mCursor.Fill(ref mData, ref mBase, ref mEnd, Math.Min(Math.Min(mRetain, mPos), pos), pos, count);
+		bool grew = mCursor.Fill(ref mData, ref mBase, ref mEnd, Math.Min(Math.Min(Math.Min(mRetain, mHold), mPos), pos), pos, count);
 		if (mData != oldData)
 			RebaseViews(oldData, oldBase, oldEnd);
 		if (!grew)

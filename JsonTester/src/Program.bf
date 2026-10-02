@@ -18,7 +18,9 @@ namespace JsonTester;
 /// Output modes (from the document): -rewrite (write compact, read that back, print its canonical form;
 /// exit 3 if the writer's output is rejected), -rewrite-pretty (the same, indented), -compact and
 /// -pretty (print the writer's output as is), -jcs (RFC 8785), -pointer P (the canonical form of the
-/// value at JSON Pointer P; a pointer error exits 1), -strings (every member name and string in order,
+/// value at JSON Pointer P; a pointer error exits 1), -select P (the same on demand: JsonReader.Find, the
+/// value printed from its tokens, the rest of the text read and checked; with either reading mode and
+/// -stream), -strings (every member name and string in order,
 /// one per line), -echo (the document as Write(output) gives it: with -preserve, as it was read),
 /// -mutate SEED (PreserveStyle, random edits, the preserving writer's output must read back into the
 /// edited document; prints that output).
@@ -39,6 +41,7 @@ class Program
 		Pretty,
 		Jcs,
 		Pointer,
+		Select,
 		Strings,
 		Echo,
 		Mutate
@@ -101,6 +104,11 @@ class Program
 				output = .Pointer;
 				pointer = args[++i];
 			}
+			else if (arg == "-select" && i + 1 < args.Count)
+			{
+				output = .Select;
+				pointer = args[++i];
+			}
 			else if (arg == "-no-bom")
 				config.AllowBom = false;
 			else if (arg == "-collect")
@@ -139,6 +147,8 @@ class Program
 			return Usage("no input file");
 		if (events && output != .Canonical)
 			return Usage("-events prints the canonical form only");
+		if (output == .Select && config.CollectErrors)
+			return Usage("-select stops at the first error");
 
 		let input = scope List<uint8>();
 		FileStream file = null;
@@ -164,6 +174,49 @@ class Program
 		StringView text = .((char8*)input.Ptr, input.Count);
 
 		let result = scope String();
+		if (output == .Select)
+		{
+			// On demand: the reader's Find, the value printed from its tokens, the rest checked
+			let reader = scope JsonReader();
+			if (stream != null)
+				reader.Reset(stream, config);
+			else
+				reader.Reset(text, config);
+			if (!JsonPointer.IsValid(pointer))
+			{
+				Console.Error.WriteLine($"pointer error: `{pointer}` is not a JSON Pointer");
+				return 1;
+			}
+			bool found = false;
+			switch (reader.Find(pointer))
+			{
+			case .Ok(let present):
+				found = present;
+			case .Err(let findError):
+				return PrintError(findError);
+			}
+			if (found && Canonical.WriteValue(reader, result) case .Err(let valueError))
+				return PrintError(valueError);
+			while (true)
+			{
+				switch (reader.Next())
+				{
+				case .Ok(let token):
+					if (token != .EndOfDocument)
+						continue;
+				case .Err(let restError):
+					return PrintError(restError);
+				}
+				break;
+			}
+			if (!found)
+			{
+				Console.Error.WriteLine($"pointer error: `{pointer}` is not in the document");
+				return 1;
+			}
+			result.Append('\n');
+			return Print(result);
+		}
 		if (events)
 		{
 			let reader = scope JsonReader();
@@ -252,7 +305,7 @@ class Program
 				Console.Error.WriteLine($"write error: {writeError.mKind}: {writeError.mMessage}");
 				return 1;
 			}
-		case .Mutate:
+		case .Mutate, .Select:
 		}
 		return Print(result);
 	}
@@ -277,7 +330,7 @@ class Program
 	{
 		Console.Error.WriteLine($"JsonTester: {message}");
 		Console.Error.WriteLine("usage: JsonTester [-document|-events] [-stream N] [output mode] [options] FILE");
-		Console.Error.WriteLine("       output modes: -rewrite -rewrite-pretty -compact -pretty -jcs -pointer P -strings");
+		Console.Error.WriteLine("       output modes: -rewrite -rewrite-pretty -compact -pretty -jcs -pointer P -select P -strings");
 		Console.Error.WriteLine("       options: -no-bom -max-depth N -dup=keep|last|first|error");
 		Console.Error.WriteLine("       JsonTester -fxx [-every K] FILE...");
 		Console.Error.WriteLine("       JsonTester -es6 [-limit N] [-every K] FILE");

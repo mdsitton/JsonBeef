@@ -24,6 +24,8 @@ public class JsonDiagnostic
 	public String mMessage ~ delete _;
 	/// @brief Name of the input the position refers to; empty if unnamed.
 	public String mSource ~ delete _;
+	/// @brief Typed binding: the JSON Pointer of the value the error is in; empty otherwise.
+	public String mPath ~ delete _;
 	/// @brief 1-based line (0 when there is no position).
 	public int32 mLine;
 	/// @brief 1-based column, in code points.
@@ -40,6 +42,7 @@ public class JsonDiagnostic
 		mKind = error.mKind;
 		mMessage = new String(error.mMessage);
 		mSource = new String(error.mSource);
+		mPath = new String(error.mPath);
 		mLine = error.mLine;
 		mColumn = error.mColumn;
 		mOffset = error.mOffset;
@@ -55,6 +58,7 @@ public class JsonDiagnostic
 			error.mKind = mKind;
 			error.mMessage = mMessage;
 			error.mSource = mSource;
+			error.mPath = mPath;
 			error.mLine = mLine;
 			error.mColumn = mColumn;
 			error.mOffset = mOffset;
@@ -63,7 +67,7 @@ public class JsonDiagnostic
 		}
 	}
 
-	/// @brief Formats the diagnostic as JsonParseError.ToString does (`source:line:column: message`).
+	/// @brief Formats the diagnostic as JsonParseError.ToString does (`source:line:column: path: message`).
 	/// @param strBuffer The string to append to.
 	public override void ToString(String strBuffer)
 	{

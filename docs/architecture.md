@@ -7,10 +7,12 @@ the suites in [test-suites.md](test-suites.md). Code conventions and Beef gotcha
 ## 1. Overview
 
 - A JSON (RFC 8259) library for Beef. Today it has a **pull reader** (`JsonReader`) over UTF-8 bytes in
-  memory or a `Stream`, number conversion and formatting (`JsonNumber`), a **document** built on the
-  reader (`JsonDocument` with `JsonNode` handles, lookups, JSON Pointer), and **writers**: the streaming
-  `JsonWriter` (compact or indented) and the document's `Write`, also in RFC 8785 canonical form.
-  JSONC, typed mapping and the rest follow `plan.md` §6.
+  memory or a `Stream`, with on-demand `SkipValue`, `ReadRaw` and `Find`; number conversion and
+  formatting (`JsonNumber`); a **document** built on the reader (`JsonDocument` with `JsonNode`
+  handles, lookups, JSON Pointer, mutation, positions, PreserveStyle); **writers**: the streaming
+  `JsonWriter` (compact or indented) and the document's `Write`, also in RFC 8785 canonical form;
+  JSONC; and **typed mapping** (`[JsonObject]`, `JsonSerializer`) bound straight from the reader.
+  Sequences, JSON5 and the rest follow `plan.md` §6.
 - **Strict and complete.** Every token is validated when it is read: UTF-8, the grammar, escapes,
   surrogate pairs, the number grammar. Nothing is skipped for speed. The first error stops the read
   with a located `JsonParseError` (kind, message, line, column in code points, byte offset, length,
@@ -33,26 +35,33 @@ the suites in [test-suites.md](test-suites.md). Code conventions and Beef gotcha
 | `JsonWriter.bf` | `JsonWriteOptions`, `JsonNonFiniteNumbers`, `JsonWriteError`; `JsonWriter`: the streaming writer, escaping, number output |
 | `JsonValueKind.bf` | `JsonValueKind` |
 | `JsonTextArena.bf`, `JsonStack.bf` | Internal: XmlBeef's chunked byte arena (kept across reads) and growable array with inlined `Add` |
-| `JsonReader.bf` | `JsonToken`; `JsonReader` (public: tokens, depth, offsets, strings, number conversions), dispatching to one core per cursor type |
-| `JsonReaderCore.bf` | `JsonFailure`; `JsonReaderCore<TCursor>`: the state machine, the container bit stack, literals, numbers, strings and escapes, whitespace, the window helpers, `Fail` |
+| `JsonReader.bf` | `JsonToken`; `JsonReader` (public: tokens, depth, offsets, strings, number conversions, `SkipValue`, `ReadRaw`, `Find`), dispatching to one core per cursor type |
+| `JsonReaderCore.bf` | `JsonFailure`; `JsonReaderCore<TCursor>`: the state machine, the container bit stack, literals, numbers, strings and escapes, whitespace, the window helpers, `Fail`; on demand: `SkipValue` and its fast loop, `ReadRaw`, `PeekMember` |
 | `JsonCursor.bf` | `IJsonCursor`, `JsonLineCounter`, `JsonInputStart` (UTF-16/32 detection, the BOM), `JsonByteCursor` (in memory) |
 | `JsonStreamCursor.bf` | `JsonBufferedStreamCursor` (a `Stream` through a bounded buffer) and its `JsonStreamState` |
-| `JsonNumber.bf` | `JsonNumberKind`, `JsonFloatFormat`; `JsonNumber`: double/float parsing (Clinger, then corlib's fast_float), int64/uint64 parsing, classification, shortest round-trip output in the plain and ECMAScript layouts |
+| `JsonNumber.bf` | `JsonNumberKind`, `JsonFloatFormat`; `JsonNumber`: double/float parsing (Clinger, then corlib's fast_float), int64/uint64 parsing, grammar check and classification, shortest round-trip output of doubles and floats in the plain and ECMAScript layouts |
 | `JsonChar.bf` | Byte classes, SWAR word tests, UTF-8 validation (`FindInvalid`), decode/encode, line and column, character descriptions for messages |
-| `JsonError.bf`, `JsonReadConfig.bf` | `JsonErrorKind`, `JsonParseError` (KdlBeef's model); `JsonReadConfig` (dialect, metadata, collect-errors, limits, stream buffer), `JsonMetadataMode`, `JsonDuplicateNames` |
+| `JsonError.bf`, `JsonReadConfig.bf` | `JsonErrorKind`, `JsonParseError` (KdlBeef's model, with a JSON Pointer path for binding errors); `JsonReadConfig` (dialect, metadata, collect-errors, limits, stream buffer), `JsonMetadataMode`, `JsonDuplicateNames` |
 | `JsonDiagnostic.bf` | `JsonDiagnostic`: an error that owns its text |
 | `JsonDocument.Positions.bf` | `JsonSourceRange`, `JsonRangeRecord`; the line index, `TryGetSourceRange`/`TryGetNameRange` |
 | `JsonDocument.Fast.bf` | The fast build for memory input (phase 3) |
 | `JsonDocument.Mutation.bf` | `IsValidText`, `CreateRoot`, the table operations behind editing; the mutation API on `JsonNode` (setters, Add, Insert, Remove, Rename) |
 | `JsonDocument.Style.bf` | PreserveStyle: `JsonNodeStyle`, capture, layout detection, change marks, the preserving writer |
+| `JsonObjectAttribute.bf` | `[JsonObject]`, `JsonNaming`, `[JsonName]`, `[JsonAlias]`, `[JsonIgnore]`, `[JsonRequired]`; `IJsonSerializable`, `IJsonConverter<T>`, `[JsonConverter]`, `[JsonUseConverter]` (all in the JsonBeef namespace: BJSON has `[JsonObject]` and `[JsonIgnore]` too) |
+| `JsonSerializerPlan.bf`, `JsonSerializerCodeGen.bf` | The compile-time generator: field plans (`ValueSpec`) and checks; the emitted method shells and their bodies (`Body`), polymorphic dispatch (`TypeDispatch`) |
+| `JsonBind.bf` | `JsonStep`, `JsonDuplicateAction`; `JsonBind`: what the generated code calls per value (reading with errors kept in the reader, located errors and paths, discriminators, writing helpers) |
+| `JsonBind.Node.bf` | `JsonArrayCursor`, `JsonMemberWriter`; a node's text with its span map and error relocation; the in-place node setters |
+| `JsonSerializer.bf` | `JsonSerializer`: whole texts, streams, files and document nodes to and from `[JsonObject]` types |
 
 Tests are in `src/JsonBeef/tests/`: `JsonEdgeCaseTests` (spec-reference §16, one test per edge case,
 numbered as there; each input is read from memory and through 1-byte stream reads, which must agree),
-`JsonReaderTests` (API, limits, streams, number layouts) and `JsonDocumentTests` (the document, the
-writers), with `JsonTestUtil` (the trace helpers and a trickling test stream). The CLI is
-`JsonTester/src/` (`Program.bf`, `Canonical.bf`, `Numbers.bf`, `TrickleStream.bf`); the scripts are
-`test-json-suite.sh`, `test-json-corpus.sh`, `test-json-numbers.sh` and `test-leaks.sh`, and
-`tests/tools/json-canonical.py` is the independent oracle of the canonical form.
+`JsonReaderTests` (API, limits, streams, number layouts), `JsonDocumentTests` (the document, the
+writers), `JsonCollectTests`, `JsonPreserveTests`, `JsonObjectTests` and `JsonOnDemandTests`, with
+`JsonTestUtil` (the trace helpers and a trickling test stream). The CLI is `JsonTester/src/`
+(`Program.bf`, `Canonical.bf`, `Numbers.bf`, `TrickleStream.bf`, `Bench.bf`, `Fuzz.bf`, `Mutate.bf`);
+the scripts are `test-json-suite.sh`, `test-json-corpus.sh`, `test-json-numbers.sh`,
+`test-json-fuzz.sh`, `test-roundtrip.sh` and `test-leaks.sh`, and `tests/tools/json-canonical.py` is
+the independent oracle of the canonical form.
 
 ## 3. Reading
 
@@ -223,6 +232,35 @@ Not done: Eisel–Lemire (decided against), a stream path as close to memory as 
 column is 1.3–1.5× the event pass), a 32-byte record (its gain is memory traffic, which only a timed
 run shows).
 
+### On demand
+
+`SkipValue`, `ReadRaw` and `Find` read only what they are asked for, but skipping is not "validate
+only what you use" (simdjson): everything skipped is checked as reading would check it (plan §9
+item 7).
+
+- **SkipValue** moves from the value's first token to its last (at a member name, the member's value;
+  before the first token, the document's). For memory input a container goes through `SkipFast`, one
+  loop over the reader's own states (ObjectStart, Name, Colon, ArrayStart, Value, AfterValue) that
+  makes no tokens and decodes no strings: strings are checked to their closing quote (escapes,
+  surrogate pairs, UTF-8), numbers against the grammar and what may follow them, literals as one word,
+  depth and the string and number limits. As with the fast build, anything it does not take (an error,
+  a malformed comment, a trailing comma, a string over `MaxStringBytes` before decoding) is handed to
+  the token loop where it is, in the equivalent state, which reports the exact error or reads on.
+  Streams and collect-errors use the token loop. `JsonTester -fuzz` requires both to give the token
+  reader's outcome on every mutation. citm_catalog's query: 12.6 → 10.6 instructions per byte.
+- **ReadRaw** is SkipValue that returns the span from the first token's start to the last one's end.
+  A stream holds its window from the value's start (`mHold`, beside the token's `mRetain`) until the
+  next public `Next`, so the span stays one view and is bounded by `MaxTokenBytes`.
+- **Find** (RFC 6901) walks forward from the current value: through an object member by member
+  (comparing decoded names), through an array element by element, skipping what is passed. A reader
+  cannot go back, so in an object with a repeated name it finds the first member (document lookups
+  find the last); not found, the reader is left at the last token of the value where the lookup
+  failed. `JsonTester -select` prints the value found; `test-json-corpus.sh` compares it with the
+  document's `-pointer` and the oracle, from memory and from 7-byte stream reads.
+- **PeekMember** (internal, for discriminators) looks ahead in an object for a member and comes back:
+  the position, state and depth are saved (the open-container bits below the object do not change),
+  and a stream holds its window meanwhile.
+
 ## 4. Document
 
 ### Values are IDs
@@ -330,7 +368,76 @@ and a container on one line stays on one line when it grows.
 
 `Write(output, options)` writes any document plainly (strict JSON: comments are not kept).
 
-## 5. Writing
+## 5. Typed mapping (`[JsonObject]`)
+
+KdlBeef's and XmlBeef's generator, with JSON's shapes and reading straight from the reader's tokens:
+no document in between, so the typed track costs one pass.
+
+### Generation
+
+`[JsonObject]`'s `ApplyToType` adds `IJsonSerializable` and emits three method shells whose bodies are
+`Compiler.Mixin(JsonSerializerCodeGen.Body(typeof(T), n))`: the bodies are planned and written when
+the methods are compiled, once every type is complete. Planning at type-initialization time made a
+self-referencing type (`List<Node> children`, twitter's `Status retweeted_status`) a data cycle in its
+own initialization, which crashed the compiler in the benchmark project. A class's methods are
+virtual (override in `[JsonObject]` subclasses) and each covers its whole `[JsonObject]` chain, base
+fields first, since a reader is read once and cannot hand an object to a base's method midway.
+
+`JsonSerializerPlan.bf` plans each field as a `ValueSpec`, recursively: scalars (bool, integers,
+float, double, String, enums), `[JsonObject]` types, `T?`, `List<T>`, `Dictionary<K, T>` (String,
+integer or enum keys) to any depth, converter types. Member names come from the field through the
+naming policy, `[JsonName]` and `[JsonAlias]`; two members of one name in the chain (the discriminator
+included), an unsupported field type or an abstract field type without a discriminator stop the build
+with the field named.
+
+### Reading
+
+The generated `JsonRead` is one loop over the object's members:
+
+- **Matching** a name: the slot after the last one matched first (members usually come in the
+  declared order: a `switch` on the slot and one byte compare), else a `switch` on the name's length
+  and byte compares within it. Never a hash alone (plan §4.6: DSL-JSON and DAW match on hashes).
+- **Each slot has a bit**: a member that comes again is `DuplicateName` (a typed field holds one value;
+  aliases count as the same member), unless `DuplicateNames` is FirstWins or LastWins; `[JsonRequired]`
+  members missing at the end are `MissingValue`, located at the object. A member no field maps is
+  skipped with `SkipValue` (so it is checked), or is `UnknownMember` in a Strict type.
+- **Values** go through `JsonBind`'s helpers. They return bool and keep their error in the reader
+  (`mBindError`), so the hot path carries no large `Result`. Kinds and ranges are strict: an integer
+  field takes an integer token within its type's range (not `1.0` or `1e2`), a float parses the text
+  as binary32 directly (not through a double, which would round twice), a double is never an infinity.
+  `null` sets a reference or `T?` field to null and is `TypeMismatch` for the others.
+- **Filling**: an existing String is set, an existing object read into, an existing List or Dictionary
+  emptied (what it owns deleted, nested containers too) and refilled; a new object is handed to its
+  owner before it is read, so an error leaves nothing unowned. An allocator, when given, makes every
+  new object and nothing is deleted.
+- **Error paths**: an error leaving a nested value gets the member name or index put in front of
+  `JsonParseError.mPath` (a JSON Pointer), built only on the way out, so success pays nothing for it:
+  `config.json:3:12: /servers/1/port: Expected an integer, found the string "80"`.
+- **Polymorphism**: a field whose class (or a base) has a `Discriminator` peeks at the object for it
+  (`PeekMember`: anywhere in the object; the reader comes back to the `{`), then a `switch` over the
+  visible concrete `[JsonObject]` subclasses, generated when the method is compiled
+  (`TypeDispatch`), creates the type it names and reads it from the start. The subtype's own loop
+  checks the discriminator's value against its `TypeName`.
+
+`JsonSerializer.Read(JsonNode)` binds a document's value through the same code: the subtree is written
+compactly with a map from offsets to node IDs (values and member names), numbers as their source text
+when the document kept it and it still reads as the node's value (so a float field gets the float of
+the text), and read with a reader. An error is moved to the node's source range when the document has
+positions; otherwise its path says where.
+
+### Writing
+
+`JsonWrite(JsonWriter)` writes the members in declared order (the discriminator first), floats as
+their own shortest digits (`WriteFloat`); `JsonSerializer.Write` with `Canonical` goes through a
+document to sort them. `JsonWrite(JsonNode)` updates a node in place, for documents read with
+PreserveStyle: a value equal to what is there is not touched (a number of the same value in any
+spelling, `1.50` for 1.5, stays), array elements are updated by position (`JsonArrayCursor`: extra
+ones removed, new ones appended; an element node keeps the members no field maps, whichever item is
+written into it), dictionary members by key (`JsonMemberWriter` removes keys that are gone), members
+no field maps stay, a member under an alias is renamed. A converter's output is compared as compact
+text and parsed into the node when it differs.
+
+## 6. Writing
 
 `JsonWriter` appends compact or indented JSON to a String. Misuse (a value where a name is needed, a
 mismatched end, a second root) and bad data (invalid UTF-8, a malformed number text, NaN with
@@ -351,7 +458,7 @@ below U+E000), every number is written as ECMAScript writes its double (big inte
 whitespace and no final newline. The canonical walk keeps each open object's sorted member list on one
 shared stack, so it is iterative too.
 
-## 6. Testing
+## 7. Testing
 
 - `test-json-suite.sh` runs JSONTestSuite (parsing and transform), JSON_checker, simdjson-data's
   jsonchecker and adversarial files, nativejson's round-trip files and json5-tests (strict) through
@@ -367,8 +474,22 @@ shared stack, so it is iterative too.
 - `test-json-corpus.sh` runs the 14 real-world files the same ways, checks that the compact writer is
   a fixed point, that twitter.json and twitterescaped.json hold the same strings, that mesh.json and
   its sorted, pretty-printed copy give the same RFC 8785 output, and 27 JSON Pointer lookups against
-  the oracle's.
+  the oracle's: on the document (`-pointer`) and on demand (`-select`, the reader's `Find`), from memory
+  and from 7-byte stream reads.
 - `test-json-numbers.sh` runs `JsonTester -fxx` (each fxx string read by `JsonReader` as a whole
   document, its acceptance checked against an independent grammar matcher, then f64 and f32 bits) and
   `-es6` (ECMAScript output of each double, and the text read back). Both run every line in Debug
   too: about 4 seconds, so test-suites.md §3.1's Debug subsampling is not needed.
+- `test-json-fuzz.sh` first reads every suite input through streams fed 1 to 31 bytes per read (the
+  memory read's outcome every time), then mutates every input at random and requires one outcome from
+  the fast build, the reader, a 1-byte stream, collect-errors from memory and from a stream, and
+  SkipValue (its fast loop from memory, the token loop from a stream). `test-roundtrip.sh` writes every
+  accepted input back with PreserveStyle (byte for byte) and checks random edits (`-mutate`).
+- The `[Test]`s: `JsonEdgeCaseTests` (spec-reference §16), `JsonReaderTests`, `JsonDocumentTests`,
+  `JsonCollectTests`, `JsonPreserveTests` (with ported jsonc-parser edit cases), `JsonObjectTests`
+  (every field shape, names, errors with paths, duplicates, polymorphism, converters, allocators,
+  files, documents in place) and `JsonOnDemandTests` (SkipValue, ReadRaw, Find, from memory and
+  streams). They run in Debug and TestRelease on Linux and Windows (the Windows Debug runtime's leak
+  check at exit catches what LeakSanitizer can miss), and under LeakSanitizer (`test-leaks.sh`).
+- `bench/compare` checks every JsonBeef column's check line against `reference.py` (all four tracks),
+  and `bench/instructions.sh` counts instructions per byte, which the load does not change.

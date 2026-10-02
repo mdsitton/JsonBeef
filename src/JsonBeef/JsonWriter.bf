@@ -85,7 +85,12 @@ public enum JsonWriteErrorKind : uint8
 	DuplicateName,
 	/// @brief Calls out of order: a value where a name is needed (or the reverse), an end that does not
 	/// match its start, a second root value, or an unfinished document.
-	InvalidStructure
+	InvalidStructure,
+	/// @brief Typed writing ([JsonObject]): a value JSON has no text for, such as an enum value that is
+	/// none of its cases.
+	InvalidValue,
+	/// @brief Writing a file failed.
+	IoError
 }
 
 /// @brief A write error. `mMessage` views a per-thread buffer, valid until the next error on the thread.
@@ -197,6 +202,15 @@ public class JsonWriter
 		if (mFailed)
 			return .Err(mError);
 		return .Ok;
+	}
+
+	/// @brief Record an error of the caller's own (a converter's, a value it cannot write): the writer
+	/// stops as for its own errors, and Finish returns the first one.
+	/// @param kind The category.
+	/// @param message What went wrong.
+	public void SetError(JsonWriteErrorKind kind, StringView message)
+	{
+		Fail(kind, message);
 	}
 
 	/// Records the first error; later calls write nothing.
@@ -397,6 +411,20 @@ public class JsonWriter
 		}
 		if (BeforeValue())
 			JsonNumber.AppendDouble(mOutput, value, mOptions.Canonical ? .EcmaScript : mOptions.FloatFormat);
+	}
+
+	/// @brief A float as its own shortest round-trip digits (`0.1`, which reads back as the same
+	/// float), in the options' layout. Canonical (RFC 8785, whose numbers are doubles) writes the
+	/// double it widens to. NaN and ±∞ follow NonFiniteNumbers.
+	public void WriteFloat(float value)
+	{
+		if (!value.IsFinite || mOptions.Canonical)
+		{
+			WriteNumber((double)value);
+			return;
+		}
+		if (BeforeValue())
+			JsonNumber.AppendFloat(mOutput, value, mOptions.FloatFormat);
 	}
 
 	/// @brief A number given as its text, written as is (a big integer, `1.50`, `1e400`); it must follow

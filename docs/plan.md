@@ -268,7 +268,18 @@ Windows tests, committed (`AGENTS.md`).
    (`test-roundtrip.sh`, `JsonPreserveTests` with ported jsonc-parser edit cases).*
    Byte-exact round trips of every accepted suite input and of
    JSONC samples; edits keep neighbors.
-6. **`[JsonObject]` and on-demand.** Typed binding from the reader and nodes; the typed and on-demand
+6. **`[JsonObject]` and on-demand.** *Done (2026-10-02): `[JsonObject]` reads straight from the
+   reader's tokens (no tree) with the plan's rules: names as declared with naming policies, unknown
+   members skipped (Strict opt-in), repeated members an error (FirstWins/LastWins by config), required
+   members, integers and floats range-checked, never an infinity, errors located with the JSON Pointer
+   of the value; Lists, Dictionaries and `T?` to any depth, self-referencing types, polymorphism by a
+   discriminator found anywhere in the object, converters, allocators; writing to a `JsonWriter` and
+   into document nodes in place (PreserveStyle keeps the rest); `JsonSerializer` for texts, streams,
+   files and nodes. On demand: `SkipValue` (with a fast loop for memory input that hands anything
+   unusual to the token loop, so skipping checks exactly what reading checks), `ReadRaw`, `Find`. The
+   typed and query tracks have JsonBeef columns whose check lines equal the reference; their timed
+   figures wait for P3T with the rest.*
+   Typed binding from the reader and nodes; the typed and on-demand
    benchmark tracks.
 7. **Extras.** Sequence reader (JSON Lines), JSON5, non-finite numbers, I-JSON check, replacement
    modes; then push streaming, Patch.

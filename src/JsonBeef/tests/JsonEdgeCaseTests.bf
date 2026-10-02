@@ -3,6 +3,52 @@ using static JsonBeef.Tests.JsonTestUtil;
 
 namespace JsonBeef.Tests;
 
+// The [JsonObject] types of E087-E089
+
+[JsonObject]
+class EdgeInt
+{
+	public int x;
+}
+
+[JsonObject]
+class EdgeSmall
+{
+	public uint8 b;
+	public uint32 u;
+}
+
+/// An integer written as a string holding a JSON integer (`"12"`); numbers read too.
+struct EdgeQuotedInt : IJsonConverter<int>
+{
+	public static Result<void, JsonParseError> Read(JsonReader reader, ref int target)
+	{
+		if (reader.TokenType == .Number && reader.TryGetInt64(let number))
+		{
+			target = (int)number;
+			return .Ok;
+		}
+		StringView text = reader.StringValue;
+		int64 value = 0;
+		if (reader.TokenType != .String || !JsonNumber.IsValid(text) || JsonNumber.Classify(text) != .Integer || !JsonNumber.TryParseInt64(text, out value))
+			return .Err(JsonBind.Mismatch(reader, "an integer, or a string holding one"));
+		target = (int)value;
+		return .Ok;
+	}
+
+	public static void Write(int value, JsonWriter writer)
+	{
+		writer.WriteString(scope $"{value}");
+	}
+}
+
+[JsonObject]
+class EdgeQuoted
+{
+	[JsonUseConverter(typeof(EdgeQuotedInt))] public int x;
+	[JsonUseConverter(typeof(EdgeQuotedInt))] public int y;
+}
+
 /// docs/spec-reference.md §16, one test per edge case (numbered as there). Each input is read from
 /// memory and through 1-byte stream reads, which must agree. Cases for features of later phases (the
 /// writer's JCS mode, JSON Pointer, JSONC, JSON5, sequences, typed binding) are added with them.
@@ -667,6 +713,57 @@ static class JsonEdgeCaseTests
 	{
 		Test.Assert(JsonNumber.ParseFloat("7.038531e-26", var value));
 		Test.Assert(*(uint32*)&value == 0x15AE43FD);
+	}
+
+	// Typed binding ([JsonObject]), from memory and through 1-byte stream reads
+
+	static JsonErrorKind BindError<T>(T target, StringView text) where T : class, IJsonSerializable
+	{
+		JsonErrorKind kind = (JsonErrorKind)255;
+		for (int chunk < 2)
+		{
+			Result<void, JsonParseError> result;
+			if (chunk == 0)
+				result = JsonSerializer.Read(text, target);
+			else
+			{
+				var config = JsonReadConfig();
+				config.StreamBufferBytes = 16;
+				result = JsonSerializer.Read(scope JsonTestStream(text, 1), target, config);
+			}
+			let found = result case .Err(let error) ? error.mKind : (JsonErrorKind)255;
+			Test.Assert(chunk == 0 || found == kind, "the stream read differs");
+			kind = found;
+		}
+		return kind;
+	}
+
+	[Test]
+	public static void E087_FractionIntoInteger()
+	{
+		Test.Assert(BindError(scope EdgeInt(), "{\"x\":1.0}") == .TypeMismatch);
+		Test.Assert(BindError(scope EdgeInt(), "{\"x\":1e2}") == .TypeMismatch);
+		let value = scope EdgeInt();
+		Test.Assert(JsonSerializer.Read("{\"x\":-7}", value) case .Ok && value.x == -7);
+	}
+
+	[Test]
+	public static void E088_IntegerRanges()
+	{
+		Test.Assert(BindError(scope EdgeSmall(), "{\"b\":300}") == .NumberOutOfRange);
+		Test.Assert(BindError(scope EdgeSmall(), "{\"u\":-1}") == .NumberOutOfRange);
+		let value = scope EdgeSmall();
+		Test.Assert(JsonSerializer.Read("{\"b\":255,\"u\":4294967295}", value) case .Ok && value.b == 255 && value.u == uint32.MaxValue);
+	}
+
+	[Test]
+	public static void E089_NumberInAString()
+	{
+		Test.Assert(BindError(scope EdgeInt(), "{\"x\":\"12\"}") == .TypeMismatch);
+		// A field opts in with a converter
+		let value = scope EdgeQuoted();
+		Test.Assert(JsonSerializer.Read("{\"x\":\"12\",\"y\":13}", value) case .Ok && value.x == 12 && value.y == 13);
+		Test.Assert(BindError(scope EdgeQuoted(), "{\"x\":\"1.5\"}") == .TypeMismatch);
 	}
 
 	// String escapes

@@ -35,8 +35,8 @@
 # Usage: run.sh [min-samples] [input names...]      (TRACKS='dom stream' limits the tracks)
 # A full run prints results.md (save it: ./run.sh > results.md, then ./plot.py). With ONLY (merge.sh),
 # for example ONLY='yyjson|simdjson.*' ./run.sh, only the matching implementations are measured and
-# results.md (or the file RESULTS names) is updated in place; inputs not named keep their saved rows. JsonBeef's own columns go
-# in the same way once it has a parser (ONLY='JsonBeef.*').
+# results.md (or the file RESULTS names) is updated in place; inputs not named keep their saved rows. JsonBeef's own columns
+# (all four tracks) go in the same way: ONLY='JsonBeef.*'.
 # Benchmarks need a quiet machine: run.sh refuses to start when the 1-minute load average is above 2
 # (FORCE=1 runs anyway, for smoke tests; the output then says the figures are not comparable).
 set -uo pipefail
@@ -149,6 +149,7 @@ TYPED=(
 	"msgspec Struct|Python|$PY $C/python/bench.py msgspec-typed"
 	"pydantic|Python|$PY $C/python/bench.py pydantic-typed"
 	"std.json|Zig|$B/zig-jsonbench typed"
+	"JsonBeef [JsonObject]|Beef|$B/beef-jsonbench jsonbeef-typed"
 	"BJSON|Beef|$B/beef-jsonbench bjson-typed"
 )
 STREAM=(
@@ -187,6 +188,7 @@ QUERY=(
 	"fastjson2 JSONPath|Java|$B/java/bin/jsonbench fastjson2-path"
 	"pysimdjson lazy|Python|$PY $C/python/bench.py pysimdjson-lazy"
 	"msgspec partial Struct|Python|$PY $C/python/bench.py msgspec-partial"
+	"JsonBeef JsonReader|Beef|$B/beef-jsonbench jsonbeef-query"
 )
 
 # The reference check line of an input for a track (dom and stream share one)
@@ -344,8 +346,11 @@ exactly what its columns time):
   release over an old simdjson).
 - Perl 5.42: Cpanel::JSON::XS 4.53, JSON::XS 4.04, JSON::PP 4.16 (the core one). Lua: lua-cjson 2.1.0.16
   on LuaJIT 2.1 and Lua 5.5.1. Zig 0.16.0: std.json (Value, typed parseFromSlice, Scanner).
-- Beef (BeefBuild 0.43.6, Release): BJSON a1396c8 (tree, typed `[JsonObject]` classes, which build the
-  tree first, and its JsonReader), Beef's own Beefy.utils.StructuredData, EinScott/json ab9ace5.
+- Beef (BeefBuild 0.43.6, Release): JsonBeef (this repository: JsonDocument; JsonReader, every token;
+  typed `[JsonObject]` classes bound straight from the reader's tokens; on demand, JsonReader.Find and
+  SkipValue, which checks what it skips, through to the end of the text), BJSON a1396c8 (tree, typed
+  `[JsonObject]` classes, which build the tree first, and its JsonReader), Beef's own
+  Beefy.utils.StructuredData, EinScott/json ab9ace5.
 
 Why cells fail (every input is valid JSON; FAIL = rejected, crashed, or a check line that differs):
 

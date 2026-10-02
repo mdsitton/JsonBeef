@@ -4,9 +4,28 @@ A JSON (RFC 8259) parser and writer for the [Beef](https://www.beeflang.org/) pr
 fully correct by default, fast, with located errors and opt-in JSONC/JSON5/JSON Lines support. The
 sibling of [TomlBeef](https://github.com/mdsitton/TomlBeef), KdlBeef and XmlBeef.
 
-**Status: in development.** The pull reader (`JsonReader`, memory and streams) passes every
-conformance suite; the document, writers and the rest are under way (`docs/status.md`). The plan,
-requirements, design and research are in `docs/`:
+**Status: in development.** Done: the pull reader (`JsonReader`, memory and streams, with on-demand
+`SkipValue`, `ReadRaw` and `Find`), which passes every conformance suite; the document (`JsonDocument`:
+lookups, JSON Pointer, mutation, positions, PreserveStyle round trips); the writers (compact, indented,
+RFC 8785); JSONC; collect-errors; and typed mapping. Sequences, JSON5 and the other extras are next
+(`docs/status.md`).
+
+```beef
+[JsonObject(Naming = .CamelCase)]
+class Server
+{
+	public String HostName ~ delete _;
+	public int32 Port = 8080;
+	public List<String> Tags ~ DeleteContainerAndItems!(_);
+}
+
+let server = scope Server();
+Try!(JsonSerializer.ReadFile("server.json", server));   // straight from the reader, every check on
+server.Port = 8443;
+Try!(JsonSerializer.WriteFile(server, "server.json", .Pretty));
+```
+
+The plan, requirements, design and research are in `docs/`:
 
 - [`docs/plan.md`](docs/plan.md) — requirements, design, phases, open questions
 - [`docs/architecture.md`](docs/architecture.md) — how the implementation works

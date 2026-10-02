@@ -226,6 +226,16 @@ public static class JsonNumber
 		return true;
 	}
 
+	/// @brief Whether `text` is a JSON number: RFC 8259's number production, nothing before or after
+	/// (`-0`, `1.5e3`; not `+1`, `01`, `.5`, `1.`, ` 1`). The parse and classify methods take only such
+	/// text: check first what did not come from the reader (a converter's string, a dictionary key).
+	/// @param text The text.
+	/// @return Whether it is one.
+	public static bool IsValid(StringView text)
+	{
+		return JsonWriter.IsNumberText(text);
+	}
+
 	/// @brief The kind of a JSON number token (the reader's classification, from its text).
 	public static JsonNumberKind Classify(StringView token)
 	{
@@ -364,6 +374,42 @@ public static class JsonNumber
 	{
 		char8[64] text = ?;
 		int length = double.[Friend]ToString_RoundTripFast(value, &text);
+		return ShortestDigitsOf(&text, length, digits, out point);
+	}
+
+	/// @brief Append the shortest decimal text that reads back as the float `value` (binary32: `0.1`,
+	/// not the double's `0.10000000149011612`), laid out in `format`. Non-finite values as AppendDouble.
+	/// @param output The string to append to.
+	/// @param value The float.
+	/// @param format The layout.
+	public static void AppendFloat(String output, float value, JsonFloatFormat format = .Plain)
+	{
+		if (!value.IsFinite)
+		{
+			AppendDouble(output, value, format);
+			return;
+		}
+		char8[64] text = ?;
+		int length = float.[Friend]ToString_RoundTripFast(value, &text);
+		char8[32] digits = ?;
+		int count = ShortestDigitsOf(&text, length, &digits, let point);
+		bool negative = IsNegative(value);
+		if (count == 0)
+		{
+			if (format == .EcmaScript)
+				output.Append('0');
+			else
+				output.Append(negative ? "-0.0" : "0.0");
+			return;
+		}
+		if (negative)
+			output.Append('-');
+		AppendLayout(output, &digits, count, point, format);
+	}
+
+	/// The significant digits and point position of corlib's round-trip text (`ddd[.ddd][e±dd]`).
+	static int ShortestDigitsOf(char8* text, int length, char8* digits, out int point)
+	{
 		int pos = 0;
 		if (text[0] == '-')
 			pos++;

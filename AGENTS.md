@@ -100,6 +100,16 @@ These are non-obvious Beef behaviors discovered through debugging (in TomlBeef).
 ### Comptime
 
 - **`[Comptime]` code may enumerate `Type.TypeDeclarations`** (not `Type.Types`), read attributes with `GetCustomAttribute<T>()` on declarations, types and fields (`GetCustomAttributes<T>()` for repeated ones), and emit code with `Compiler.EmitTypeBody` / `EmitAddInterface`. `Runtime.FatalError` in comptime code becomes a build error. See TomlBeef's `TomlSerializerCodeGen.bf`.
+- **An `IComptimeTypeApply` runs during the type's initialization**: looking at a field type that specializes a generic over the type itself (`List<Node>` in `Node`) there is a data cycle ("OnCompile const evaluation creates a data dependency during TypeInit"), and in a larger project it crashed the compiler outright. Emit only signatures then, and the bodies as `System.Compiler.Mixin(SomeGen.Body(typeof(T), ...))`: the mixin runs when the method is compiled, when every type is complete (`JsonSerializerCodeGen.Emit`). `Compiler.Mixin` is a statement, not an expression: a property returns through a mixed-in `return ...;`.
+- **A generic constraint on an interface that comptime adds** (`where T : IJsonSerializable` with a `[JsonObject]` type) can fail with "must implement" when the type argument is written out (`F<MyType>(...)`); let it be inferred from an argument (`F(myObject, ...)`).
+
+### Lambdas
+
+- **A lambda that outlives a block must not capture the block's locals.** `op = scope:: () => Use(kind);` with `kind` declared inside an inner `{ }` (or a `case` block) reads a dead stack slot once the block ends: the values silently change. Declare captured locals at the lambda's own scope, and capture by value with `[=]`.
+
+### Windows Debug
+
+- **The Windows Debug runtime checks for leaks when the process exits** and stops it with a breakpoint (`Test process exited with error code: 2147483651`, 0x80000003) after every test has passed. LeakSanitizer on Linux can miss such a leak (a stale pointer keeps it "reachable"). Find it by marking tests `[Test(Ignore=true)]` in halves.
 
 ### Console & debugging
 

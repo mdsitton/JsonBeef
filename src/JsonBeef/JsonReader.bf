@@ -63,6 +63,8 @@ public class JsonReader
 	internal JsonReaderCore<JsonBufferedStreamCursor> mStream ~ delete _;
 	JsonStreamState mStreamState ~ delete _;
 	internal bool mStreaming;
+	/// Typed binding: the error of the JsonBind call that last returned false.
+	internal JsonParseError mBindError;
 
 	/// @brief Create a reader with no input; call Reset before reading.
 	public this()
@@ -176,6 +178,111 @@ public class JsonReader
 	/// @brief Whether the read has stopped at an error; Next then returns it again.
 	public bool IsStopped => mStreaming ? mStream.IsStopped : mBytes.IsStopped;
 
+	/// @brief The config the reader was last reset with.
+	public JsonReadConfig Config => mStreaming ? mStream.Config : mBytes.Config;
+
+	// On-demand
+
+	/// @brief Skip the value the current token starts, to its last token (a container's EndObject or
+	/// EndArray; a scalar is its own token), so that Next goes on after it. Skipping checks everything
+	/// reading would (UTF-8, escapes, numbers, structure, limits): an invalid value is an error here
+	/// too. At a PropertyName it skips the member's value; before the first token, the document's
+	/// value; at an End token or EndOfDocument there is nothing to skip.
+	/// @return .Ok, or the read's error.
+	public Result<void, JsonParseError> SkipValue()
+	{
+		if (!mStreaming)
+		{
+			if (mBytes.SkipValue() case .Err)
+				return .Err(mBytes.mError);
+			return .Ok;
+		}
+		if (mStream.SkipValue() case .Err)
+			return .Err(mStream.mError);
+		return .Ok;
+	}
+
+	/// @brief The source text of the value the current token starts, checked and skipped as SkipValue
+	/// does: a string with its quotes and escapes as written, a number as written, a container from its
+	/// bracket through the closing one, whitespace and all. Valid until the next call to Next or Reset.
+	/// A stream keeps the whole value in its buffer for this, so MaxTokenBytes bounds it.
+	/// @return The text, or the read's error.
+	public Result<StringView, JsonParseError> ReadRaw()
+	{
+		if (!mStreaming)
+		{
+			if (mBytes.ReadRaw() case .Ok(let raw))
+				return raw;
+			return .Err(mBytes.mError);
+		}
+		if (mStream.ReadRaw() case .Ok(let raw))
+			return raw;
+		return .Err(mStream.mError);
+	}
+
+	/// @brief Move forward to the value at `pointer` (RFC 6901), relative to the value the current
+	/// token starts (before the first token: the document's): every value passed on the way is skipped
+	/// and checked as SkipValue does. Found, the reader is at the value's first token (read it with
+	/// Next, SkipValue, ReadRaw or a [JsonObject] type's JsonRead). Not found, the reader is at the last
+	/// token of the value where the lookup failed (the object without the member, the array too short,
+	/// the scalar that is not a container), so Next goes on after it.
+	///
+	/// The reader cannot go back: in an object with a repeated name it finds the first member of that
+	/// name (JsonNode lookups find the last), and a second Find starts where the first one stopped.
+	/// `-` and indexes that are not canonical (`01`) find nothing.
+	/// @param pointer The JSON Pointer: `""` for the value itself, else `/`-separated reference tokens
+	/// (`~0` for `~`, `~1` for `/`). A malformed pointer is a fatal error (JsonPointer.IsValid checks).
+	/// @return Whether the value was found, or the read's error.
+	public Result<bool, JsonParseError> Find(StringView pointer)
+	{
+		if (!JsonPointer.IsValid(pointer))
+			Runtime.FatalError(scope $"JsonReader.Find: `{pointer}` is not a JSON Pointer");
+		var token = TokenType;
+		if (token == .None || token == .PropertyName)
+			token = Try!(Next());
+		if (token != .StartObject && token != .StartArray && token != .String && token != .Number && token != .True && token != .False && token != .Null)
+			return false;
+		let scratch = scope String();
+		int pos = 0;
+		while (pos < pointer.Length)
+		{
+			pos++;
+			StringView reference = JsonPointer.NextToken(pointer, ref pos, scratch).Value;
+			switch (TokenType)
+			{
+			case .StartObject:
+				while (true)
+				{
+					if (Try!(Next()) == .EndObject)
+						return false;
+					bool match = StringValue == reference;
+					Try!(Next());
+					if (match)
+						break;
+					Try!(SkipValue());
+				}
+			case .StartArray:
+				int index = JsonPointer.ParseIndex(reference);
+				if (index < 0)
+				{
+					Try!(SkipValue());
+					return false;
+				}
+				for (int i = 0; ; i++)
+				{
+					if (Try!(Next()) == .EndArray)
+						return false;
+					if (i == index)
+						break;
+					Try!(SkipValue());
+				}
+			default:
+				return false;
+			}
+		}
+		return true;
+	}
+
 	/// @brief Number: the value as an int64, if the token is an integer that fits (`NumberKind` Integer).
 	/// @param value Receives the value.
 	/// @return Whether it fits.
@@ -242,6 +349,24 @@ public class JsonReader
 	{
 		output.Append(StringValue);
 	}
+
+	/// At a StartObject: whether the member `name` is in the object, its value's first token and a
+	/// string's text; the reader is then back where it was (see JsonReaderCore.PeekMember).
+	internal Result<bool, JsonParseError> PeekMember(StringView name, out JsonToken token, String text)
+	{
+		if (!mStreaming)
+		{
+			if (mBytes.PeekMember(name, out token, text) case .Ok(let found))
+				return found;
+			return .Err(mBytes.mError);
+		}
+		if (mStream.PeekMember(name, out token, text) case .Ok(let found))
+			return found;
+		return .Err(mStream.mError);
+	}
+
+	/// The current token's integer payload (Number: Integer or UInteger).
+	internal int64 IntegerPayload => mStreaming ? mStream.mInteger : mBytes.mInteger;
 
 	/// The line and column of `offset` (at or after the current token's start for a stream).
 	internal bool Locate(int offset, out int line, out int column)

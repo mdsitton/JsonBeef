@@ -60,26 +60,26 @@ extension JsonDocument
 	/// @brief Write the document to a file (UTF-8; a PreserveStyle document as Write(output) gives it,
 	/// its BOM included if it had one).
 	/// @param path The file's path.
-	/// @return .Ok, or the first error (I/O errors as InvalidStructure with the message).
+	/// @return .Ok, or the first error (IoError if the file cannot be written).
 	public Result<void, JsonWriteError> WriteFile(StringView path)
 	{
 		let output = scope String();
 		Try!(Write(output));
 		if (File.WriteAllText(path, output) case .Err)
-			return .Err(JsonWriteError(.InvalidStructure, scope $"Cannot write the file {path}"));
+			return .Err(JsonWriteError(.IoError, scope $"Cannot write the file {path}"));
 		return .Ok;
 	}
 
 	/// @brief Write the document to a file (UTF-8, no BOM) in a given layout.
 	/// @param path The file's path.
 	/// @param options Layout, escaping and number options.
-	/// @return .Ok, or the first error (I/O errors as InvalidStructure with the message).
+	/// @return .Ok, or the first error (IoError if the file cannot be written).
 	public Result<void, JsonWriteError> WriteFile(StringView path, JsonWriteOptions options)
 	{
 		let output = scope String();
 		Try!(Write(output, options));
 		if (File.WriteAllText(path, output) case .Err)
-			return .Err(JsonWriteError(.InvalidStructure, scope $"Cannot write the file {path}"));
+			return .Err(JsonWriteError(.IoError, scope $"Cannot write the file {path}"));
 		return .Ok;
 	}
 

@@ -8,6 +8,7 @@ namespace JsonBeefBench;
 /// Benchmarks JsonBeef and the existing Beef JSON libraries, built into one program (Release):
 ///
 ///   JsonBeefBench <variant> <input> <min-samples>
+///   JsonBeefBench <variant> <input> loop=N      (N runs after the check, untimed: for ../instructions.sh)
 ///
 ///   jsonbeef       - DOM: JsonBeef's JsonDocument.Read(StringView) (RFC 8259, every check on; the
 ///                    document copies the input once, strings without escapes are views of the copy,
@@ -16,6 +17,12 @@ namespace JsonBeefBench;
 ///   jsonbeef-stream - streaming: JsonBeef's JsonReader over the text: every token, every key and string
 ///                    decoded (the reader decodes escapes as it scans), every number converted to a
 ///                    double (TryGetDouble).
+///   jsonbeef-typed - typed: JsonBeef's [JsonObject] classes (JsonBeefTyped.bf) through
+///                    JsonSerializer.Read<T>(text, obj), straight from the reader's tokens (no tree),
+///                    every check on; the object is deleted afterwards. twitter, citm_catalog, canada.
+///   jsonbeef-query - on-demand: JsonReader.Find to the array, then only the queried values read, the
+///                    rest passed with SkipValue, which checks everything it skips, through to the end
+///                    of the text (the whole document is validated, as in every JsonBeef mode).
 ///   bjson          - DOM: M0n7y5/BJSON's Json.Deserialize(StringView) into its JsonValue tree (a
 ///                    Deserializer per call, as Json.Deserialize does; keys in its bump allocator),
 ///                    then Dispose. Defaults (duplicate keys: the last one wins).
@@ -135,7 +142,7 @@ class Program
 	{
 		if (args.Count < 3)
 		{
-			Console.Error.WriteLine("usage: JsonBeefBench <jsonbeef|jsonbeef-stream|bjson|bjson-stream|bjson-typed|structureddata|einscott-json> <input> <min-samples>");
+			Console.Error.WriteLine("usage: JsonBeefBench <jsonbeef|jsonbeef-stream|jsonbeef-typed|jsonbeef-query|bjson|bjson-stream|bjson-typed|structureddata|einscott-json> <input> <min-samples>");
 			return 2;
 		}
 		let variant = args[0];
@@ -166,6 +173,10 @@ class Program
 		else
 			docs.Add(new String(file));
 		int minSamples = int.Parse(args[2]) case .Ok(let v) ? v : 5;
+		// `loop=N`: N runs and no timing, for counting instructions (../../instructions.sh)
+		int loops = 0;
+		if (args[2].StartsWith("loop=") && int.Parse(args[2].Substring(5)) case .Ok(let n))
+			loops = n;
 
 		Check check = default;
 		delegate void() op;
@@ -213,6 +224,18 @@ class Program
 					return 1;
 			}
 			op = scope:: () => { for (let d in docs) if (!EinScottBench.Dom(d, null)) failed = true; };
+		case "jsonbeef-typed", "jsonbeef-query":
+			// (The lambda's captures live as long as Main: a local of an inner block would not)
+			let fileName = Path.GetFileName(path, .. scope:: String());
+			if (fileName != "twitter.json" && fileName != "citm_catalog.json" && fileName != "canada.json")
+				return 3;
+			StringView kind = fileName == "twitter.json" ? "twitter" : fileName == "canada.json" ? "canada" : "citm_catalog";
+			StringView text = docs[0];
+			bool typed = variant == "jsonbeef-typed";
+			if (!(typed ? JsonBeefTyped.Run.Typed(kind, text, true) : JsonBeefTyped.Run.Query(kind, text, true)))
+				return 1;
+			Console.Out.Flush();
+			op = scope:: [=]() => { if (!(typed ? JsonBeefTyped.Run.Typed(kind, text, false) : JsonBeefTyped.Run.Query(kind, text, false))) failed = true; };
 		case "bjson-typed":
 			{
 				let fileName = Path.GetFileName(path, .. scope String());
@@ -229,8 +252,14 @@ class Program
 			Console.Error.WriteLine(scope $"unknown variant {variant}");
 			return 2;
 		}
-		if (variant != "bjson-typed")
+		if (variant != "bjson-typed" && variant != "jsonbeef-typed" && variant != "jsonbeef-query")
 			check.Print();
+		if (loops > 0)
+		{
+			for (int i < loops)
+				op();
+			return failed ? 1 : 0;
+		}
 		let m = Measure(minSamples, op);
 		if (failed)
 			return 1;

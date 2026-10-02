@@ -10,8 +10,10 @@ namespace JsonTester;
 /// escapes, digits and UTF-8 lead bytes), and every mutation is read three ways: JsonDocument from
 /// memory (the fast build, with the reader's report on failure), JsonReader's tokens from memory, and a
 /// JsonDocument built through 1-byte stream reads (the reader's builder). All three must agree: the same
-/// canonical form when accepted, the same error kind, line, column and offset when rejected. Prints
-/// the number of runs and disagreements (with the input of the first ones) and exits 1 on any.
+/// canonical form when accepted, the same error kind, line, column and offset when rejected. So must
+/// collect-errors from memory and from a stream, and SkipValue from memory (its fast loop) and from a
+/// stream (the token loop), skipping the whole value or the first one inside it. Prints the number of
+/// runs and disagreements (with the input of the first ones) and exits 1 on any.
 static class Fuzz
 {
 	const String cInteresting = "{}[],:\"\\/-+.0123456789eEtrufalsn \t\r\nbx\u{E9}";
@@ -137,7 +139,28 @@ static class Fuzz
 		CollectOutcome(collectedStream.Read(collectStream, collectConfig), collectedStream, e);
 		bool firstAgrees = a.StartsWith("error") ? d.StartsWith(a) : d == a;
 
-		if (a == b && b == c && d == e && firstAgrees)
+		// SkipValue (from memory its fast loop, from a stream the token loop) finds what reading finds:
+		// the same first error, or the end of the document. Skipping the whole value, and skipping the
+		// first value inside it.
+		let expected = b.StartsWith("error") ? b : "ok";
+		bool skipsAgree = true;
+		for (int inside < 2)
+		{
+			let skipped = scope String();
+			SkipOutcome(scope JsonReader(text), inside == 1, skipped);
+			let skipStream = scope TrickleStream(scope FixedMemoryStream(Span<uint8>((uint8*)text.Ptr, text.Length)), 1);
+			let streamReader = scope JsonReader();
+			streamReader.Reset(skipStream, config);
+			let skippedStream = scope String();
+			SkipOutcome(streamReader, inside == 1, skippedStream);
+			if (skipped != expected || skippedStream != expected)
+			{
+				Console.WriteLine($"  skip{(inside == 1 ? " inside" : "")}: {skipped} / from a stream: {skippedStream}");
+				skipsAgree = false;
+			}
+		}
+
+		if (a == b && b == c && d == e && firstAgrees && skipsAgree)
 			return true;
 		Console.WriteLine($"  document: {a.Substring(0, Math.Min(a.Length, 200))}");
 		Console.WriteLine($"  reader:   {b.Substring(0, Math.Min(b.Length, 200))}");
@@ -145,6 +168,41 @@ static class Fuzz
 		Console.WriteLine($"  collect:  {d.Substring(0, Math.Min(d.Length, 300))}");
 		Console.WriteLine($"  collect stream: {e.Substring(0, Math.Min(e.Length, 300))}");
 		return false;
+	}
+
+	/// Skips the document's value with SkipValue (`inside`: its first member's value or element, after
+	/// reading into it), then reads to the end: "ok", or the error as Outcome writes it.
+	static void SkipOutcome(JsonReader reader, bool inside, String output)
+	{
+		Result<void, JsonParseError> result = .Ok;
+		if (inside)
+		{
+			if (reader.Next() case .Err(let first))
+				result = .Err(first);
+			else if (reader.TokenType == .StartObject || reader.TokenType == .StartArray)
+			{
+				if (reader.Next() case .Err(let second))
+					result = .Err(second);
+			}
+		}
+		if (result case .Ok)
+			result = reader.SkipValue();
+		while (result case .Ok)
+		{
+			switch (reader.Next())
+			{
+			case .Ok(let token):
+				if (token == .EndOfDocument)
+				{
+					output.Append("ok");
+					return;
+				}
+			case .Err(let error):
+				result = .Err(error);
+			}
+		}
+		if (result case .Err(let error))
+			output.AppendF("error {} {}:{} @{}", error.mKind, error.mLine, error.mColumn, error.mOffset);
 	}
 
 	/// `JsonTester -stream-sweep FILE...`: every file read as a document from memory, then through streams

@@ -4,7 +4,9 @@
 # machine is not available (XmlBeef's bench/instructions.sh). It is not speed: memory traffic and
 # branch misses are not in it. Timed figures come from bench/compare/run.sh on a quiet machine.
 # Usage: bash bench/instructions.sh [input names...]      (beefbuild -config=Release first)
-#   MODES="events document" limits the columns (default: events document stream write).
+#   MODES="events document" limits the columns (default: events document stream write; also typed and
+#   query, [JsonObject] binding and on-demand reading, from bench/compare's Beef harness, built with
+#   bench/compare/build.sh beef, for twitter, citm_catalog and canada).
 #   EVENT=cycles counts CPU cycles instead (closer to speed, as it sees branch misses and memory stalls,
 #   but it varies with the load: compare runs taken back to back).
 set -uo pipefail
@@ -27,7 +29,12 @@ fi
 modes=(${MODES:-events document stream write})
 
 EVENT="${EVENT:-instructions}"
+H=./bench/compare/bin/beef-jsonbench
 count() { # mode path iterations
+	if [ "$1" = typed ] || [ "$1" = query ]; then
+		perf stat -x, -e "$EVENT:u" "$H" "jsonbeef-$1" "$2" "loop=$3" 2>&1 > /dev/null | grep "$EVENT" | cut -d, -f1
+		return
+	fi
 	perf stat -x, -e "$EVENT:u" "$T" -bench-loop "$1" "$2" "$3" 2>&1 > /dev/null | grep "$EVENT" | cut -d, -f1
 }
 
@@ -47,6 +54,10 @@ for name in "${inputs[@]}"; do
 	line=$(printf '%-15s' "$name")
 	for mode in "${modes[@]}"; do
 		if [ "$mode" = write ] && [[ "$path" == *.ndjson ]]; then
+			line+=$(printf ' %9s' -)
+			continue
+		fi
+		if { [ "$mode" = typed ] || [ "$mode" = query ]; } && [[ ! "$name" =~ ^(twitter|citm_catalog|canada)$ ]]; then
 			line+=$(printf ' %9s' -)
 			continue
 		fi

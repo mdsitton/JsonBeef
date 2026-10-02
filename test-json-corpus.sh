@@ -12,7 +12,8 @@
 # And across files: twitter.json and twitterescaped.json hold the same names and strings (-strings;
 # their numbers differ: the escaped copy's ids went through a double); mesh.json and mesh.pretty.json
 # (its members sorted) give the same RFC 8785 output (-jcs); and JSON Pointer lookups into the
-# documents (-pointer) agree with the oracle's, missing values included.
+# documents agree with the oracle's, missing values included: on the document (-pointer) and on
+# demand with the reader's Find (-select), from memory and from 7-byte stream reads.
 
 BIN="${BIN:-./build/Debug_Linux64/JsonTester/JsonTester}"
 SUITES="${SUITES:-tests/suites}"
@@ -90,13 +91,15 @@ if [ ${#@} -eq 0 ]; then
 		pointers=$((pointers + 1))
 		python3 "$ORACLE" -pointer "$pointer" "$EXAMPLES/$file" > "$tmpdir/pw" 2>/dev/null
 		want=$?
-		"$BIN" -pointer "$pointer" "$EXAMPLES/$file" > "$tmpdir/pg" 2> "$tmpdir/err"
-		got=$?
-		if [ $want -ne $got ]; then
-			fail "$file $pointer: exit $got, the oracle's $want ($(head -c 200 "$tmpdir/err"))"
-		elif [ $want -eq 0 ] && ! cmp -s "$tmpdir/pw" "$tmpdir/pg"; then
-			fail "$file $pointer: the value differs from the oracle's"
-		fi
+		for mode in "-pointer" "-select" "-stream 7 -select"; do
+			"$BIN" $mode "$pointer" "$EXAMPLES/$file" > "$tmpdir/pg" 2> "$tmpdir/err"
+			got=$?
+			if [ $want -ne $got ]; then
+				fail "$file $mode $pointer: exit $got, the oracle's $want ($(head -c 200 "$tmpdir/err"))"
+			elif [ $want -eq 0 ] && ! cmp -s "$tmpdir/pw" "$tmpdir/pg"; then
+				fail "$file $mode $pointer: the value differs from the oracle's"
+			fi
+		done
 	done <<'EOF'
 twitter.json	/statuses/0/id_str
 twitter.json	/statuses/0/id
@@ -126,7 +129,7 @@ numbers.json	/10000
 numbers.json	/10001
 numbers.json
 EOF
-	echo "$pointers JSON Pointer lookups"
+	echo "$pointers JSON Pointer lookups, each on the document, on demand and on demand from a stream"
 fi
 
 if [ $failed -ne 0 ]; then

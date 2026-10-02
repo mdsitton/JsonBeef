@@ -34,45 +34,67 @@ static class Canonical
 			}
 			if (token == .EndOfDocument)
 				return .Ok;
-			if (token == .EndObject || token == .EndArray)
-			{
-				output.Append(token == .EndObject ? '}' : ']');
-				hasElement.PopBack();
-				afterName = false;
-				continue;
-			}
-			if (afterName)
-				afterName = false;
-			else if (hasElement.Count > 0)
-			{
-				if (hasElement.Back)
-					output.Append(',');
-				hasElement.Back = true;
-			}
-			switch (token)
-			{
-			case .StartObject:
-				output.Append('{');
-				hasElement.Add(false);
-			case .StartArray:
-				output.Append('[');
-				hasElement.Add(false);
-			case .PropertyName:
-				AppendString(output, reader.StringValue);
-				output.Append(':');
-				afterName = true;
-			case .String:
-				AppendString(output, reader.StringValue);
-			case .Number:
-				AppendNumber(output, reader);
-			case .True:
-				output.Append("true");
-			case .False:
-				output.Append("false");
-			case .Null:
-				output.Append("null");
-			default:
-			}
+			AppendToken(reader, token, output, hasElement, ref afterName);
+		}
+	}
+
+	/// The canonical form of the value the reader's current token starts (JsonReader.Find left it there),
+	/// read through its last token.
+	public static Result<void, JsonParseError> WriteValue(JsonReader reader, String output)
+	{
+		let hasElement = scope List<bool>();
+		bool afterName = false;
+		var token = reader.TokenType;
+		while (true)
+		{
+			AppendToken(reader, token, output, hasElement, ref afterName);
+			if (hasElement.IsEmpty)
+				return .Ok;
+			token = Try!(reader.Next());
+		}
+	}
+
+	/// One token's text, with the comma before it when it follows an element.
+	static void AppendToken(JsonReader reader, JsonToken token, String output, List<bool> hasElement, ref bool afterName)
+	{
+		if (token == .EndObject || token == .EndArray)
+		{
+			output.Append(token == .EndObject ? '}' : ']');
+			hasElement.PopBack();
+			afterName = false;
+			return;
+		}
+		if (afterName)
+			afterName = false;
+		else if (hasElement.Count > 0)
+		{
+			if (hasElement.Back)
+				output.Append(',');
+			hasElement.Back = true;
+		}
+		switch (token)
+		{
+		case .StartObject:
+			output.Append('{');
+			hasElement.Add(false);
+		case .StartArray:
+			output.Append('[');
+			hasElement.Add(false);
+		case .PropertyName:
+			AppendString(output, reader.StringValue);
+			output.Append(':');
+			afterName = true;
+		case .String:
+			AppendString(output, reader.StringValue);
+		case .Number:
+			AppendNumber(output, reader);
+		case .True:
+			output.Append("true");
+		case .False:
+			output.Append("false");
+		case .Null:
+			output.Append("null");
+		default:
 		}
 	}
 

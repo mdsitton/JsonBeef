@@ -43,6 +43,18 @@ public enum JsonErrorKind : uint8
 	/// integer beyond the type's range).
 	NumberOutOfRange,
 
+	// Typed binding ([JsonObject])
+	/// @brief A value of another kind than the field needs (a string for an integer, `null` for a
+	/// field that cannot be null, a fraction for an integer).
+	TypeMismatch,
+	/// @brief A [JsonRequired] member is absent.
+	MissingValue,
+	/// @brief A value of the right kind that the field cannot take: an unknown enum case or
+	/// discriminator, a converter's rejection.
+	InvalidValue,
+	/// @brief A member no field maps, in a [JsonObject(Strict = true)] type.
+	UnknownMember,
+
 	// Limits
 	/// @brief A resource limit of JsonReadConfig was exceeded.
 	ResourceLimitExceeded,
@@ -62,6 +74,7 @@ public struct JsonParseError
 	/// Per-thread message and source-name storage, freed when the thread exits.
 	static LazyTLS<String> sMessageBuffer = new .() ~ delete _;
 	static LazyTLS<String> sSourceBuffer = new .() ~ delete _;
+	static LazyTLS<String> sPathBuffer = new .() ~ delete _;
 
 	public JsonErrorKind mKind;
 	/// @brief Human-readable description. Valid until the next error on this thread.
@@ -69,6 +82,10 @@ public struct JsonParseError
 	/// @brief Name of the input the position refers to; empty if unnamed. Valid until the next error
 	/// on this thread.
 	public StringView mSource;
+	/// @brief Typed binding: the JSON Pointer (RFC 6901) of the value the error is in, from the bound
+	/// object (`/statuses/3/user/id`); empty for the object itself and outside binding. Valid until the
+	/// next error on this thread.
+	public StringView mPath;
 	/// @brief 1-based line (0 when there is no position).
 	public int32 mLine;
 	/// @brief 1-based column, in code points.
@@ -94,6 +111,28 @@ public struct JsonParseError
 		mLength = (int32)length;
 		mMessage = Store(sMessageBuffer.Value, message);
 		mSource = default;
+		mPath = default;
+	}
+
+	/// Prepends a reference token to mPath (`/name`, escaped, or `/index`): binding builds the path as
+	/// the error leaves each level.
+	internal void PrependPath(StringView token, bool escape = true) mut
+	{
+		let buffer = sPathBuffer.Value;
+		let prefix = scope String(token.Length + 2);
+		prefix.Append('/');
+		if (escape)
+			JsonPointer.AppendToken(prefix, token);
+		else
+			prefix.Append(token);
+		if (mPath.IsEmpty)
+			buffer.Set(prefix);
+		else
+		{
+			// mPath views the buffer (an error's path is only ever built here)
+			buffer.Insert(0, prefix);
+		}
+		mPath = buffer;
 	}
 
 	/// An error at byte `offset` of `input`, with the line and column computed from it.
@@ -126,8 +165,8 @@ public struct JsonParseError
 		mSource = Store(sSourceBuffer.Value, source);
 	}
 
-	/// @brief Formats the error as `source:line:column: message`, dropping the parts that are unknown
-	/// (no source name, or no position: line 0).
+	/// @brief Formats the error as `source:line:column: path: message`, dropping the parts that are
+	/// unknown (no source name, no position: line 0, no path).
 	/// @param strBuffer The string to append to.
 	public override void ToString(String strBuffer)
 	{
@@ -140,6 +179,11 @@ public struct JsonParseError
 			strBuffer.AppendF("{}:{}:", mLine, mColumn);
 		if (!mSource.IsEmpty || mLine > 0)
 			strBuffer.Append(' ');
+		if (!mPath.IsEmpty)
+		{
+			strBuffer.Append(mPath);
+			strBuffer.Append(": ");
+		}
 		strBuffer.Append(mMessage);
 	}
 }
