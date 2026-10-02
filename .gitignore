@@ -1,0 +1,38 @@
+build/
+dist/
+bin/
+obj/
+*.o
+*.a
+*.so
+*.dylib
+*.dll
+*.exe
+
+BeefSpace_User.toml
+BeefSpace_Lock.toml
+
+# Test suites and corpora (third-party licenses), fetched at pinned versions by tests/fetch-suites.sh
+tests/suites/
+
+# Test script logs
+test-*.log
+
+# Benchmark comparison: fetched implementations, toolchains, builds and generated inputs
+bench/compare/deps/
+bench/compare/bin/
+bench/compare/inputs/
+bench/compare/rust/target/
+bench/compare/cs/bin/
+bench/compare/cs/obj/
+bench/compare/java/build/
+bench/compare/java/lib/
+bench/compare/js/node_modules/
+bench/compare/python/.venv/
+bench/compare/perl/local/
+bench/compare/lua/rocks/
+bench/compare/zig/.zig-cache/
+bench/compare/zig/zig-out/
+bench/compare/c/build/
+bench/compare/cpp/build/
+bench/compare/beef/build/

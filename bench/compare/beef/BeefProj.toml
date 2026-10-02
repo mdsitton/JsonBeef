@@ -1,0 +1,10 @@
+FileVersion = 1
+
+[Project]
+Name = "JsonBeefBench"
+StartupObject = "JsonBeefBench.Program"
+
+[Dependencies]
+corlib = "*"
+BJSON = "*"
+json = "*"

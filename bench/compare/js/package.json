@@ -1,0 +1,9 @@
+{
+  "name": "jsonbench",
+  "private": true,
+  "type": "module",
+  "description": "JavaScript harness for the JSON comparison benchmark (see ../build.sh js): simdjson_nodejs, the only dependency, exact version (the newest, 2022), locked in package-lock.json; its native addon is built with node-gyp",
+  "dependencies": {
+    "simdjson": "0.9.2"
+  }
+}

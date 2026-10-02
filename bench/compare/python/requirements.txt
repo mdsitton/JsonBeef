@@ -1,0 +1,12 @@
+# Exact versions (the newest on 2026-10-01), with pydantic's dependencies. pysimdjson has no wheel for
+# Python 3.14 and builds from source (C++, its bundled simdjson).
+annotated-types==0.8.0
+ijson==3.5.1
+msgspec==0.22.0
+orjson==3.12.0
+pydantic==2.13.5
+pydantic_core==2.46.5
+pysimdjson==7.0.2
+python-rapidjson==1.25
+typing-inspection==0.4.4
+typing_extensions==4.16.0
