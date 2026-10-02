@@ -1,7 +1,6 @@
 # JsonBeef status
 
-Last reviewed: 2026-10-02 (phases 1–7 done; the timed benchmark run, P3T, under way with run.sh's
-settling repeats in place of the quiet-machine rule).
+Last reviewed: 2026-10-02 (phases 1–7 done; the first timed benchmark run is in).
 
 ## Verification baseline
 
@@ -19,15 +18,31 @@ settling repeats in place of the quiet-machine rule).
 | `tests/fetch-suites.sh` | Pinned suites in `tests/suites/` (`docs/test-suites.md`) |
 | `bash ./test-json-lines.sh` (and with the Release `BIN`) | JsonSequenceReader against the oracle's `-lines` and `-concatenated`, from memory and from 7-byte stream reads: amazon_cellphones.ndjson (793 records), simdjson-data's three jsonchecker .ndjson files, 8 generated inputs (CRLF, empty lines, a BOM, ill-formed UTF-8, touching values) and every nst parsing case, both ways: 1,320 runs, 0 differences |
 | `bash ./test-json-fuzz.sh` (and with the Release `BIN`) | The stream sweep: every suite input through streams fed 1 to 31 bytes per read (16,895 runs) reads as from memory; then 2 seeds × 50 rounds of every suite input (57,200 runs) and 3 rounds of the 14 real-world files: fast build, reader, 1-byte stream and a push reader fed 1 byte at a time agree on every mutation, with CollectErrors memory and stream give the same errors and recovered document, SkipValue (the fast loop from memory, the token loop from a stream; the whole value and the first one inside it) gives the reader's outcome, and with `InvalidUtf8.Replace` and `InvalidSurrogates.Wtf8`, and as JSON5 (with SkipValue there too), a document from memory, one from 1-byte streams and the reader's tokens agree; each document read, copied into another with SetValue, prints the same, is ValueEquals to it and passes a JSON Patch testing and replacing it with the original. Run with `SEEDS=3 ROUNDS=200` (343,326 runs, Release) at the end of phase 6: 0 disagreements |
-| `bench/compare/run.sh` | The existing implementations and JsonBeef's columns in all four tracks: `JsonBeef` (DOM), `JsonBeef JsonReader` (streaming), `JsonBeef [JsonObject]` (typed), `JsonBeef JsonReader` (on-demand query). No quiet machine is assumed: each process samples until converged, and each cell runs processes until 3 of them agree within ±10% (at most 9; a cell that never settles is marked `~`). JsonBeef's check lines equal the reference on all 16 inputs in the DOM and streaming tracks and on twitter, citm_catalog and canada in the typed and query tracks (`./build.sh beef`). No timed run yet (P3T): there is no `results.md`, so the first timed run is the full one, then `ONLY='JsonBeef.*'` |
+| `bench/compare/run.sh` | The existing implementations and JsonBeef's columns in all four tracks: `JsonBeef` (DOM), `JsonBeef JsonReader` (streaming), `JsonBeef [JsonObject]` (typed), `JsonBeef JsonReader` (on-demand query). No quiet machine is assumed: each process samples until converged, and each cell runs processes until 3 of them agree within ±10% (at most 9; a cell that never settles is marked `~`). JsonBeef's check lines equal the reference on all 16 inputs in the DOM and streaming tracks and on twitter, citm_catalog and canada in the typed and query tracks (`./build.sh beef`). A full run takes about 95 minutes; remeasure JsonBeef's columns alone with `ONLY='JsonBeef.*'` (a partial rerun keeps every other cell and track) |
 | `bash bench/instructions.sh` (after `beefbuild -config=Release`; `MODES="events document typed query"` after `bench/compare/build.sh beef`) | The instruction counts below |
 
 Any change to `.bf` files must keep these green in both Debug and Release.
 
 ## Performance baseline
 
-No timed figures yet (P3T: the load average has stayed between 7 and 27). The load-independent
-measure, user-space instructions per input byte of the Release `JsonTester` (`bench/instructions.sh`):
+Timed run of 2026-10-02 (`bench/compare/results.md`, plots in `docs/benchmark-*.svg`; Ryzen 9 5900X,
+single thread; load average 4–7 throughout, absorbed by run.sh's settling repeats: every JsonBeef cell
+settled, and 4 cells of other libraries remain `~`). JsonBeef's MB/s and rank among the
+implementations that passed each input:
+
+| Track | twitter | twitterescaped | citm | canada | strings | floats | Rank, most inputs | Ahead of JsonBeef |
+|---|---:|---:|---:|---:|---:|---:|---|---|
+| DOM (`JsonBeef`) | 1,202 (2nd) | 627 (6th) | 1,621 (2nd) | 494 (4th) | 414 (20th) | 262 (8th) | 2nd–4th of 43–49 | simdjson DOM; yyjson and sonic-rs on most inputs |
+| Streaming (`JsonReader`) | 860 (3rd) | 456 (9th) | 988 (5th) | 359 (4th) | 351 (10th) | 237 (3rd) | 3rd–8th of 18–20 | simdjson On-Demand, jiter; RapidJSON SAX and serde_json on numeric and string-heavy inputs |
+| Typed (`[JsonObject]`) | 554 (7th) | | 752 (8th) | 259 (7th) | | | 7th–8th of 19–22 | glaze, sonic-rs, sonic, go-json, fastjson2, serde_json |
+| On-demand (`Find`) | 824 (8th) | | 1,303 (6th) | 387 (5th) | | | 5th–8th of 13–14 | simdjson On-Demand, jiter, serde_json partial, pysimdjson |
+
+For reference, yyjson's DOM does 1,027 on twitter and 1,637 on twitterescaped; simdjson's 3,046 and
+1,947; jiter's streaming 940 and 469. The weak spots are escaped strings (strings, twitterescaped:
+P3E) and the on-demand query, which is no faster than the full streaming pass on twitter (P6Q).
+
+The load-independent measure, user-space instructions per input byte of the Release `JsonTester`
+(`bench/instructions.sh`):
 the event pass (`JsonReader` from memory, every string decoded and number converted), the document
 read, and at the end of phase 3 also the event pass from a `Stream` (64 KiB buffer) and the compact
 write:
@@ -75,7 +90,7 @@ text): only twitter, citm_catalog and canada are in those tracks.
 | PreserveStyle (byte-exact writes, edits regenerated in their surroundings' style) | Done (phase 5) |
 | `[JsonObject]` typed mapping: reading straight from the reader (strict kinds and ranges, duplicates, required and unknown members, errors with JSON Pointer paths, polymorphism by discriminator, converters, allocators), writing to a JsonWriter and into document nodes in place; `JsonSerializer` (texts, streams, files, nodes) | Done (phase 6) |
 | On demand: `SkipValue` (checks what it skips; a fast loop for memory input), `ReadRaw`, the reader's `Find`; `JsonTester -select` | Done (phase 6) |
-| Speed: fast paths and the benchmark columns of all four tracks | Code done (phases 3 and 6); timed run pending (P3T) |
+| Speed: fast paths and the benchmark columns of all four tracks | Done (phases 3 and 6); timed run of 2026-10-02 in `bench/compare/results.md` |
 | Non-finite numbers (`AllowNonFiniteNumbers`), replacement modes (`InvalidUtf8`, `InvalidSurrogates`: Replace, Wtf8 with the writer's `\udxxx`), the I-JSON check (`IJson`) | Done (phase 7) |
 | JSON5 (`JsonDialect.Json5`, the `Json5` preset): identifier and single-quoted names, JSON5 strings and escapes, hexadecimal and other JSON5 numbers reported as JSON numbers, JSON5 whitespace | Done (phase 7) |
 | Sequences (`JsonSequenceReader`: JSON Lines, concatenated, RFC 7464; memory and streams) | Done (phase 7) |
@@ -86,10 +101,11 @@ text): only twitter, citm_catalog and canada are in those tracks.
 
 | ID | Item | Size |
 |----|------|------|
-| P3T | Phase 3's timed run: `bash bench/compare/run.sh > results.md` (the first, full run; rerun `~` cells with `ONLY=`), then `./plot.py`; compare JsonBeef with yyjson/sonic-rs (DOM) and jiter (streaming); decide from it whether the 32-byte record, a closer stream path or a flat read-only document (plan §9 open item 3) are worth doing | M |
+| P3E | Escaped strings are JsonBeef's weak spot: DOM strings 414 MB/s (20th; yyjson 945, sonic-rs 1,064), twitterescaped 627 (6th; yyjson 1,637). The decoding loop after the first `\` (escapes, `\u` pairs, the copy into the decode buffer) is the place to look; profile with `perf` on the Release `JsonTester -bench` | M |
+| P6Q | The on-demand query is no faster than the full streaming pass on twitter (824 MB/s against 860) and only 1.3× on citm_catalog (1,303 against 988), where simdjson's on-demand gains 1.6–1.8× over its streaming: skipped values pay for more than structure (SkipValue checks every string and number it skips, by design), but the gap says the skip loop or Find's member matching costs more than it should | M |
 | P3S | The stream event pass costs 1.3–1.5× the memory one in instructions (XmlBeef got its to 1.1–1.3×): the reader's `Grow` checks in scans | S |
-| P6T | Typed binding's overhead over the event pass in instructions (twitter 19.9 per byte against 14.7; citm_catalog 19.0 against 13.4): the generated member matching (User's 40 fields: about 2 per byte), allocation (about 1), and the per-token calls through `JsonReader`'s memory/stream dispatch; worth looking at once the timed run says where JsonBeef stands in the typed track | M |
+| P6T | Typed binding's overhead over the event pass in instructions (twitter 19.9 per byte against 14.7; citm_catalog 19.0 against 13.4): the generated member matching (User's 40 fields: about 2 per byte), allocation (about 1), and the per-token calls through `JsonReader`'s memory/stream dispatch. The timed run puts the typed track 7th–8th (twitter 554 MB/s against glaze's 911 and sonic-rs's; citm_catalog 752 against glaze's 2,104), the furthest JsonBeef is from the front | M |
 | P6S | The on-demand fast loop serves memory input only; streams skip through the token loop | S |
 | P7S | json-patch-tests (github.com/json-patch/json-patch-tests: `tests.json`, `spec_tests.json`) could join `tests/fetch-suites.sh` as a pinned suite with a runner over `JsonTester -patch`; checked once by hand so far, when the author agrees to add a suite | S |
 | T | TomlTester's BJSON dependency could move to JsonBeef now that the document and writer exist (`plan.md` §9 open item 2): a separate step in TomlBeef, when the author asks | S |
-| Q | Open questions (`plan.md` §9): the proposals are in use (floats keep `.0`, JCS separate; TomlTester moves later; a flat document only if phase 3 asks for one) | — |
+| Q | Open questions (`plan.md` §9): the proposals are in use (floats keep `.0`, JCS separate; TomlTester moves later; a flat document only if phase 3 asks for one: the timed run does not, the DOM is 2nd–4th on most inputs) | — |

@@ -1,0 +1,181 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="920" height="1040" viewBox="0 0 920 1040" role="img" aria-label="JSON JSON into typed structs: throughput of existing implementations">
+
+  <style>
+    svg { font-family: system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif; }
+    .bg { fill: #ffffff; }
+    .title { font-size: 19px; font-weight: 650; fill: #1f2328; }
+    .subtitle, .footer, .axis { font-size: 12.5px; fill: #656d76; }
+    .group { font-size: 11px; font-weight: 650; letter-spacing: 0.08em; fill: #656d76; }
+    .label { font-size: 13.5px; fill: #1f2328; }
+    .lang { font-size: 11px; fill: #8c959f; }
+    .ours { font-weight: 700; }
+    .value { font-size: 12.5px; fill: #424a53; font-variant-numeric: tabular-nums; }
+    .value.ours { fill: #c2410c; }
+    .small { font-size: 12px; fill: #424a53; }
+    .note-plain { fill: #8c959f; }
+    .footnote { font-size: 12px; fill: #656d76; }
+    .repo { font-size: 11.5px; fill: #8c959f; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+    .bar { fill: #afb8c1; }
+    .bar-ours { fill: #ea580c; }
+    .rule { stroke: #d8dee4; stroke-width: 1; }
+    .libname { fill: #656d76; }
+    .libname.ours { fill: #c2410c; font-weight: 650; }
+    .colhead { font-size: 11px; font-weight: 600; fill: #424a53; }
+    .cell { font-size: 11.5px; fill: #424a53; font-variant-numeric: tabular-nums; }
+    .cell.best { font-weight: 700; fill: #1f2328; }
+    .cell.ours { fill: #c2410c; }
+    .cell-missing { font-size: 10px; fill: #8c959f; }
+    .heat { fill: #2da44e; }
+    .row-ours { fill: #ea580c; fill-opacity: 0.07; }
+    @media (prefers-color-scheme: dark) {
+      .bg { fill: #0d1117; }
+      .title, .label { fill: #e6edf3; }
+      .subtitle, .footer, .axis, .group { fill: #8d96a0; }
+      .lang, .note-plain { fill: #6e7681; }
+      .footnote { fill: #8d96a0; }
+      .repo { fill: #6e7681; }
+      .value, .small { fill: #c9d1d9; }
+      .value.ours { fill: #fb923c; }
+      .bar { fill: #3d444d; }
+      .bar-ours { fill: #f97316; }
+      .rule { stroke: #262c36; }
+      .libname { fill: #8d96a0; }
+      .libname.ours { fill: #fb923c; }
+      .colhead { fill: #c9d1d9; }
+      .cell { fill: #c9d1d9; }
+      .cell.best { fill: #f0f6fc; }
+      .cell.ours { fill: #fb923c; }
+      .cell-missing { fill: #6e7681; }
+      .heat { fill: #3fb950; }
+      .row-ours { fill: #f97316; fill-opacity: 0.10; }
+    }
+  </style>
+<rect class="bg" x="0" y="0" width="920" height="1040" rx="10"/>
+<text x="40.0" y="44.0" class="title" text-anchor="start">JSON into typed structs: speed relative to JsonBeef [JsonObject]</text>
+<text x="40.0" y="66.0" class="subtitle" text-anchor="start">one operation: decode into structs mirroring serde-rs/json-benchmark's · geometric mean over the inputs both handled of MB/s ÷ JsonBeef [JsonObject]'s · higher is better</text>
+<text x="40.0" y="107.0" class="lang" text-anchor="start">C++</text>
+<text x="112" y="107.0"><tspan class="label">glaze</tspan><tspan class="repo" dx="8">stephenberry/glaze</tspan></text>
+<rect x="500" y="94.5" width="200.0" height="15" rx="3" class="bar"/>
+<text x="708.0" y="107.0" class="small"><tspan class="value">2.57×</tspan><tspan class="note-plain" dx="8">2.6× faster</tspan></text>
+<text x="40.0" y="131.0" class="lang" text-anchor="start">Rust</text>
+<text x="112" y="131.0"><tspan class="label">sonic-rs</tspan><tspan class="repo" dx="8">cloudwego/sonic-rs</tspan></text>
+<rect x="500" y="118.5" width="112.4" height="15" rx="3" class="bar"/>
+<text x="620.4" y="131.0" class="small"><tspan class="value">1.44×</tspan><tspan class="note-plain" dx="8">1.4× faster</tspan></text>
+<text x="40.0" y="155.0" class="lang" text-anchor="start">Go</text>
+<text x="112" y="155.0"><tspan class="label">sonic</tspan><tspan class="repo" dx="8">bytedance/sonic</tspan></text>
+<rect x="500" y="142.5" width="102.0" height="15" rx="3" class="bar"/>
+<text x="610.0" y="155.0" class="small"><tspan class="value">1.31×</tspan><tspan class="note-plain" dx="8">1.3× faster</tspan></text>
+<text x="40.0" y="179.0" class="lang" text-anchor="start">Go</text>
+<text x="112" y="179.0"><tspan class="label">go-json</tspan><tspan class="repo" dx="8">goccy/go-json</tspan></text>
+<rect x="500" y="166.5" width="102.0" height="15" rx="3" class="bar"/>
+<text x="610.0" y="179.0" class="small"><tspan class="value">1.31×</tspan><tspan class="note-plain" dx="8">1.3× faster</tspan></text>
+<text x="40.0" y="203.0" class="lang" text-anchor="start">Rust</text>
+<text x="112" y="203.0"><tspan class="label">simd-json</tspan><tspan class="repo" dx="8">simd-lite/simd-json</tspan></text>
+<rect x="500" y="190.5" width="99.1" height="15" rx="3" class="bar"/>
+<text x="607.1" y="203.0" class="small"><tspan class="value">1.27×</tspan><tspan class="note-plain" dx="8">1.3× faster</tspan></text>
+<text x="40.0" y="227.0" class="lang" text-anchor="start">Java</text>
+<text x="112" y="227.0"><tspan class="label">fastjson2</tspan><tspan class="repo" dx="8">alibaba/fastjson2</tspan></text>
+<rect x="500" y="214.5" width="87.8" height="15" rx="3" class="bar"/>
+<text x="595.8" y="227.0" class="small"><tspan class="value">1.13×</tspan><tspan class="note-plain" dx="8">1.1× faster</tspan></text>
+<text x="40.0" y="251.0" class="lang" text-anchor="start">Rust</text>
+<text x="112" y="251.0"><tspan class="label">serde_json float_roundtrip</tspan><tspan class="repo" dx="8"></tspan></text>
+<rect x="500" y="238.5" width="86.6" height="15" rx="3" class="bar"/>
+<text x="594.6" y="251.0" class="small"><tspan class="value">1.11×</tspan><tspan class="note-plain" dx="8">1.1× faster</tspan></text>
+<text x="40.0" y="275.0" class="lang" text-anchor="start">Beef</text>
+<text x="112" y="275.0"><tspan class="label ours">JsonBeef [JsonObject]</tspan><tspan class="repo" dx="8"></tspan></text>
+<rect x="500" y="262.5" width="77.9" height="15" rx="3" class="bar-ours"/>
+<text x="585.9" y="275.0" class="small"><tspan class="value ours">1.00×</tspan><tspan class="note-plain" dx="8">baseline</tspan></text>
+<text x="40.0" y="299.0" class="lang" text-anchor="start">Rust</text>
+<text x="112" y="299.0"><tspan class="label">serde_json*</tspan><tspan class="repo" dx="8">serde-rs/json</tspan></text>
+<rect x="500" y="286.5" width="77.8" height="15" rx="3" class="bar"/>
+<text x="585.8" y="299.0" class="small"><tspan class="value">1.00×</tspan><tspan class="note-plain" dx="8">1.0× slower</tspan></text>
+<text x="40.0" y="323.0" class="lang" text-anchor="start">Python</text>
+<text x="112" y="323.0"><tspan class="label">msgspec Struct</tspan><tspan class="repo" dx="8">jcrist/msgspec</tspan></text>
+<rect x="500" y="310.5" width="65.3" height="15" rx="3" class="bar"/>
+<text x="573.3" y="323.0" class="small"><tspan class="value">0.84×</tspan><tspan class="note-plain" dx="8">1.2× slower</tspan></text>
+<text x="40.0" y="347.0" class="lang" text-anchor="start">Java</text>
+<text x="112" y="347.0"><tspan class="label">Jackson databind</tspan><tspan class="repo" dx="8">FasterXML/jackson</tspan></text>
+<rect x="500" y="334.5" width="63.3" height="15" rx="3" class="bar"/>
+<text x="571.3" y="347.0" class="small"><tspan class="value">0.81×</tspan><tspan class="note-plain" dx="8">1.2× slower</tspan></text>
+<text x="40.0" y="371.0" class="lang" text-anchor="start">Java</text>
+<text x="112" y="371.0"><tspan class="label">DSL-JSON*</tspan><tspan class="repo" dx="8">ngs-doo/dsl-json</tspan></text>
+<rect x="500" y="358.5" width="54.1" height="15" rx="3" class="bar"/>
+<text x="562.1" y="371.0" class="small"><tspan class="value">0.69×</tspan><tspan class="note-plain" dx="8">1.4× slower</tspan></text>
+<text x="40.0" y="395.0" class="lang" text-anchor="start">Zig</text>
+<text x="112" y="395.0"><tspan class="label">std.json</tspan><tspan class="repo" dx="8">Zig 0.16 std</tspan></text>
+<rect x="500" y="382.5" width="51.0" height="15" rx="3" class="bar"/>
+<text x="559.0" y="395.0" class="small"><tspan class="value">0.65×</tspan><tspan class="note-plain" dx="8">1.5× slower</tspan></text>
+<text x="40.0" y="419.0" class="lang" text-anchor="start">Go</text>
+<text x="112" y="419.0"><tspan class="label">segmentio</tspan><tspan class="repo" dx="8">segmentio/encoding</tspan></text>
+<rect x="500" y="406.5" width="46.2" height="15" rx="3" class="bar"/>
+<text x="554.2" y="419.0" class="small"><tspan class="value">0.59×</tspan><tspan class="note-plain" dx="8">1.7× slower</tspan></text>
+<text x="40.0" y="443.0" class="lang" text-anchor="start">C#</text>
+<text x="112" y="443.0"><tspan class="label">System.Text.Json (source gen)</tspan><tspan class="repo" dx="8">.NET 10 System.Text.Json</tspan></text>
+<rect x="500" y="430.5" width="42.1" height="15" rx="3" class="bar"/>
+<text x="550.1" y="443.0" class="small"><tspan class="value">0.54×</tspan><tspan class="note-plain" dx="8">1.9× slower</tspan></text>
+<text x="40.0" y="467.0" class="lang" text-anchor="start">Go</text>
+<text x="112" y="467.0"><tspan class="label">jsoniter</tspan><tspan class="repo" dx="8">json-iterator/go</tspan></text>
+<rect x="500" y="454.5" width="35.3" height="15" rx="3" class="bar"/>
+<text x="543.3" y="467.0" class="small"><tspan class="value">0.45×</tspan><tspan class="note-plain" dx="8">2.2× slower</tspan></text>
+<text x="40.0" y="491.0" class="lang" text-anchor="start">Java</text>
+<text x="112" y="491.0"><tspan class="label">Gson</tspan><tspan class="repo" dx="8">google/gson</tspan></text>
+<rect x="500" y="478.5" width="34.8" height="15" rx="3" class="bar"/>
+<text x="542.8" y="491.0" class="small"><tspan class="value">0.45×</tspan><tspan class="note-plain" dx="8">2.2× slower</tspan></text>
+<text x="40.0" y="515.0" class="lang" text-anchor="start">Go</text>
+<text x="112" y="515.0"><tspan class="label">json/v2</tspan><tspan class="repo" dx="8">Go encoding/json/v2</tspan></text>
+<rect x="500" y="502.5" width="34.4" height="15" rx="3" class="bar"/>
+<text x="542.4" y="515.0" class="small"><tspan class="value">0.44×</tspan><tspan class="note-plain" dx="8">2.3× slower</tspan></text>
+<text x="40.0" y="539.0" class="lang" text-anchor="start">Go</text>
+<text x="112" y="539.0"><tspan class="label">encoding/json</tspan><tspan class="repo" dx="8">Go standard library</tspan></text>
+<rect x="500" y="526.5" width="28.2" height="15" rx="3" class="bar"/>
+<text x="536.2" y="539.0" class="small"><tspan class="value">0.36×</tspan><tspan class="note-plain" dx="8">2.8× slower</tspan></text>
+<text x="40.0" y="563.0" class="lang" text-anchor="start">C#</text>
+<text x="112" y="563.0"><tspan class="label">Newtonsoft.Json</tspan><tspan class="repo" dx="8">JamesNK/Newtonsoft.Json</tspan></text>
+<rect x="500" y="550.5" width="26.0" height="15" rx="3" class="bar"/>
+<text x="534.0" y="563.0" class="small"><tspan class="value">0.33×</tspan><tspan class="note-plain" dx="8">3.0× slower</tspan></text>
+<text x="40.0" y="587.0" class="lang" text-anchor="start">Python</text>
+<text x="112" y="587.0"><tspan class="label">pydantic</tspan><tspan class="repo" dx="8">pydantic/pydantic</tspan></text>
+<rect x="500" y="574.5" width="25.6" height="15" rx="3" class="bar"/>
+<text x="533.6" y="587.0" class="small"><tspan class="value">0.33×</tspan><tspan class="note-plain" dx="8">3.0× slower</tspan></text>
+<text x="40.0" y="611.0" class="lang" text-anchor="start">Beef</text>
+<text x="112" y="611.0"><tspan class="label">BJSON*</tspan><tspan class="repo" dx="8">M0n7y5/BJSON</tspan></text>
+<rect x="500" y="598.5" width="5.9" height="15" rx="3" class="bar"/>
+<text x="513.9" y="611.0" class="small"><tspan class="value">0.076×</tspan><tspan class="note-plain" dx="8">13× slower</tspan></text>
+<text x="40.0" y="668.0" class="title" text-anchor="start">The fastest per input</text>
+<text x="40.0" y="690.0" class="subtitle" text-anchor="start">MB/s · the three fastest implementations of this track on each input · bars scaled per input</text>
+<line x1="40" y1="712.0" x2="880" y2="712.0" class="rule"/>
+<text x="190.0" y="753.0" class="label" text-anchor="end">twitter</text>
+<rect x="210" y="718.0" width="330.0" height="12" rx="2" class="bar"/>
+<text x="547.0" y="728.0" class="small"><tspan class="value">910</tspan><tspan class="libname" dx="6">glaze</tspan><tspan class="note-plain" dx="6">C++</tspan></text>
+<rect x="210" y="733.0" width="268.1" height="12" rx="2" class="bar"/>
+<text x="485.1" y="743.0" class="small"><tspan class="value">740</tspan><tspan class="libname" dx="6">fastjson2</tspan><tspan class="note-plain" dx="6">Java</tspan></text>
+<rect x="210" y="748.0" width="249.7" height="12" rx="2" class="bar"/>
+<text x="466.7" y="758.0" class="small"><tspan class="value">689</tspan><tspan class="libname" dx="6">go-json</tspan><tspan class="note-plain" dx="6">Go</tspan></text>
+<rect x="210" y="763.0" width="200.8" height="12" rx="2" class="bar-ours"/>
+<text x="417.8" y="773.0" class="small"><tspan class="value ours">554</tspan><tspan class="libname ours" dx="6">JsonBeef [JsonObject]</tspan><tspan class="note-plain" dx="6">Beef</tspan></text>
+<line x1="40" y1="784.0" x2="880" y2="784.0" class="rule"/>
+<text x="190.0" y="825.0" class="label" text-anchor="end">citm_catalog</text>
+<rect x="210" y="790.0" width="330.0" height="12" rx="2" class="bar"/>
+<text x="547.0" y="800.0" class="small"><tspan class="value">2104</tspan><tspan class="libname" dx="6">glaze</tspan><tspan class="note-plain" dx="6">C++</tspan></text>
+<rect x="210" y="805.0" width="149.9" height="12" rx="2" class="bar"/>
+<text x="366.9" y="815.0" class="small"><tspan class="value">955</tspan><tspan class="libname" dx="6">sonic-rs</tspan><tspan class="note-plain" dx="6">Rust</tspan></text>
+<rect x="210" y="820.0" width="148.3" height="12" rx="2" class="bar"/>
+<text x="365.3" y="830.0" class="small"><tspan class="value">945</tspan><tspan class="libname" dx="6">fastjson2</tspan><tspan class="note-plain" dx="6">Java</tspan></text>
+<rect x="210" y="835.0" width="118.0" height="12" rx="2" class="bar-ours"/>
+<text x="335.0" y="845.0" class="small"><tspan class="value ours">752</tspan><tspan class="libname ours" dx="6">JsonBeef [JsonObject]</tspan><tspan class="note-plain" dx="6">Beef</tspan></text>
+<line x1="40" y1="856.0" x2="880" y2="856.0" class="rule"/>
+<text x="190.0" y="897.0" class="label" text-anchor="end">canada</text>
+<rect x="210" y="862.0" width="330.0" height="12" rx="2" class="bar"/>
+<text x="547.0" y="872.0" class="small"><tspan class="value">952</tspan><tspan class="libname" dx="6">glaze</tspan><tspan class="note-plain" dx="6">C++</tspan></text>
+<rect x="210" y="877.0" width="209.4" height="12" rx="2" class="bar"/>
+<text x="426.4" y="887.0" class="small"><tspan class="value">604</tspan><tspan class="libname" dx="6">simd-json</tspan><tspan class="note-plain" dx="6">Rust</tspan></text>
+<rect x="210" y="892.0" width="201.2" height="12" rx="2" class="bar"/>
+<text x="418.2" y="902.0" class="small"><tspan class="value">581</tspan><tspan class="libname" dx="6">sonic-rs</tspan><tspan class="note-plain" dx="6">Rust</tspan></text>
+<rect x="210" y="907.0" width="89.7" height="12" rx="2" class="bar-ours"/>
+<text x="306.7" y="917.0" class="small"><tspan class="value ours">259</tspan><tspan class="libname ours" dx="6">JsonBeef [JsonObject]</tspan><tspan class="note-plain" dx="6">Beef</tspan></text>
+<line x1="40" y1="928.0" x2="880" y2="928.0" class="rule"/>
+<text x="40.0" y="956.0" class="footnote" text-anchor="start">* serde_json failed canada (float conversion not correctly rounded without its float_roundtrip feature).</text>
+<text x="40.0" y="976.0" class="footnote" text-anchor="start">* DSL-JSON failed canada (its typed double parsing is not correctly rounded).</text>
+<text x="40.0" y="996.0" class="footnote" text-anchor="start">* BJSON its List cannot hold Lists, so canada cannot be expressed (n/a).</text>
+<text x="40.0" y="1024.0" class="footer" text-anchor="start">Linux x86-64, single thread, warm · 1 s warm-up, then samples until 60% are within ±10% of their median · median of 3 processes · bench/compare</text>
+</svg>

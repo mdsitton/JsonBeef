@@ -71,11 +71,11 @@ bit-exact sum of every number as a double), and peak RSS is recorded per cell. T
 installed here (Ruby, PHP, Swift, Dart, Nim, Crystal, Julia, R, Haskell, OCaml, Elixir/Erlang, D,
 Kotlin, Scala) are left out; Boost.JSON (no Boost headers, ~1 GB) and DAW JSON Link are skipped.
 
-**No timed run exists yet**: the machine stayed loaded (load average 8–17), so only a one-sample smoke
-run was taken (`bench/compare/results-smoke.md`, labeled unreliable). Rough picture on twitter.json
-(MB/s): DOM simdjson ~3,000, sonic-rs and yyjson ~1,000, RapidJSON in-situ ~750, jiter ~700, BJSON 45;
-typed glaze ~900, go-json and fastjson2 ~750–800, sonic-rs ~600; streaming simdjson On-Demand ~1,700,
-jiter ~950; on-demand simdjson ~4,500.
+**Timed run (2026-10-02, `bench/compare/results.md`):** on twitter.json (MB/s), DOM simdjson 3,046,
+sonic-rs 1,065, yyjson 1,027, RapidJSON 491, BJSON 46; typed glaze 911; streaming simdjson On-Demand
+2,491, jiter 940; on-demand simdjson 4,468. JsonBeef's own figures and ranks are in `docs/status.md`.
+(The earlier one-sample smoke run, `bench/compare/results-smoke.md`, was taken under load and is
+superseded.)
 
 **Correctness (independent of load):** on valid inputs, floats are not correctly rounded by default in
 RapidJSON (needs `kParseFullPrecisionFlag`), serde_json (needs `float_roundtrip`), DSL-JSON's typed
@@ -240,15 +240,19 @@ Windows tests, committed (`AGENTS.md`).
    (`test-json-corpus.sh`). Mutation stays in phase 5.*
    Store, nodes, members, the builder, compact/pretty/JCS writers, lookups,
    JSON Pointer.
-3. **Speed.** *Code done, timed run pending (2026-10-02): `JsonBeef` and `JsonBeef JsonReader` join
+3. **Speed.** *Done (2026-10-02): `JsonBeef` and `JsonBeef JsonReader` join
    the DOM and streaming tracks with check lines equal to the reference on all 16 inputs (typed and
    on-demand follow `[JsonObject]` in phase 6); UTF-8 is checked in the string scan instead of a pass
    before reading; a fast document build for memory input that falls back to the reader to report
    errors; SWAR whitespace and digits; floats' mantissas gathered in the one scan; the `u8x16` string
    scan (SSE2 compares, kept: fewer instructions on long strings, neutral on short ones). Document
    reads went from 17.8 to 9.4 instructions per byte on citm_catalog, 19.1 to 11.9 on twitter
-   (`docs/status.md`). The machine stayed loaded (load average 7–27), so the timed run, and with it
-   the 32-byte record's measurement and the comparison with the §2.3 targets, waits for a quiet one.*
+   (`docs/status.md`). The timed run (taken once run.sh repeated cells until they settled instead of
+   waiting for a quiet machine) against the §2.3 targets: the document is in yyjson's and sonic-rs's
+   class or ahead on the real files (twitter 1,202 MB/s against 1,027 and 1,065; citm_catalog 1,621
+   against 1,124 and 1,412) but behind on escaped strings (P3E) and float-heavy files (canada 494
+   against 928); the streaming reader is in jiter's class (twitter 860 against 940, citm_catalog 988
+   against 1,045, floats 237 against 336). The 32-byte record was not measured separately.*
    Join the four benchmark tracks (`JsonBeef` columns), profile, fast paths; measure the
    `u8x16` scan and the 32-byte record. Targets from §2.3.
 4. **Errors, positions, limits, streams, collect-errors.** *Done (2026-10-02): errors located in
@@ -277,8 +281,10 @@ Windows tests, committed (`AGENTS.md`).
    into document nodes in place (PreserveStyle keeps the rest); `JsonSerializer` for texts, streams,
    files and nodes. On demand: `SkipValue` (with a fast loop for memory input that hands anything
    unusual to the token loop, so skipping checks exactly what reading checks), `ReadRaw`, `Find`. The
-   typed and query tracks have JsonBeef columns whose check lines equal the reference; their timed
-   figures wait for P3T with the rest.*
+   typed and query tracks have JsonBeef columns whose check lines equal the reference. Timed: the
+   typed track is short of the §2.3 target (twitter 554 MB/s against go-json's 689 and glaze's 911;
+   citm_catalog 752 against 929 and 2,104: P6T), and the on-demand query gains too little over the
+   full streaming pass (P6Q).*
    Typed binding from the reader and nodes; the typed and on-demand
    benchmark tracks.
 7. **Extras.** *Done (2026-10-02): `AllowNonFiniteNumbers`; `InvalidUtf8` and `InvalidSurrogates`
