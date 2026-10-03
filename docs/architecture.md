@@ -23,6 +23,17 @@ the suites in [test-suites.md](test-suites.md). Code conventions and Beef gotcha
   conversion to double reports `NumberOutOfRange`.
 - **Few allocations.** Token strings are views of the input; only strings with escapes are decoded,
   into one reusable buffer.
+- **Built on FormatCore** (`~/development/FormatCore`, the shared core of the author's four format
+  libraries; most of its input, number and mapping designs came from here). JsonBeef uses its cursors
+  (`ByteCursor`/`BufferedStreamCursor<JsonText>`, `LineCounter`, `InputStart`), SWAR, UTF-8 and hex
+  helpers, the error carrier (`JsonParseError` and `JsonDiagnostic` are typealiases of
+  `ParseError`/`Diagnostic<JsonErrorKind>`), storage (`GrowList`, `TextArena`, `DecodeBuffer`, `BitStack`,
+  `ReadShell`, `LineIndex`, `OpenIdIndex`, `Tree`), numbers (`DecimalParse`, `ShortestDouble`,
+  `BigDecimal`, `FloatBits`) and the typed-mapping driver and helpers (`FormatCore.Mapping`). What stays
+  here is JSON: the grammar, the reader's state machine and fast paths, the document and its
+  PreserveStyle, the writers, JSON Pointer and Patch, sequences, push input, and the `[JsonObject]`
+  planning and emit templates. FormatCore's `docs/architecture.md` describes the shared parts;
+  `docs/migration.md` there records what moved and what the move measured.
 
 ## 2. Source layout
 
@@ -31,30 +42,28 @@ the suites in [test-suites.md](test-suites.md). Code conventions and Beef gotcha
 | `JsonDocument.bf` | `JsonNodeRecord`, `JsonNodeFlags`; `JsonDocument`: the node table, the text (source copy, string table), `Read`/`ReadFile` and the builder over the reader's core, links, member lookup and the duplicate-name policies |
 | `JsonDocument.Write.bf` | `Write`/`WriteFile`: the iterative tree walk over `JsonWriter`, the canonical (RFC 8785) walk with UTF-16 member order |
 | `JsonNode.bf` | `JsonNodeId`, the `JsonNode` handle (kind, navigation, lookups by name and index, values), `JsonNodeList`, `JsonMember`, `JsonMemberList` |
-| `JsonMemberIndex.bf` | The seeded hash index of large objects |
+| `JsonMemberIndex.bf` | The name index of large objects: FormatCore's `OpenIdIndex` (seeded per index) over the member names |
 | `JsonPointer.bf` | `JsonPointer` (RFC 6901 evaluation, syntax, escaping), `JsonPointerError` |
 | `JsonPatch.bf` | `JsonPatch` (RFC 6902 `Apply`, RFC 7396 `Merge`), `JsonPatchError`; the document's `Checkpoint`, `CopyDetached` and `Adopt`; `JsonNode.SetValue` and `ValueEquals` |
 | `JsonWriter.bf` | `JsonWriteOptions`, `JsonNonFiniteNumbers`, `JsonWriteError`; `JsonWriter`: the streaming writer, escaping, number output |
 | `JsonValueKind.bf` | `JsonValueKind` |
-| `JsonTextArena.bf`, `JsonStack.bf` | Internal: XmlBeef's chunked byte arena (kept across reads) and growable array with inlined `Add` |
-| `JsonDecodeBuffer.bf` | Internal: the bytes strings with escapes decode to, written through a raw pointer |
 | `JsonReader.bf` | `JsonToken`; `JsonReader` (public: tokens, depth, offsets, strings, number conversions, `SkipValue`, `ReadRaw`, `Find`), dispatching to one core per cursor type |
 | `JsonReaderCore.bf` | `JsonFailure`; `JsonReaderCore<TCursor>`: the state machine, the container bit stack, literals, numbers, strings and escapes, whitespace, the window helpers, `Fail`; on demand: `SkipValue` and its fast loop, `ReadRaw`, `PeekMember` |
 | `JsonReaderCore.Json5.bf`, `JsonIdentifierTables.bf` | JSON5's whitespace, strings, member names and numbers; the generated identifier ranges |
 | `JsonSequenceReader.bf` | `JsonSequenceMode`; `JsonSequenceReader`: JSON Lines, concatenated and RFC 7464 sequences |
 | `JsonPushReader.bf` | `JsonPushState`, `JsonPushCursor` (fed input); `JsonPushReader`: `Feed`, `Finish`, `Next` |
-| `JsonCursor.bf` | `IJsonCursor`, `JsonLineCounter`, `JsonInputStart` (UTF-16/32 detection, the BOM), `JsonByteCursor` (in memory) |
-| `JsonStreamCursor.bf` | `JsonBufferedStreamCursor` (a `Stream` through a bounded buffer) and its `JsonStreamState` |
-| `JsonNumber.bf` | `JsonNumberKind`, `JsonFloatFormat`; `JsonNumber`: double/float parsing (Clinger, then corlib's fast_float), int64/uint64 parsing, grammar check and classification, shortest round-trip output of doubles and floats in the plain and ECMAScript layouts |
-| `JsonChar.bf` | Byte classes, SWAR word tests, UTF-8 validation (`FindInvalid`), decode/encode, line and column, character descriptions for messages |
-| `JsonError.bf`, `JsonReadConfig.bf` | `JsonErrorKind`, `JsonParseError` (KdlBeef's model, with a JSON Pointer path for binding errors); `JsonReadConfig` (dialect, metadata, collect-errors, limits, stream buffer), `JsonMetadataMode`, `JsonDuplicateNames` |
-| `JsonDiagnostic.bf` | `JsonDiagnostic`: an error that owns its text |
+| `JsonCursor.bf` | `JsonInput`: the cursors' settings from a `JsonReadConfig` and their input errors as `JsonParseError`s (the cursors are FormatCore's) |
+| `JsonText.bf` | `JsonText`: JSON's `ITextPolicy` for FormatCore (nothing validated up front, no bans, LF/CR/CRLF) |
+| `JsonNumber.bf` | `JsonNumberKind`, `JsonFloatFormat`; `JsonNumber`: the public number API over FormatCore's `DecimalParse` (Clinger, then corlib's fast_float, culture-free), `ShortestDouble` (the plain and ECMAScript layouts), `BigDecimal` and `FloatBits`; grammar check and classification |
+| `JsonChar.bf` | JSON's byte classes and string stop sets (the format-free byte helpers are FormatCore's `Swar`, `Bytes16`, `Utf8`, `Hex`) |
+| `JsonError.bf`, `JsonReadConfig.bf` | `JsonErrorKind`, `JsonParseError` (FormatCore's `ParseError<JsonErrorKind>`, with a JSON Pointer path for binding errors); `JsonReadConfig` (dialect, metadata, collect-errors, limits, stream buffer), `JsonMetadataMode`, `JsonDuplicateNames` |
+| `JsonDiagnostic.bf` | `JsonDiagnostic`: an error that owns its text (FormatCore's `Diagnostic<JsonErrorKind>`) |
 | `JsonDocument.Positions.bf` | `JsonSourceRange`, `JsonRangeRecord`; the line index, `TryGetSourceRange`/`TryGetNameRange` |
 | `JsonDocument.Fast.bf` | The fast build for memory input (phase 3) |
 | `JsonDocument.Mutation.bf` | `IsValidText`, `CreateRoot`, the table operations behind editing; the mutation API on `JsonNode` (setters, Add, Insert, Remove, Rename) |
 | `JsonDocument.Style.bf` | PreserveStyle: `JsonNodeStyle`, capture, layout detection, change marks, the preserving writer |
 | `JsonObjectAttribute.bf` | `[JsonObject]`, `JsonNaming`, `[JsonName]`, `[JsonAlias]`, `[JsonIgnore]`, `[JsonRequired]`; `IJsonSerializable`, `IJsonConverter<T>`, `[JsonConverter]`, `[JsonUseConverter]` (all in the JsonBeef namespace: BJSON has `[JsonObject]` and `[JsonIgnore]` too) |
-| `JsonSerializerPlan.bf`, `JsonSerializerCodeGen.bf` | The compile-time generator: field plans (`ValueSpec`) and checks; the emitted method shells and their bodies (`Body`), polymorphic dispatch (`TypeDispatch`) |
+| `JsonSerializerPlan.bf`, `JsonSerializerCodeGen.bf` | The compile-time generator on FormatCore.Mapping: field plans (FormatCore's `ValueSpec`) and checks; the emitted method shells and their bodies (`Body`, through FormatCore's `MappingDriver`), polymorphic dispatch (`TypeDispatch`) |
 | `JsonBind.bf` | `JsonStep`, `JsonDuplicateAction`; `JsonBind`: what the generated code calls per value (reading with errors kept in the reader, located errors and paths, discriminators, writing helpers) |
 | `JsonBind.Node.bf` | `JsonArrayCursor`, `JsonMemberWriter`; a node's text with its span map and error relocation; the in-place node setters |
 | `JsonSerializer.bf` | `JsonSerializer`: whole texts, streams, files and document nodes to and from `[JsonObject]` types |
@@ -552,11 +561,20 @@ no document in between, so the typed track costs one pass.
 
 ### Generation
 
-`[JsonObject]`'s `ApplyToType` adds `IJsonSerializable` and emits three method shells whose bodies are
-`Compiler.Mixin(JsonSerializerCodeGen.Body(typeof(T), n))`: the bodies are planned and written when
-the methods are compiled, once every type is complete. Planning at type-initialization time made a
-self-referencing type (`List<Node> children`, twitter's `Status retweeted_status`) a data cycle in its
-own initialization, which crashed the compiler in the benchmark project. A class's methods are
+`[JsonObject]`'s `ApplyToType` adds `IJsonSerializable` and emits three method shells and, through
+FormatCore's `MappingDriver`, a `[Comptime] JsonGen_` entry in the type; each body is
+`Compiler.Mixin(JsonGen_(n))`, which calls `JsonSerializerCodeGen.Body(typeof(Self), n)`. The bodies
+are planned and written when the methods are compiled, once every type is complete: planning at
+type-initialization time made a self-referencing type (`List<Node> children`, twitter's `Status
+retweeted_status`) a data cycle in its own initialization, which crashed the compiler in the benchmark
+project. And because the evaluation's entry point is the user's own method, `Type.TypeDeclarations`
+is relative to the user's project: registered converters and the subclasses a discriminator
+dispatches to are found in it and what it depends on (FormatCore's `Registry.IsVisible`), however
+many projects depend on JsonBeef. (Filtering from JsonBeef's side with `AlwaysVisible`, as before,
+lost them as soon as a second project depended on JsonBeef: `tests/codegen`'s `OkRegisteredConverter`
+and `OkPolymorphic` reproduce it with the earlier generator.) The discriminator dispatch is written
+inline in the body for the same reason: a nested mixin of a JsonBeef method would make JsonBeef the
+entry again. The unspecialized pass of a generic type gets stub bodies. A class's methods are
 virtual (override in `[JsonObject]` subclasses) and each covers its whole `[JsonObject]` chain, base
 fields first, since a reader is read once and cannot hand an object to a base's method midway.
 

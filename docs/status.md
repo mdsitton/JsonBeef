@@ -14,7 +14,9 @@ Last reviewed: 2026-10-02 (phases 1–7 done; the first timed benchmark run is i
 | `bash ./test-json-corpus.sh` (and with the Release `BIN`) | The 14 simdjson-data jsonexamples files: canonical form in 6 modes equal to the oracle's, compact writer a fixed point; twitter/twitterescaped strings equal; mesh/mesh.pretty RFC 8785 output equal; 27 JSON Pointer lookups agree with the oracle on the document (`-pointer`) and on demand (`-select`, from memory and from 7-byte stream reads) |
 | `bash ./test-json-numbers.sh` (and with the Release `BIN`) | fxx: 1,414,285 lines, 0 mismatches (1,414,116 numbers bit-exact in f64 and f32, 169 non-JSON strings rejected, 30,700 overflows); es6: 100,000 lines, 0 mismatches (writes and reads) |
 | `bash ./test-leaks.sh` | No leaks (LeakSanitizer over the TestRelease `[Test]`s) |
-| `beefbuild-win -test`, `beefbuild-win -test -config=TestRelease` (`~/development/beef-proton`) | 281/281 pass (the Debug runtime's leak check at exit also passes: it breaks the run, exit code 0x80000003, on a leak LeakSanitizer can miss) |
+| `bash ./win-test.sh` (`beefbuild-win -test` and `-config=TestRelease`, `~/development/beef-proton`) | 281/281 pass in both (the Debug runtime's leak check at exit also passes: it breaks the run, exit code 0x80000003, on a leak LeakSanitizer can miss) |
+| `bash ./test-codegen.sh` | 18/18 `[JsonObject]` fixtures as expected (`tests/codegen`: 5 positive controls, among them `OkRegisteredConverter` and `OkPolymorphic`, the bug-1 regressions with a second project depending on JsonBeef) |
+| `bash ../FormatCore/tools/sync.sh . --check` | PASS: the vendored scripts, bench-kit files and the AGENTS.md region match FormatCore's |
 | `tests/fetch-suites.sh` | Pinned suites in `tests/suites/` (`docs/test-suites.md`) |
 | `bash ./test-json-lines.sh` (and with the Release `BIN`) | JsonSequenceReader against the oracle's `-lines` and `-concatenated`, from memory and from 7-byte stream reads: amazon_cellphones.ndjson (793 records), simdjson-data's three jsonchecker .ndjson files, 8 generated inputs (CRLF, empty lines, a BOM, ill-formed UTF-8, touching values) and every nst parsing case, both ways: 1,320 runs, 0 differences |
 | `bash ./test-json-fuzz.sh` (and with the Release `BIN`) | The stream sweep: every suite input through streams fed 1 to 31 bytes per read (16,895 runs) reads as from memory; then 2 seeds × 50 rounds of every suite input (57,200 runs) and 3 rounds of the 14 real-world files: fast build, reader, 1-byte stream and a push reader fed 1 byte at a time agree on every mutation, with CollectErrors memory and stream give the same errors and recovered document, SkipValue (the fast loop from memory, the token loop from a stream; the whole value and the first one inside it) gives the reader's outcome, and with `InvalidUtf8.Replace` and `InvalidSurrogates.Wtf8`, and as JSON5 (with SkipValue there too), a document from memory, one from 1-byte streams and the reader's tokens agree; each document read, copied into another with SetValue, prints the same, is ValueEquals to it and passes a JSON Patch testing and replacing it with the original. Run with `SEEDS=3 ROUNDS=200` (343,326 runs, Release) at the end of phase 6: 0 disagreements |
@@ -67,6 +69,19 @@ write:
 | Document, phase 6 | 11.91 | 19.61 | 9.45 | 37.62 | 9.25 | 5.05 | 30.16 | 22.43 | 27.90 | 27.96 | 14.18 | 20.66 | 22.23 | 20.52 | 43.71 | 21.01 |
 | Typed, phase 6 | 19.91 | | 18.99 | 60.55 | | | | | | | | | | | | |
 | Query, phase 6 | 14.73 | | 10.63 | 40.19 | | | | | | | | | | | | |
+| Events, on FormatCore | 14.25 | 19.41 | 12.94 | 44.21 | 11.22 | 4.94 | 40.29 | 26.93 | 36.70 | 32.32 | 16.73 | 25.18 | 16.77 | 36.66 | 47.11 | 24.83 |
+| Document, on FormatCore | 11.07 | 15.74 | 9.37 | 37.70 | 9.04 | 4.79 | 30.04 | 22.23 | 27.65 | 27.75 | 13.99 | 20.32 | 14.24 | 20.50 | 43.90 | 20.72 |
+| Stream events, on FormatCore | 19.59 | 24.04 | 18.86 | 50.08 | 12.52 | 7.24 | 50.04 | 32.15 | 44.38 | 40.15 | 18.94 | 29.54 | 19.12 | 42.88 | 49.93 | 28.88 |
+| Compact write, on FormatCore | 17.57 | 19.73 | 10.51 | 46.00 | 13.88 | 7.64 | 48.20 | 51.09 | 42.23 | | | 35.68 | 4.81 | 28.56 | 33.08 | |
+| Typed, on FormatCore | 19.37 | | 18.46 | 61.14 | | | | | | | | | | | | |
+| Query, on FormatCore | 13.29 | | 10.00 | 40.70 | | | | | | | | | | | | |
+
+The move onto FormatCore (2026-10-03, against 7959c3f, measured before and after every step: FormatCore's
+`docs/migration.md` §9) left every column equal or lower but canada's and floats' reads (+0.03 to +0.16,
+at most 0.4%, a code-layout effect of the shared number paths, measured and recorded there): events
+-0.1% to -1.5%, document -0.1% to -1.6%, stream -0.1% to -1.2%, write -0.2% to -7.4% (FormatCore's float
+layout inlined per layout), typed -0.8% to -1.1%, query -0.2% to -0.6%. A name lookup in a 2,000-member
+object fell from 355 to 211 instructions (FormatCore's ByteHash in the member index).
 
 About a third of canada's, floats' and numbers' document instructions are corlib's fast_float (17-digit
 mantissas are past Clinger's fast path; plan §9 item 6 keeps fast_float).
@@ -104,6 +119,7 @@ text): only twitter, citm_catalog and canada are in those tracks.
 | Sequences (`JsonSequenceReader`: JSON Lines, concatenated, RFC 7464; memory and streams) | Done (phase 7) |
 | Push streaming (`JsonPushReader`: `Feed`/`Finish`, whole tokens only, every chunk size reads as the whole input) | Done (phase 7) |
 | JSON Patch (`JsonPatch.Apply`, RFC 6902: all or nothing, `test` by value), Merge Patch (`JsonPatch.Merge`, RFC 7396), `JsonNode.SetValue` (deep copy from any document) and `ValueEquals`; `JsonTester -patch`/`-merge-patch` | Done (phase 7). Checked once, outside the committed tests, against json-patch-tests (108 enabled cases, 0 failures) |
+| On FormatCore (the shared core of the four format libraries): cursors, text and UTF-8 helpers, the error carrier, storage, member index, tree links, numbers, the `[JsonObject]` driver and helpers; the vendored scripts and bench-kit | Done (2026-10-03, `architecture.md` §1). Fixed on the way: user converters and subclasses lost when a second project depends on JsonBeef (`tests/codegen`), uint64 field bounds started at int64.MinValue (FormatCore's IntegerBounds). Not moved: `KeptSource` (the document stores packed offsets into its source, not views), `Marks` (the style records start with -1 sentinels; FormatCore's SideTable grows with defaults), FormatCore's `Planner` (JsonBeef keeps its planning: discriminators, EnumsAsNumbers, hand-written IJsonSerializable) |
 
 ## Open items
 
