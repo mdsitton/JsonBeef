@@ -1,5 +1,7 @@
 using System;
 using System.Collections;
+using FormatCore;
+using internal FormatCore;
 using internal JsonBeef;
 
 namespace JsonBeef;
@@ -594,64 +596,7 @@ extension JsonNode
 			number.AppendNumber(output);
 			return;
 		}
-		uint64 bits = record.mPayload;
-		uint64 mantissa = bits & (((uint64)1 << 52) - 1);
-		int biased = (int)((bits >> 52) & 0x7FF);
-		int power = -1074;
-		if (biased != 0)
-		{
-			mantissa |= (uint64)1 << 52;
-			power = biased - 1075;
-		}
-		// mantissa × 2^power: by 2s, or by 5s and a decimal exponent of `power`; in base 10^9 limbs, least
-		// significant first
-		let limbs = scope List<uint32>();
-		limbs.Add((uint32)(mantissa % 1000000000));
-		limbs.Add((uint32)((mantissa / 1000000000) % 1000000000));
-		limbs.Add((uint32)(mantissa / 1000000000000000000));
-		int twos = Math.Max(power, 0);
-		int fives = Math.Max(-power, 0);
-		while (twos > 0)
-		{
-			int step = Math.Min(twos, 28);
-			Multiply(limbs, (uint64)1 << step);
-			twos -= step;
-		}
-		while (fives > 0)
-		{
-			int step = Math.Min(fives, 12);
-			uint64 factor = 1;
-			for (int i < step)
-				factor *= 5;
-			Multiply(limbs, factor);
-			fives -= step;
-		}
-		while (limbs.Count > 1 && limbs.Back == 0)
-			limbs.PopBack();
-		if (bits >> 63 != 0)
-			output.Append('-');
-		limbs.Back.ToString(output);
-		for (int i = limbs.Count - 2; i >= 0; i--)
-			output.AppendF("{:D9}", limbs[i]);
-		if (power < 0)
-			output.AppendF("e{}", power);
-	}
-
-	/// limbs × factor (factor below 2^32), in place.
-	static void Multiply(List<uint32> limbs, uint64 factor)
-	{
-		uint64 carry = 0;
-		for (int i < limbs.Count)
-		{
-			uint64 product = (uint64)limbs[i] * factor + carry;
-			limbs[i] = (uint32)(product % 1000000000);
-			carry = product / 1000000000;
-		}
-		while (carry != 0)
-		{
-			limbs.Add((uint32)(carry % 1000000000));
-			carry /= 1000000000;
-		}
+		BigDecimal.AppendExact(output, JsonNumber.FromBits(record.mPayload));
 	}
 
 	/// Whether two JSON number texts have the same value: both as sign, significant digits and the

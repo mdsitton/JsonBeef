@@ -2028,7 +2028,7 @@ internal class JsonReaderCore<TCursor> where TCursor : IInputCursor
 		default:
 		}
 		// The number's JSON text (a JSON5 number's, normalized: `.5` is `0.5`)
-		return JsonNumber.ParseDoubleSlow(mValue, out value);
+		return JsonNumber.ParseDoubleSlowOutOfLine(mValue, out value);
 	}
 
 	/// Locates `offset` for an error made outside the reader (a value conversion).
