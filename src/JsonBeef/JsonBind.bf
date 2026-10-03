@@ -76,7 +76,10 @@ public static class JsonBind
 	public static JsonParseError AtMember(JsonParseError error, StringView name)
 	{
 		var error;
-		error.PrependPath(name);
+		let segment = scope String(name.Length + 2);
+		segment.Append('/');
+		JsonPointer.AppendToken(segment, name);
+		error.PrependPath(segment);
 		return error;
 	}
 
@@ -87,7 +90,10 @@ public static class JsonBind
 	public static JsonParseError AtIndex(JsonParseError error, int index)
 	{
 		var error;
-		error.PrependPath(index.ToString(.. scope .()), false);
+		let segment = scope String(8);
+		segment.Append('/');
+		index.ToString(segment);
+		error.PrependPath(segment);
 		return error;
 	}
 
