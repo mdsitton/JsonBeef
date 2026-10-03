@@ -71,16 +71,7 @@ extension JsonDocument
 							node.mFlags |= .NameInTable;
 					}
 					// Appended as the parent's last child
-					ref JsonNodeRecord container = ref nodes[parent];
-					uint32 last = container.LastChild;
-					if (last == 0)
-						container.mFirstChild = id;
-					else
-					{
-						nodes[last].mNext = id;
-						node.mPrev = last;
-					}
-					container.mPayload = ((uint64)(uint32)(container.Count + 1) << 32) | id;
+					JsonTree.AppendFresh(nodes, parent, id, ref node);
 				}
 				char8 c = data[p];
 				switch (c)

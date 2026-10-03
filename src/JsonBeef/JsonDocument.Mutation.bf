@@ -95,45 +95,16 @@ extension JsonDocument
 	/// Marks `id` and every node under it removed (their handles become invalid), without recursion.
 	void MarkRemovedSubtree(uint32 top)
 	{
-		uint32 id = top;
-		while (true)
-		{
-			ref JsonNodeRecord node = ref mNodes[id];
-			node.mFlags |= .Removed;
-			if (node.IsContainer && node.mFirstChild != 0)
-			{
-				id = node.mFirstChild;
-				continue;
-			}
-			while (id != top && mNodes[id].mNext == 0)
-				id = mNodes[id].mParent;
-			if (id == top)
-				return;
-			id = mNodes[id].mNext;
-		}
+		JsonTree.MarkRemovedSubtree(mNodes.Ptr, top);
 	}
 
 	/// Links new node `id` into `parent` before `before` (0: at the end).
 	internal void LinkBefore(uint32 parent, uint32 id, uint32 before)
 	{
 		if (before == 0)
-		{
-			AppendChild(parent, id);
-		}
+			JsonTree.LinkLastFresh(mNodes.Ptr, parent, id);
 		else
-		{
-			ref JsonNodeRecord container = ref mNodes[parent];
-			uint32 previous = mNodes[before].mPrev;
-			mNodes[id].mPrev = previous;
-			mNodes[id].mNext = before;
-			mNodes[before].mPrev = id;
-			if (previous != 0)
-				mNodes[previous].mNext = id;
-			else
-				container.mFirstChild = id;
-			container.mPayload = ((uint64)(uint32)(container.Count + 1) << 32) | container.LastChild;
-		}
-		mNodes[id].mParent = parent;
+			JsonTree.LinkBefore(mNodes.Ptr, before, id);
 		DropIndex(parent);
 		MarkChildrenChanged(parent);
 		MarkNew(id);

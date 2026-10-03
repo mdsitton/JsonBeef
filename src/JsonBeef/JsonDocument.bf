@@ -27,7 +27,7 @@ internal enum JsonNodeFlags : uint8
 
 /// A value's slot in the document's node table, 40 bytes. Links are node IDs; 0 means none (slot 0 is
 /// unused, so the root is 1). Children are a doubly linked list in document order, built in preorder.
-internal struct JsonNodeRecord
+internal struct JsonNodeRecord : ITreeRecord
 {
 	/// Number: the int64, uint64 or double bits, or with Lexeme the token's text. String: its text.
 	/// Array, Object: the last child's ID (low 32 bits) and the child count (high 32 bits). Text is a
@@ -48,6 +48,8 @@ internal struct JsonNodeRecord
 	{
 		[Inline]
 		get => (uint32)mPayload;
+		[Inline]
+		set mut => mPayload = (mPayload & 0xFFFFFFFF00000000UL) | value;
 	}
 
 	public int Count
@@ -61,7 +63,71 @@ internal struct JsonNodeRecord
 		[Inline]
 		get => mKind >= .Array;
 	}
+
+	// FormatCore's Tree reaches the links through these (JsonTree)
+
+	public uint32 Parent
+	{
+		[Inline]
+		get => mParent;
+		[Inline]
+		set mut => mParent = value;
+	}
+
+	public uint32 FirstChild
+	{
+		[Inline]
+		get => mFirstChild;
+		[Inline]
+		set mut => mFirstChild = value;
+	}
+
+	public uint32 Next
+	{
+		[Inline]
+		get => mNext;
+		[Inline]
+		set mut => mNext = value;
+	}
+
+	public uint32 Prev
+	{
+		[Inline]
+		get => mPrev;
+		[Inline]
+		set mut => mPrev = value;
+	}
+
+	public int32 ChildCount
+	{
+		[Inline]
+		get => (int32)(mPayload >> 32);
+		[Inline]
+		set mut => mPayload = ((uint64)(uint32)value << 32) | (uint32)mPayload;
+	}
+
+	/// The last child and the count in one store (they share the payload).
+	[Inline]
+	public void SetLastChildAndCount(uint32 last, int32 count) mut
+	{
+		mPayload = ((uint64)(uint32)count << 32) | last;
+	}
+
+	public bool IsRemoved
+	{
+		[Inline]
+		get => mFlags.HasFlag(.Removed);
+	}
+
+	[Inline]
+	public void MarkRemoved() mut
+	{
+		mFlags |= .Removed;
+	}
 }
+
+/// The link algorithms on the node table (slot 0 is unused: no node is 0).
+typealias JsonTree = FormatCore.Tree<JsonNodeRecord, const false>;
 
 /// @brief A JSON document: one value and everything under it, mutable, with handles (`JsonNode`) to
 /// its values.
@@ -552,7 +618,8 @@ public class JsonDocument
 				}
 				else
 				{
-					AppendChild(parent, id);
+					// (node's Parent is set above, and the table has not grown since)
+					JsonTree.AppendFresh(mNodes.Ptr, parent, id, ref node);
 					if (parentIsObject && duplicates != .KeepAll)
 						IndexMember(parent, id);
 				}
@@ -614,40 +681,10 @@ public class JsonDocument
 
 	// Links
 
-	/// Appends `id` as the last child of `parent`.
-	[Inline]
-	internal void AppendChild(uint32 parent, uint32 id)
-	{
-		ref JsonNodeRecord container = ref mNodes[parent];
-		uint32 last = container.LastChild;
-		if (last == 0)
-			container.mFirstChild = id;
-		else
-		{
-			mNodes[last].mNext = id;
-			mNodes[id].mPrev = last;
-		}
-		container.mPayload = ((uint64)(uint32)(container.Count + 1) << 32) | id;
-	}
-
 	/// Takes `id` out of its parent's children (its subtree goes with it).
 	internal void Unlink(uint32 id)
 	{
-		ref JsonNodeRecord node = ref mNodes[id];
-		uint32 parent = node.mParent;
-		ref JsonNodeRecord container = ref mNodes[parent];
-		uint32 last = container.LastChild;
-		if (node.mPrev != 0)
-			mNodes[node.mPrev].mNext = node.mNext;
-		else
-			container.mFirstChild = node.mNext;
-		if (node.mNext != 0)
-			mNodes[node.mNext].mPrev = node.mPrev;
-		else
-			last = node.mPrev;
-		container.mPayload = ((uint64)(uint32)(container.Count - 1) << 32) | last;
-		node.mNext = 0;
-		node.mPrev = 0;
+		JsonTree.Unlink(mNodes.Ptr, id);
 	}
 
 	// Members
