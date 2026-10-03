@@ -12,5 +12,3 @@ JsonBeefBench = {Path = "."}
 BJSON = {Path = "../deps/BJSON/BJSON"}
 json = {Path = "../deps/EinScott-json"}
 JsonBeef = {Path = "../../.."}
-# The local FormatCore checkout, overriding JsonBeef's Git dependency (same project name)
-FormatCore = {Path = "../../../../FormatCore"}

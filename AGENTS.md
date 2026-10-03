@@ -9,7 +9,9 @@
 - **FormatCore** (`~/development/FormatCore`, `https://github.com/mdsitton/FormatCore.git`) is the
   shared core of the four: input cursors, UTF-8 and SWAR scanning, errors, arenas and node tables,
   numbers, the typed-mapping driver, test and benchmark tooling. JsonBeef depends on it (the library's
-  `BeefProj.toml` by Git; the workspaces by path, `../FormatCore`) and reaches its building blocks with
+  `BeefProj.toml` by Git, `Version = "0.1"`: BeefBuild fetches the highest matching tag and pins it in
+  the workspace's `BeefSpace_Lock.toml`; a FormatCore change reaches JsonBeef as a new `v0.1.x` tag,
+  picked up by deleting `BeefSpace_Lock.toml`) and reaches its building blocks with
   `using internal FormatCore;`. A change a shared component needs is made in FormatCore (its
   AGENTS.md), never by copying it back here; `docs/architecture.md` says which parts moved.
 - Beef `String` stores UTF-8 data and is mutable. Prefer `StringView` for borrowed string inputs.
