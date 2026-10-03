@@ -88,10 +88,10 @@ public class JsonDocument
 	/// config.
 	public JsonReadConfig ReadConfig = .();
 
-	internal JsonStack<JsonNodeRecord> mNodes ~ delete _;
+	internal GrowList<JsonNodeRecord> mNodes ~ delete _;
 	/// The copy of the source the reader read (strings without escapes view it) and the text of the
 	/// string table; both live in the arena.
-	internal JsonTextArena mText ~ delete _;
+	internal TextArena mText ~ delete _;
 	internal List<StringView> mStrings ~ delete _;
 	internal char8* mSource;
 	internal int mSourceLength;

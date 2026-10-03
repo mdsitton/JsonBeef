@@ -79,7 +79,7 @@ internal class JsonReaderCore<TCursor> where TCursor : IInputCursor
 	/// JSON5's decoded strings and normalized numbers
 	String mStringBuffer ~ delete _;
 	/// JSON's decoded strings (DecodeEscaped)
-	JsonDecodeBuffer mDecodeBuffer ~ delete _;
+	DecodeBuffer mDecodeBuffer ~ delete _;
 
 	// The current token
 	internal JsonToken mToken;
@@ -1312,7 +1312,7 @@ internal class JsonReaderCore<TCursor> where TCursor : IInputCursor
 		int count = p - start - 1;
 		if (dest + count + 16 > limit)
 			buffer.Grow(ref dest, ref limit, count + 16);
-		JsonDecodeBuffer.CopyRun(dest, mData + start + 1, count, start + 17 <= mEnd);
+		DecodeBuffer.CopyRun(dest, mData + start + 1, count, start + 17 <= mEnd);
 		dest += count;
 		while (true)
 		{
@@ -1366,7 +1366,7 @@ internal class JsonReaderCore<TCursor> where TCursor : IInputCursor
 			count = q - p;
 			if (dest + count + 16 > limit)
 				buffer.Grow(ref dest, ref limit, count + 16);
-			JsonDecodeBuffer.CopyRun(dest, mData + p, count, p + 16 <= mEnd);
+			DecodeBuffer.CopyRun(dest, mData + p, count, p + 16 <= mEnd);
 			dest += count;
 			p = q;
 		}

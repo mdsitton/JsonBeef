@@ -145,7 +145,7 @@ public class JsonWriter
 	String mOutput;
 	JsonWriteOptions mOptions;
 	/// Per open container: bit 0 object, bit 1 has an element or member.
-	JsonStack<uint8> mFrames ~ delete _;
+	GrowList<uint8> mFrames ~ delete _;
 	bool mAfterName;
 	bool mRootWritten;
 	bool mFailed;

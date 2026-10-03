@@ -8,7 +8,7 @@ namespace JsonBeef;
 extension JsonDocument
 {
 	/// Scratch for strings with escapes in FastBuild.
-	JsonDecodeBuffer mDecodeBuffer = new .() ~ delete _;
+	DecodeBuffer mDecodeBuffer = new .() ~ delete _;
 
 	/// The fast build for input in memory (the document's copy of it, `data[start ..< end]`): one loop,
 	/// with the position, depth and current container in locals, writing records directly (yyjson's
@@ -290,7 +290,7 @@ extension JsonDocument
 		int count = q - start;
 		if (dest + count + 16 > limit)
 			buffer.Grow(ref dest, ref limit, count + 16);
-		JsonDecodeBuffer.CopyRun(dest, data + start, count, start + 16 <= end);
+		DecodeBuffer.CopyRun(dest, data + start, count, start + 16 <= end);
 		dest += count;
 		var q;
 		int run = q;
@@ -342,7 +342,7 @@ extension JsonDocument
 			count = q - run;
 			if (dest + count + 16 > limit)
 				buffer.Grow(ref dest, ref limit, count + 16);
-			JsonDecodeBuffer.CopyRun(dest, data + run, count, run + 16 <= end);
+			DecodeBuffer.CopyRun(dest, data + run, count, run + 16 <= end);
 			dest += count;
 			if (q + 1 >= end)
 				return -1;
@@ -382,7 +382,7 @@ extension JsonDocument
 		count = q - run;
 		if (dest + count + 16 > limit)
 			buffer.Grow(ref dest, ref limit, count + 16);
-		JsonDecodeBuffer.CopyRun(dest, data + run, count, run + 16 <= end);
+		DecodeBuffer.CopyRun(dest, data + run, count, run + 16 <= end);
 		dest += count;
 		int length = dest - buffer.Ptr;
 		if (maxBytes > 0 && length > maxBytes)
