@@ -73,7 +73,7 @@ internal class JsonReaderCore<TCursor> where TCursor : IInputCursor
 	internal bool mMultipleValues;
 
 	/// The open containers: bit d is set when the container at depth d (0-based) is an object.
-	uint64[] mBits ~ delete _;
+	BitStack mBits ~ _.Dispose();
 	int mDepth;
 
 	/// JSON5's decoded strings and normalized numbers
@@ -127,7 +127,6 @@ internal class JsonReaderCore<TCursor> where TCursor : IInputCursor
 
 	public this()
 	{
-		mBits = new uint64[16];
 		mStringBuffer = new .();
 		mDecodeBuffer = new .();
 		mConfig = .();
@@ -846,19 +845,7 @@ internal class JsonReaderCore<TCursor> where TCursor : IInputCursor
 	{
 		if (mConfig.MaxDepth > 0 && mDepth >= mConfig.MaxDepth)
 			return .Err(Fail(.ResourceLimitExceeded, scope $"The nesting depth exceeds MaxDepth ({mConfig.MaxDepth})", mPos));
-		int word = mDepth >> 6;
-		if (word >= mBits.Count)
-		{
-			let old = mBits;
-			mBits = new uint64[old.Count * 2];
-			old.CopyTo(mBits);
-			delete old;
-		}
-		uint64 bit = 1UL << (mDepth & 63);
-		if (isObject)
-			mBits[word] |= bit;
-		else
-			mBits[word] &= ~bit;
+		mBits.Set(mDepth, isObject);
 		mToken = isObject ? .StartObject : .StartArray;
 		mTokenStart = mPos;
 		mTokenEnd = mPos + 1;
@@ -883,11 +870,7 @@ internal class JsonReaderCore<TCursor> where TCursor : IInputCursor
 	bool InObject
 	{
 		[Inline]
-		get
-		{
-			int d = mDepth - 1;
-			return ((mBits[d >> 6] >> (d & 63)) & 1) != 0;
-		}
+		get => mBits.Get(mDepth - 1);
 	}
 
 	// Literals
@@ -1892,7 +1875,7 @@ internal class JsonReaderCore<TCursor> where TCursor : IInputCursor
 		bool wantObject = closer == '}';
 		for (int d = mDepth - 1; d >= 0; d--)
 		{
-			if (((mBits[d >> 6] >> (d & 63)) & 1) != 0 == wantObject)
+			if (mBits.Get(d) == wantObject)
 			{
 				mPendingCloses = mDepth - 1 - d;
 				mState = mPendingCloses > 0 ? .Closing : .AfterValue;
