@@ -566,7 +566,7 @@ static class JsonObjectTests
 		case .Err(let error):
 			Test.Assert(error.ToString(.. scope .()) == scope $"{path}:1:10: /Port: Expected an integer, found the string \"x\"");
 		}
-		ExpectError(JsonSerializer.ReadFile(scope $"{path}.missing", read), .IoError, "Cannot open the file");
+		ExpectError(JsonSerializer.ReadFile(scope $"{path}.missing", read), .IoError, "Cannot read the file");
 	}
 
 	// Documents

@@ -161,7 +161,7 @@ public class JsonDocument
 		mRoot = 0;
 		mSourceName.Clear();
 		mRanges.Clear();
-		mLineStarts.Clear();
+		mLineIndex.Clear();
 		mErrors.Clear();
 		ClearStyle();
 		mGeneration++;
@@ -303,21 +303,9 @@ public class JsonDocument
 		{
 			// The document keeps the whole source anyway: read it all, then as memory input
 			let bytes = scope List<uint8>();
-			uint8[4096] chunk = ?;
-			while (true)
-			{
-				switch (stream.TryRead(.(&chunk, chunk.Count)))
-				{
-				case .Ok(let read):
-					if (read <= 0)
-						return Read(StringView((char8*)bytes.Ptr, bytes.Count), config);
-					bytes.AddRange(Span<uint8>(&chunk, read));
-					if (config.MaxInputBytes > 0 && bytes.Count > config.MaxInputBytes)
-						return FailRead(.ResourceLimitExceeded, scope $"The input exceeds MaxInputBytes ({config.MaxInputBytes})", config);
-				case .Err:
-					return FailRead(.IoError, "Reading the input failed", config);
-				}
-			}
+			if (ReadShell.ReadStreamBytes(stream, config.MaxInputBytes, bytes, 4096) case .Err(let error))
+				return FailRead(error, config);
+			return Read(StringView((char8*)bytes.Ptr, bytes.Count), config);
 		}
 		let readerConfig = BeginRead(config);
 		mReader.Reset(stream, readerConfig);
@@ -342,39 +330,30 @@ public class JsonDocument
 		var config;
 		if (config.SourceName.IsEmpty)
 			config.SourceName = path;
-		let file = scope FileStream();
-		if (file.Open(path, .Read, .Read) case .Err)
-			return FailRead(.IoError, "Cannot open the file", config);
 		if (config.StreamBufferBytes > 0)
-			return Read(file, config);
-		let readerConfig = BeginRead(config);
-		int64 length = file.Length;
-		if (config.MaxInputBytes > 0 && length > config.MaxInputBytes)
-			return FailRead(.ResourceLimitExceeded, scope $"The input ({length} bytes) exceeds MaxInputBytes ({config.MaxInputBytes})", config);
-		// Straight into the document's memory: the only copy
-		char8* bytes = length > 0 ? mText.Alloc((int)length) : null;
-		int filled = 0;
-		while (filled < length)
 		{
-			switch (file.TryRead(.((uint8*)bytes + filled, (int)length - filled)))
-			{
-			case .Ok(let read):
-				if (read <= 0)
-					return FailRead(.IoError, "The file ended before its size", config);
-				filled += read;
-			case .Err:
-				return FailRead(.IoError, "Reading the file failed", config);
-			}
+			let file = scope FileStream();
+			if (file.Open(path, .Read, .Read) case .Err)
+				return FailRead(InputError(.IoError, "Cannot read the file", 0, 0, 0, 0), config);
+			return Read(file, config);
 		}
-		return ReadOwned(.(bytes, filled), readerConfig, config);
+		let readerConfig = BeginRead(config);
+		// Straight into the document's memory: the only copy
+		switch (ReadShell.ReadFileInto(path, config.MaxInputBytes, mText))
+		{
+		case .Ok(let owned):
+			return ReadOwned(owned, readerConfig, config);
+		case .Err(let error):
+			return FailRead(error, config);
+		}
 	}
 
-	/// Clears the document and returns an error that names the source.
-	Result<void, JsonParseError> FailRead(JsonErrorKind kind, StringView message, JsonReadConfig config)
+	/// Clears the document and returns the read's error, naming the source.
+	Result<void, JsonParseError> FailRead(InputError inputError, JsonReadConfig config)
 	{
 		Clear();
 		mSourceName.Set(config.SourceName);
-		var error = JsonParseError(kind, message, 0, 0, 0, 0);
+		var error = JsonInput.Error(inputError);
 		if (!config.SourceName.IsEmpty)
 			error.SetSource(config.SourceName);
 		return .Err(error);

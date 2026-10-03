@@ -1,6 +1,8 @@
 using System;
 using System.Collections;
 using System.IO;
+using FormatCore;
+using internal FormatCore;
 using internal JsonBeef;
 
 namespace JsonBeef;
@@ -195,34 +197,13 @@ public static class JsonSerializer
 		if (config.SourceName.IsEmpty)
 			config.SourceName = path;
 		// The bytes as they are (no decoding: the reader checks the encoding)
-		let file = scope FileStream();
-		if (file.Open(path, .Read, .Read) case .Err)
-			return .Err(FileError(path, .IoError, "Cannot open the file"));
-		int64 length = file.Length;
-		if (config.MaxInputBytes > 0 && length > config.MaxInputBytes)
-			return .Err(FileError(path, .ResourceLimitExceeded, scope $"The input ({length} bytes) exceeds MaxInputBytes ({config.MaxInputBytes})"));
-		char8* bytes = text.PrepareBuffer((int)length);
-		int filled = 0;
-		while (filled < length)
+		if (ReadShell.ReadFileText(path, config.MaxInputBytes, text) case .Err(let inputError))
 		{
-			switch (file.TryRead(.((uint8*)bytes + filled, (int)length - filled)))
-			{
-			case .Ok(let read):
-				if (read <= 0)
-					return .Err(FileError(path, .IoError, "The file ended before its size"));
-				filled += read;
-			case .Err:
-				return .Err(FileError(path, .IoError, "Reading the file failed"));
-			}
+			var error = JsonInput.Error(inputError);
+			error.SetSource(path);
+			return .Err(error);
 		}
 		return .Ok;
-	}
-
-	static JsonParseError FileError(StringView path, JsonErrorKind kind, StringView message)
-	{
-		var error = JsonParseError(kind, message, 0, 0, 0, 0);
-		error.SetSource(path);
-		return error;
 	}
 
 	/// For the text written from a node: no depth limit (the document had its own), and the non-finite

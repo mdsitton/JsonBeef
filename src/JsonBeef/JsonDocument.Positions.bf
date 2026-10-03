@@ -63,42 +63,14 @@ extension JsonDocument
 {
 	/// Positions: one range per node ID (empty in other modes).
 	internal List<JsonRangeRecord> mRanges = new .() ~ delete _;
-	/// The offsets where lines start in the source copy, built on the first request.
-	List<int> mLineStarts = new .() ~ delete _;
+	/// The line starts of the source copy, built on the first request (FormatCore's LineIndex).
+	LineIndex<JsonText> mLineIndex = new .() ~ delete _;
 
 	/// The line and column of `offset` in the source copy (lines LF, CR or CRLF; columns in code points;
 	/// a leading BOM takes no column), from an index of line starts built once.
 	internal void LocateInSource(int offset, out int line, out int column)
 	{
-		if (mLineStarts.IsEmpty)
-		{
-			mLineStarts.Add(Utf8.StartsWithBom(mSource, mSourceLength) ? 3 : 0);
-			int i = 0;
-			while (i < mSourceLength)
-			{
-				char8 c = mSource[i];
-				if (c == '\n' || c == '\r')
-				{
-					i += (c == '\r' && i + 1 < mSourceLength && mSource[i + 1] == '\n') ? 2 : 1;
-					mLineStarts.Add(i);
-					continue;
-				}
-				i++;
-			}
-		}
-		// The last line start at or before the offset
-		int low = 0;
-		int high = mLineStarts.Count - 1;
-		while (low < high)
-		{
-			int mid = (low + high + 1) / 2;
-			if (mLineStarts[mid] <= offset)
-				low = mid;
-			else
-				high = mid - 1;
-		}
-		line = low + 1;
-		column = Utf8.CountCodePoints(mSource, mLineStarts[low], Math.Max(offset, mLineStarts[low])) + 1;
+		mLineIndex.Locate(mSource, mSourceLength, offset, out line, out column);
 	}
 
 	/// The source range of node `id`'s value (`name` false) or member name.
