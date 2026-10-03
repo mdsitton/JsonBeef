@@ -1,5 +1,7 @@
 using System;
 using System.IO;
+using FormatCore;
+using internal FormatCore;
 using internal JsonBeef;
 
 namespace JsonBeef;
@@ -59,9 +61,9 @@ public enum JsonToken : uint8
 /// ```
 public class JsonReader
 {
-	internal JsonReaderCore<JsonByteCursor> mBytes ~ delete _;
-	internal JsonReaderCore<JsonBufferedStreamCursor> mStream ~ delete _;
-	JsonStreamState mStreamState ~ delete _;
+	internal JsonReaderCore<ByteCursor<JsonText>> mBytes ~ delete _;
+	internal JsonReaderCore<BufferedStreamCursor<JsonText>> mStream ~ delete _;
+	InputState mStreamState ~ delete _;
 	internal bool mStreaming;
 	/// Typed binding: the error of the JsonBind call that last returned false.
 	internal JsonParseError mBindError;
@@ -101,7 +103,7 @@ public class JsonReader
 	public void Reset(StringView input, JsonReadConfig config)
 	{
 		mStreaming = false;
-		mBytes.Reset(JsonByteCursor(input, config), config);
+		mBytes.Reset(ByteCursor<JsonText>(input, JsonInput.Settings(config)), config);
 	}
 
 	/// @brief Start reading a stream with the default config.
@@ -125,7 +127,7 @@ public class JsonReader
 			mStream = new .();
 			mStreamState = new .();
 		}
-		mStream.Reset(JsonBufferedStreamCursor(stream, mStreamState, config), config);
+		mStream.Reset(BufferedStreamCursor<JsonText>(stream, mStreamState, JsonInput.Settings(config)), config);
 	}
 
 	/// @brief Read the next token.

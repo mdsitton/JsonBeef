@@ -28,7 +28,7 @@ internal struct JsonFailure
 ///   releases it.
 /// - **Views.** mValue and mRaw view the window or mStringBuffer: valid until the next call (Grow
 ///   rebases them when the window moves). mError views the per-thread error buffers.
-internal class JsonReaderCore<TCursor> where TCursor : IJsonCursor
+internal class JsonReaderCore<TCursor> where TCursor : IInputCursor
 {
 	enum State : uint8
 	{
@@ -53,7 +53,6 @@ internal class JsonReaderCore<TCursor> where TCursor : IJsonCursor
 		Failed
 	}
 
-	internal TCursor mCursor;
 	char8* mData;
 	int mBase;
 	int mPos;
@@ -66,7 +65,6 @@ internal class JsonReaderCore<TCursor> where TCursor : IJsonCursor
 	/// The cursor stopped on an error of the input; the reader's next error is replaced by it.
 	bool mInputFailed;
 	State mState;
-	internal JsonParseError mError;
 	JsonReadConfig mConfig;
 	/// mConfig.Dialect is Json5 (JsonReaderCore.Json5.bf).
 	bool mJson5;
@@ -121,6 +119,11 @@ internal class JsonReaderCore<TCursor> where TCursor : IJsonCursor
 	int mPendingCloses;
 	/// The input ended at an error: every open container gets its End token, then EndOfDocument.
 	bool mClosingAtEnd;
+
+	// Declared last: FormatCore's cursors and error are larger than the hot fields above, and placed
+	// before them they cost up to 1% (KdlBeef's migration measured it)
+	internal TCursor mCursor;
+	internal JsonParseError mError;
 
 	public this()
 	{
@@ -596,7 +599,7 @@ internal class JsonReaderCore<TCursor> where TCursor : IJsonCursor
 			case .Ok(let start):
 				mPos = start;
 			case .Err(let error):
-				mError = error;
+				mError = JsonInput.Error(error);
 				if (!mConfig.SourceName.IsEmpty)
 					mError.SetSource(mConfig.SourceName);
 				return .Err(.());
@@ -1719,7 +1722,7 @@ internal class JsonReaderCore<TCursor> where TCursor : IJsonCursor
 	JsonFailure Fail(JsonErrorKind kind, StringView message, int offset, int length = 1)
 	{
 		if (mInputFailed && mCursor.TryGetInputError(let inputError))
-			mError = inputError;
+			mError = JsonInput.Error(inputError);
 		else
 		{
 			int line = 0;

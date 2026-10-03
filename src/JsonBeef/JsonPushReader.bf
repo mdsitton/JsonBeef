@@ -1,5 +1,7 @@
 using System;
 using System.Collections;
+using FormatCore;
+using internal FormatCore;
 using internal JsonBeef;
 
 namespace JsonBeef;
@@ -15,14 +17,15 @@ internal class JsonPushState
 	public bool mStarved;
 	public int mMaxInputBytes;
 	public int mMaxTokenBytes;
-	public bool mAllowBom;
+	/// The cursor-level settings (the BOM rule and the wide-encoding check at Begin)
+	public InputSettings mSettings;
 	public bool mHasError;
-	public JsonErrorKind mErrorKind;
+	public InputErrorKind mErrorKind;
 	public String mErrorMessage = new .() ~ delete _;
 	public int mErrorOffset;
 	/// Lines counted up to the bytes dropped from the buffer, and forward for Locate
-	public JsonLineCounter mLines;
-	public JsonLineCounter mLocated;
+	public LineCounter<JsonText> mLines;
+	public LineCounter<JsonText> mLocated;
 
 	public void Reset(JsonReadConfig config)
 	{
@@ -33,7 +36,7 @@ internal class JsonPushState
 		mStarved = false;
 		mMaxInputBytes = config.MaxInputBytes;
 		mMaxTokenBytes = config.MaxTokenBytes;
-		mAllowBom = config.AllowBom;
+		mSettings = JsonInput.Settings(config);
 		mHasError = false;
 		mLines = .(0);
 		mLocated = .(0);
@@ -70,7 +73,7 @@ internal class JsonPushState
 		mBase += drop;
 	}
 
-	public void SetError(JsonErrorKind kind, StringView message, int offset)
+	public void SetError(InputErrorKind kind, StringView message, int offset)
 	{
 		if (mHasError)
 			return;
@@ -92,7 +95,7 @@ internal class JsonPushState
 		if (offset < mLines.mPos)
 			return false;
 		int target = Math.Min(offset, End);
-		if (target >= mLocated.mPos && target >= mLocated.mLineStart)
+		if (mLocated.CanReach(target))
 		{
 			mLocated.Locate(Text, target, End, out line, out column);
 			return true;
@@ -106,7 +109,7 @@ internal class JsonPushState
 /// Push input (JsonPushReader): the window is every byte fed and not yet dropped. Where the reader needs
 /// more than has been fed, Begin and Fill note that they are starved (unless the input is finished), and
 /// the reader takes the token back.
-internal struct JsonPushCursor : IJsonCursor
+internal struct JsonPushCursor : IInputCursor
 {
 	JsonPushState mState;
 
@@ -115,7 +118,7 @@ internal struct JsonPushCursor : IJsonCursor
 		mState = state;
 	}
 
-	public Result<int, JsonParseError> Begin(ref char8* data, ref int windowStart, ref int end) mut
+	public Result<int, InputError> Begin(ref char8* data, ref int windowStart, ref int end) mut
 	{
 		SetWindow(ref data, ref windowStart, ref end, 0);
 		// Enough to tell a BOM or UTF-16/32 from UTF-8 (or the whole input)
@@ -124,7 +127,7 @@ internal struct JsonPushCursor : IJsonCursor
 			mState.mStarved = true;
 			return 0;
 		}
-		int start = Try!(JsonInputStart.Check(mState.Text, mState.End, mState.mAllowBom));
+		int start = Try!(InputStart.Check(mState.Text, mState.End, mState.mSettings));
 		mState.mLines = .(start);
 		mState.mLocated = .(start);
 		return start;
@@ -154,12 +157,12 @@ internal struct JsonPushCursor : IJsonCursor
 			end = Math.Max(from + mState.mMaxTokenBytes, mState.mBase);
 	}
 
-	public bool TryGetInputError(out JsonParseError error)
+	public bool TryGetInputError(out InputError error)
 	{
 		error = default;
 		if (!mState.mHasError)
 			return false;
-		error = JsonParseError(mState.mErrorKind, mState.mErrorMessage, mState.mErrorLine, mState.mErrorColumn, mState.mErrorOffset, 0);
+		error = InputError(mState.mErrorKind, mState.mErrorMessage, mState.mErrorLine, mState.mErrorColumn, mState.mErrorOffset, 0);
 		return true;
 	}
 

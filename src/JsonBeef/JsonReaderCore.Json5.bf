@@ -9,7 +9,7 @@ namespace JsonBeef;
 /// numbers. The structure, comments and trailing commas are the JSON reader's. Tokens are reported as
 /// JSON's: a string's decoded text, a name's, and a number's JSON text in mValue (normalized when it
 /// is written otherwise: mEscaped then says so), what was written in mRaw.
-extension JsonReaderCore<TCursor> where TCursor : IJsonCursor
+extension JsonReaderCore<TCursor> where TCursor : IInputCursor
 {
 	/// JSON5: past the whitespace JSON does not have at mPos (and the JSON whitespace and comments after
 	/// it). Called where JSON would report the byte as unexpected, so that JSON reading pays nothing.

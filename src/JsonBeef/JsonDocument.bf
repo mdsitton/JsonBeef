@@ -269,7 +269,7 @@ public class JsonDocument
 		if (config.DuplicateNames == .KeepAll && config.MetadataMode == .None && !config.CollectErrors && !config.IJson &&
 			(config.MaxInputBytes <= 0 || owned.Length <= config.MaxInputBytes))
 		{
-			if (JsonInputStart.Check(owned.Ptr, owned.Length, config.AllowBom) case .Ok(let start) && FastBuild(owned.Ptr, start, owned.Length, config))
+			if (InputStart.Check(owned.Ptr, owned.Length, JsonInput.Settings(config)) case .Ok(let start) && FastBuild(owned.Ptr, start, owned.Length, config))
 				return .Ok;
 			mNodes.Clear();
 			mNodes.Add(default);
@@ -410,7 +410,7 @@ public class JsonDocument
 	/// Builds the records from the reader's tokens in preorder. `viewSource`: the reader reads the
 	/// document's copy of the source, so unescaped text is a view of it; otherwise (a stream) every
 	/// string is copied into the string table.
-	Result<void, JsonParseError> Build<TCursor>(JsonReader reader, JsonReaderCore<TCursor> core, bool viewSource, JsonReadConfig config) where TCursor : IJsonCursor
+	Result<void, JsonParseError> Build<TCursor>(JsonReader reader, JsonReaderCore<TCursor> core, bool viewSource, JsonReadConfig config) where TCursor : IInputCursor
 	{
 		uint32 parent = 0;
 		bool parentIsObject = false;
@@ -588,7 +588,7 @@ public class JsonDocument
 
 	/// A reference to the current token's text: a view of the source when possible, else a copy.
 	[Inline]
-	uint64 TextRef<TCursor>(JsonReaderCore<TCursor> core, bool viewSource, out bool inTable) where TCursor : IJsonCursor
+	uint64 TextRef<TCursor>(JsonReaderCore<TCursor> core, bool viewSource, out bool inTable) where TCursor : IInputCursor
 	{
 		StringView text = core.mValue;
 		if (viewSource && !core.mEscaped)
@@ -601,7 +601,7 @@ public class JsonDocument
 	}
 
 	[Inline]
-	void SetNumber<TCursor>(ref JsonNodeRecord node, JsonReaderCore<TCursor> core, bool viewSource) where TCursor : IJsonCursor
+	void SetNumber<TCursor>(ref JsonNodeRecord node, JsonReaderCore<TCursor> core, bool viewSource) where TCursor : IInputCursor
 	{
 		node.mNumberKind = core.mNumberKind;
 		switch (core.mNumberKind)
