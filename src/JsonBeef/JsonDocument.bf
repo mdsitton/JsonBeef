@@ -657,7 +657,7 @@ public class JsonDocument
 	{
 		ref JsonNodeRecord node = ref mNodes[id];
 		if (node.Count > cIndexThreshold)
-			return GetIndex(id).Find(this, name, JsonMemberIndex.Hash(name));
+			return GetIndex(id).Find(this, name);
 		uint32 child = node.LastChild;
 		while (child != 0)
 		{
