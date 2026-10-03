@@ -165,7 +165,7 @@ public static class JsonNumber
 	public static void AppendDouble(String output, double value, JsonFloatFormat format = .Plain)
 	{
 		// One call per layout: each gets FormatCore's layout inlined with its tests folded
-		bool finite = format == .Plain ? ShortestDouble.Append(output, value, .JsonPlain) : ShortestDouble.Append(output, value, .EcmaScript);
+		bool finite = format == .Plain ? ShortestDouble.AppendInline(output, value, .JsonPlain) : ShortestDouble.AppendInline(output, value, .EcmaScript);
 		if (!finite)
 			output.Append(value.IsNaN ? "NaN" : value < 0 ? "-Infinity" : "Infinity");
 	}
