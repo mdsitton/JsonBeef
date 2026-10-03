@@ -1,5 +1,7 @@
 using System;
 using System.Collections;
+using FormatCore;
+using internal FormatCore;
 using internal JsonBeef;
 
 namespace JsonBeef;
@@ -436,7 +438,7 @@ internal class JsonReaderCore<TCursor> where TCursor : IJsonCursor
 			// Non-ASCII: as many well-formed sequences as follow
 			repeat
 			{
-				int length = JsonChar.ValidSequenceLength(mData, p, mEnd);
+				int length = Utf8.ValidSequenceLength(mData, p, mEnd);
 				if (length == 0)
 					return -1;
 				p += length;
@@ -450,7 +452,7 @@ internal class JsonReaderCore<TCursor> where TCursor : IJsonCursor
 	{
 		if (p + 6 > mEnd)
 			return -1;
-		uint32 value = JsonChar.Hex4(mData + p + 2);
+		uint32 value = Hex.Digits4(mData + p + 2);
 		return value <= 0xFFFF ? (int)value : -1;
 	}
 
@@ -503,7 +505,7 @@ internal class JsonReaderCore<TCursor> where TCursor : IJsonCursor
 		char8 c = mData[start];
 		uint32 expected = c == 't' ? 0x65757274 : c == 'f' ? 0x736C6166 : 0x6C6C756E;
 		int length = c == 'f' ? 5 : 4;
-		if (start + length > mEnd || JsonChar.Load32(mData + start) != expected || (length == 5 && mData[start + 4] != 'e') ||
+		if (start + length > mEnd || Swar.Load32(mData + start) != expected || (length == 5 && mData[start + 4] != 'e') ||
 			(start + length < mEnd && IsWordByte(mData[start + length])))
 			return -1;
 		return start + length;
@@ -895,7 +897,7 @@ internal class JsonReaderCore<TCursor> where TCursor : IJsonCursor
 		// The literal's first four bytes as a little-endian word (and `false`'s `e`)
 		uint32 expected = c == 't' ? 0x65757274 : c == 'f' ? 0x736C6166 : 0x6C6C756E;
 		int length = c == 'f' ? 5 : 4;
-		if (!AvailN(start, length) || JsonChar.Load32(mData + start) != expected || (length == 5 && mData[start + 4] != 'e') ||
+		if (!AvailN(start, length) || Swar.Load32(mData + start) != expected || (length == 5 && mData[start + 4] != 'e') ||
 			(Avail(start + length) && IsWordByte(mData[start + length])))
 		{
 			StringView literal = c == 't' ? "true" : c == 'f' ? "false" : "null";
@@ -977,10 +979,10 @@ internal class JsonReaderCore<TCursor> where TCursor : IJsonCursor
 				// Eight digits at a time while they fit
 				while (digits <= 11 && p + 8 <= mEnd)
 				{
-					uint64 word = JsonChar.Load64(mData + p);
-					if (!JsonChar.AllDigits(word))
+					uint64 word = Swar.Load64(mData + p);
+					if (!Swar.AllDigits(word))
 						break;
-					magnitude = magnitude * 100000000 + JsonChar.ParseEightDigits(word);
+					magnitude = magnitude * 100000000 + Swar.ParseEightDigits(word);
 					digits += 8;
 					p += 8;
 				}
@@ -1016,10 +1018,10 @@ internal class JsonReaderCore<TCursor> where TCursor : IJsonCursor
 			{
 				while (mantissaDigits <= 11 && p + 8 <= mEnd)
 				{
-					uint64 word = JsonChar.Load64(mData + p);
-					if (!JsonChar.AllDigits(word))
+					uint64 word = Swar.Load64(mData + p);
+					if (!Swar.AllDigits(word))
 						break;
-					mantissa = mantissa * 100000000 + JsonChar.ParseEightDigits(word);
+					mantissa = mantissa * 100000000 + Swar.ParseEightDigits(word);
 					mantissaDigits += 8;
 					exponent -= 8;
 					p += 8;
@@ -1076,7 +1078,7 @@ internal class JsonReaderCore<TCursor> where TCursor : IJsonCursor
 		{
 			let message = scope String();
 			message.Append("Unexpected ");
-			JsonChar.AppendCharDescription(message, mData, p, mEnd, let charLength);
+			Hex.AppendCharDescription(message, mData, p, mEnd, let charLength);
 			message.AppendF(" after the number `{}`", View(start, length));
 			return .Err(Fail(.InvalidNumber, message, p, charLength));
 		}
@@ -1149,7 +1151,7 @@ internal class JsonReaderCore<TCursor> where TCursor : IJsonCursor
 		}
 		if (IsInvalidUtf8At(p))
 			return InvalidUtf8(p);
-		JsonChar.AppendCharDescription(message, mData, p, mEnd, let length);
+		Hex.AppendCharDescription(message, mData, p, mEnd, let length);
 		return Fail(.InvalidNumber, message, p, length);
 	}
 
@@ -1183,13 +1185,13 @@ internal class JsonReaderCore<TCursor> where TCursor : IJsonCursor
 			return .Err(Fail(.ResourceLimitExceeded, scope $"The string ({mValue.Length} bytes) exceeds MaxStringBytes ({mConfig.MaxStringBytes})", start, p + 1 - start));
 		if (mConfig.IJson)
 		{
-			int at = JsonChar.FindNoncharacter(mValue);
+			int at = Utf8.FindNoncharacter(mValue);
 			if (at >= 0)
 			{
 				// Located at the character when it is written raw, else at the string
 				int offset = mEscaped ? start : start + 1 + at;
 				int length = mEscaped ? p + 1 - start : (((uint8)mValue[at] == 0xEF) ? 3 : 4);
-				uint32 cp = (uint32)JsonChar.Decode(mValue.Ptr, at, ?);
+				uint32 cp = (uint32)Utf8.Decode(mValue.Ptr, at, ?);
 				return .Err(Fail(.Noncharacter, scope $"The noncharacter U+{cp:X4} is not allowed in I-JSON (RFC 7493 §2.1)", offset, length));
 			}
 		}
@@ -1217,10 +1219,10 @@ internal class JsonReaderCore<TCursor> where TCursor : IJsonCursor
 		}
 		while (p + 8 <= mEnd)
 		{
-			uint64 word = JsonChar.Load64(mData + p);
-			uint64 stops = JsonChar.StringStops(word) | (word & JsonChar.cHigh);
+			uint64 word = Swar.Load64(mData + p);
+			uint64 stops = JsonChar.StringStops(word) | (word & Swar.High);
 			if (stops != 0)
-				return p + JsonChar.FirstByte(stops);
+				return p + Swar.FirstByte(stops);
 			p += 8;
 		}
 		while (p < mEnd)
@@ -1274,7 +1276,7 @@ internal class JsonReaderCore<TCursor> where TCursor : IJsonCursor
 	{
 		if (p + 4 > mEnd)
 			Grow(p, 4);
-		return JsonChar.ValidSequenceLength(mData, p, mEnd);
+		return Utf8.ValidSequenceLength(mData, p, mEnd);
 	}
 
 	/// Whether the byte at `p` (in the window) starts an ill-formed UTF-8 sequence.
@@ -1290,7 +1292,7 @@ internal class JsonReaderCore<TCursor> where TCursor : IJsonCursor
 		if (p + 4 > mEnd)
 			Grow(p, 4);
 		let message = scope String();
-		JsonChar.FindInvalid(mData, p, Math.Min(p + 4, mEnd), message, let length);
+		Utf8.FindInvalid<JsonText>(mData, p, Math.Min(p + 4, mEnd), message, ?, let length);
 		return Fail(.InvalidUtf8, message, p, length);
 	}
 
@@ -1324,7 +1326,7 @@ internal class JsonReaderCore<TCursor> where TCursor : IJsonCursor
 				*(dest++) = (char8)0xEF;
 				*(dest++) = (char8)0xBF;
 				*(dest++) = (char8)0xBD;
-				p += JsonChar.MaximalSubpartLength(mData, p, mEnd);
+				p += Utf8.MaximalSubpartLength(mData, p, mEnd);
 			}
 			else
 			{
@@ -1344,10 +1346,10 @@ internal class JsonReaderCore<TCursor> where TCursor : IJsonCursor
 				case 't': *(dest++) = '\t'; p += 2;
 				case 'u':
 					// The common case inline: four hex digits in the window naming no surrogate
-					uint32 cp = (p + 6 <= mEnd) ? JsonChar.Hex4(mData + p + 2) : 0x10000;
+					uint32 cp = (p + 6 <= mEnd) ? Hex.Digits4(mData + p + 2) : 0x10000;
 					if (cp < 0xD800 || (cp > 0xDFFF && cp <= 0xFFFF))
 					{
-						dest += JsonChar.EncodeUtf8(dest, cp);
+						dest += Utf8.Encode(dest, cp);
 						p += 6;
 					}
 					else
@@ -1374,7 +1376,7 @@ internal class JsonReaderCore<TCursor> where TCursor : IJsonCursor
 			return InvalidUtf8(p + 1);
 		let message = scope String();
 		message.Append("Invalid escape: `\\` followed by ");
-		JsonChar.AppendCharDescription(message, mData, p + 1, mEnd, let length);
+		Hex.AppendCharDescription(message, mData, p + 1, mEnd, let length);
 		message.Append(" (JSON's escapes are `\\\"` `\\\\` `\\/` `\\b` `\\f` `\\n` `\\r` `\\t` and `\\uXXXX`)");
 		return Fail(.InvalidEscape, message, p, 1 + length);
 	}
@@ -1397,7 +1399,7 @@ internal class JsonReaderCore<TCursor> where TCursor : IJsonCursor
 			{
 				p += 6;
 				if (mConfig.InvalidSurrogates == .Replace)
-					dest += JsonChar.EncodeUtf8(dest, 0xFFFD);
+					dest += Utf8.Encode(dest, 0xFFFD);
 				else
 				{
 					*(dest++) = (char8)(0xE0 | (cp >> 12));
@@ -1422,7 +1424,7 @@ internal class JsonReaderCore<TCursor> where TCursor : IJsonCursor
 		}
 		else
 			p += 6;
-		dest += JsonChar.EncodeUtf8(dest, cp);
+		dest += Utf8.Encode(dest, cp);
 		return .Ok;
 	}
 
@@ -1435,7 +1437,7 @@ internal class JsonReaderCore<TCursor> where TCursor : IJsonCursor
 		int value = 0;
 		for (int i = 2; i < 6; i++)
 		{
-			uint8 digit = JsonChar.HexDigitValue(mData[p + i]);
+			uint8 digit = Hex.DigitValue(mData[p + i]);
 			if (digit == 255)
 				return -1;
 			value = (value << 4) | digit;
@@ -1452,14 +1454,14 @@ internal class JsonReaderCore<TCursor> where TCursor : IJsonCursor
 			int q = p + 2 + i;
 			if (!Avail(q))
 				return .Err(Fail(.InvalidEscape, "The escape `\\u` needs four hex digits, found the end of the input", p, q - p));
-			uint8 digit = JsonChar.HexDigitValue(mData[q]);
+			uint8 digit = Hex.DigitValue(mData[q]);
 			if (digit == 255)
 			{
 				if (IsInvalidUtf8At(q))
 					return .Err(InvalidUtf8(q));
 				let message = scope String();
 				message.Append("The escape `\\u` needs four hex digits, found ");
-				JsonChar.AppendCharDescription(message, mData, q, mEnd, let length);
+				Hex.AppendCharDescription(message, mData, q, mEnd, let length);
 				return .Err(Fail(.InvalidEscape, message, p, q + length - p));
 			}
 			value = (value << 4) | digit;
@@ -1476,7 +1478,7 @@ internal class JsonReaderCore<TCursor> where TCursor : IJsonCursor
 	{
 		let message = scope String();
 		message.Append("The control character ");
-		JsonChar.AppendCharDescription(message, mData, p, mEnd, ?);
+		Hex.AppendCharDescription(message, mData, p, mEnd, ?);
 		message.Append(" must be escaped in a string");
 		return Fail(.ControlCharacterInString, message, p);
 	}
@@ -1544,19 +1546,19 @@ internal class JsonReaderCore<TCursor> where TCursor : IJsonCursor
 		int pos = mPos;
 		while (pos + 8 <= end)
 		{
-			uint64 word = JsonChar.Load64(data + pos);
+			uint64 word = Swar.Load64(data + pos);
 			// The byte that ends a run is almost always above 0x20 and the bytes before it spaces: the
 			// exact test (tabs, line breaks, control characters) only when a byte below 0x20 comes first
-			uint64 above = JsonChar.BytesAboveSpace(word);
-			uint64 below = JsonChar.BytesBelowSpace(word);
+			uint64 above = Swar.BytesAboveSpace(word);
+			uint64 below = Swar.BytesBelowSpace(word);
 			uint64 nonSpace;
 			if (below == 0 || (above != 0 && (below & ((above & (~above + 1)) - 1)) == 0))
 				nonSpace = above;
 			else
-				nonSpace = JsonChar.NonSpaceBytes(word);
+				nonSpace = Swar.NonSpaceBytes(word);
 			if (nonSpace != 0)
 			{
-				pos += JsonChar.FirstByte(nonSpace);
+				pos += Swar.FirstByte(nonSpace);
 				mPos = pos;
 				return data[pos] != '/';
 			}
@@ -1751,7 +1753,7 @@ internal class JsonReaderCore<TCursor> where TCursor : IJsonCursor
 		message.Append("Expected ");
 		message.Append(expected);
 		message.Append(", found ");
-		JsonChar.AppendCharDescription(message, mData, mPos, mEnd, let length);
+		Hex.AppendCharDescription(message, mData, mPos, mEnd, let length);
 		return Fail(kind, message, mPos, length);
 	}
 

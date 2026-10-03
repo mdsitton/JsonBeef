@@ -1,4 +1,6 @@
 using System;
+using FormatCore;
+using internal FormatCore;
 using internal JsonBeef;
 
 namespace JsonBeef;
@@ -112,17 +114,17 @@ extension JsonDocument
 					if (inTable)
 						node.mFlags |= .ValueInTable;
 				case 't':
-					if (p + 4 > end || JsonChar.Load32(data + p) != 0x65757274 || (p + 4 < end && IsWordByte(data[p + 4])))
+					if (p + 4 > end || Swar.Load32(data + p) != 0x65757274 || (p + 4 < end && IsWordByte(data[p + 4])))
 						return false;
 					node.mKind = .True;
 					p += 4;
 				case 'f':
-					if (p + 5 > end || JsonChar.Load32(data + p) != 0x736C6166 || data[p + 4] != 'e' || (p + 5 < end && IsWordByte(data[p + 5])))
+					if (p + 5 > end || Swar.Load32(data + p) != 0x736C6166 || data[p + 4] != 'e' || (p + 5 < end && IsWordByte(data[p + 5])))
 						return false;
 					node.mKind = .False;
 					p += 5;
 				case 'n':
-					if (p + 4 > end || JsonChar.Load32(data + p) != 0x6C6C756E || (p + 4 < end && IsWordByte(data[p + 4])))
+					if (p + 4 > end || Swar.Load32(data + p) != 0x6C6C756E || (p + 4 < end && IsWordByte(data[p + 4])))
 						return false;
 					node.mKind = .Null;
 					p += 4;
@@ -205,9 +207,9 @@ extension JsonDocument
 			p++;
 			while (p + 8 <= end)
 			{
-				uint64 nonSpace = JsonChar.NonSpaceBytes(JsonChar.Load64(data + p));
+				uint64 nonSpace = Swar.NonSpaceBytes(Swar.Load64(data + p));
 				if (nonSpace != 0)
-					return p + JsonChar.FirstByte(nonSpace);
+					return p + Swar.FirstByte(nonSpace);
 				p += 8;
 			}
 		}
@@ -234,11 +236,11 @@ extension JsonDocument
 			}
 			while (q + 8 <= end && IsPlain(data[q]))
 			{
-				uint64 word = JsonChar.Load64(data + q);
-				uint64 stops = JsonChar.StringStops(word) | (word & JsonChar.cHigh);
+				uint64 word = Swar.Load64(data + q);
+				uint64 stops = JsonChar.StringStops(word) | (word & Swar.High);
 				if (stops != 0)
 				{
-					q += JsonChar.FirstByte(stops);
+					q += Swar.FirstByte(stops);
 					break;
 				}
 				q += 8;
@@ -254,7 +256,7 @@ extension JsonDocument
 				// another), without going back through the scans for each
 				repeat
 				{
-					int length = JsonChar.ValidSequenceLength(data, q, end);
+					int length = Utf8.ValidSequenceLength(data, q, end);
 					if (length == 0)
 						return -1;
 					q += length;
@@ -304,11 +306,11 @@ extension JsonDocument
 			}
 			while (q + 8 <= end && IsPlain(data[q]))
 			{
-				uint64 word = JsonChar.Load64(data + q);
-				uint64 stops = JsonChar.StringStops(word) | (word & JsonChar.cHigh);
+				uint64 word = Swar.Load64(data + q);
+				uint64 stops = JsonChar.StringStops(word) | (word & Swar.High);
 				if (stops != 0)
 				{
-					q += JsonChar.FirstByte(stops);
+					q += Swar.FirstByte(stops);
 					break;
 				}
 				q += 8;
@@ -322,7 +324,7 @@ extension JsonDocument
 			{
 				repeat
 				{
-					int length = JsonChar.ValidSequenceLength(data, q, end);
+					int length = Utf8.ValidSequenceLength(data, q, end);
 					if (length == 0)
 						return -1;
 					q += length;
@@ -371,7 +373,7 @@ extension JsonDocument
 				}
 				else
 					q += 6;
-				dest += JsonChar.EncodeUtf8(dest, cp);
+				dest += Utf8.Encode(dest, cp);
 			default:
 				return -1;
 			}
@@ -396,7 +398,7 @@ extension JsonDocument
 	{
 		if (p + 4 > end)
 			return 0x10000;
-		return JsonChar.Hex4(data + p);
+		return Hex.Digits4(data + p);
 	}
 
 	/// The number at `p` into `node` (kind, value or text reference), as the reader classifies and
@@ -427,10 +429,10 @@ extension JsonDocument
 		{
 			while (digits <= 11 && p + 8 <= end)
 			{
-				uint64 word = JsonChar.Load64(data + p);
-				if (!JsonChar.AllDigits(word))
+				uint64 word = Swar.Load64(data + p);
+				if (!Swar.AllDigits(word))
 					break;
-				magnitude = magnitude * 100000000 + JsonChar.ParseEightDigits(word);
+				magnitude = magnitude * 100000000 + Swar.ParseEightDigits(word);
 				digits += 8;
 				p += 8;
 			}
@@ -459,10 +461,10 @@ extension JsonDocument
 				return -1;
 			while (mantissaDigits <= 11 && p + 8 <= end)
 			{
-				uint64 word = JsonChar.Load64(data + p);
-				if (!JsonChar.AllDigits(word))
+				uint64 word = Swar.Load64(data + p);
+				if (!Swar.AllDigits(word))
 					break;
-				mantissa = mantissa * 100000000 + JsonChar.ParseEightDigits(word);
+				mantissa = mantissa * 100000000 + Swar.ParseEightDigits(word);
 				mantissaDigits += 8;
 				exponent -= 8;
 				p += 8;

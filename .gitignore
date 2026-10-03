@@ -41,3 +41,6 @@ bench/compare/cpp/build/
 bench/compare/beef/build/
 # Copied from the installed Beef by bench/compare/fetch.sh (Beef's own source)
 bench/compare/beef/src/beefy/
+
+# The vendored win-test.sh's log (test-*.log above covers the others)
+win-test.log

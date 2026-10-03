@@ -1,6 +1,8 @@
 using System;
 using System.Collections;
 using System.IO;
+using FormatCore;
+using internal FormatCore;
 using internal JsonBeef;
 
 namespace JsonBeef;
@@ -684,7 +686,7 @@ public class JsonDocument
 			if ((int)(member.mName >> 32) == name.Length)
 			{
 				let memberName = TextOf(member.mName, member.mFlags.HasFlag(.NameInTable));
-				if (JsonChar.EqualBytes(memberName.Ptr, name.Ptr, name.Length))
+				if (Swar.EqualBytes(memberName.Ptr, name.Ptr, name.Length))
 					return child;
 			}
 			child = member.mPrev;

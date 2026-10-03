@@ -1,4 +1,6 @@
 using System;
+using FormatCore;
+using internal FormatCore;
 using internal JsonBeef;
 
 namespace JsonBeef;
@@ -52,7 +54,7 @@ internal class JsonMemberIndex
 		int i = 0;
 		while (i + 8 <= length)
 		{
-			h = Mix(h ^ JsonChar.Load64(p + i));
+			h = Mix(h ^ Swar.Load64(p + i));
 			i += 8;
 		}
 		if (i < length)

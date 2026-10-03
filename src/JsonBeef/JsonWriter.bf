@@ -1,4 +1,6 @@
 using System;
+using FormatCore;
+using internal FormatCore;
 using internal JsonBeef;
 
 namespace JsonBeef;
@@ -521,13 +523,13 @@ public class JsonWriter
 			// Words of plain ASCII
 			while (i + 8 <= length)
 			{
-				uint64 word = JsonChar.Load64(p + i);
-				uint64 stops = JsonChar.StringStops(word) | (word & JsonChar.cHigh);
+				uint64 word = Swar.Load64(p + i);
+				uint64 stops = JsonChar.StringStops(word) | (word & Swar.High);
 				if (extra && options.EscapeHtml)
-					stops |= JsonChar.BytesEqual(word, (uint8)'<') | JsonChar.BytesEqual(word, (uint8)'>') | JsonChar.BytesEqual(word, (uint8)'&');
+					stops |= Swar.BytesEqual(word, (uint8)'<') | Swar.BytesEqual(word, (uint8)'>') | Swar.BytesEqual(word, (uint8)'&');
 				if (stops != 0)
 				{
-					i += JsonChar.FirstByte(stops);
+					i += Swar.FirstByte(stops);
 					break;
 				}
 				i += 8;
@@ -538,7 +540,7 @@ public class JsonWriter
 			uint8 b = (uint8)c;
 			if (b >= 0x80)
 			{
-				int seqLength = JsonChar.ValidSequenceLength(p, i, length);
+				int seqLength = Utf8.ValidSequenceLength(p, i, length);
 				if (seqLength == 0)
 				{
 					// A surrogate in WTF-8 (JsonInvalidSurrogates.Wtf8): back to its escape, so the text
@@ -557,7 +559,7 @@ public class JsonWriter
 				}
 				if (extra)
 				{
-					uint32 cp = (uint32)JsonChar.Decode(p, i, ?);
+					uint32 cp = (uint32)Utf8.Decode(p, i, ?);
 					if (options.EscapeNonAscii || (options.EscapeLineSeparators && (cp == 0x2028 || cp == 0x2029)))
 					{
 						output.Append(p + run, i - run);

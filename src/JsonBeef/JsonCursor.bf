@@ -1,4 +1,6 @@
 using System;
+using FormatCore;
+using internal FormatCore;
 using internal JsonBeef;
 
 namespace JsonBeef;
@@ -66,7 +68,7 @@ internal struct JsonLineCounter
 		while (mPos < offset)
 		{
 			// Two words at a time while neither has a byte below 0x0E (no LF or CR)
-			while (mPos + 16 <= offset && (JsonChar.BytesBelow0E(JsonChar.Load64(text + mPos)) | JsonChar.BytesBelow0E(JsonChar.Load64(text + mPos + 8))) == 0)
+			while (mPos + 16 <= offset && (Swar.BytesBelow0E(Swar.Load64(text + mPos)) | Swar.BytesBelow0E(Swar.Load64(text + mPos + 8))) == 0)
 				mPos += 16;
 			if (mPos >= offset)
 				break;
@@ -75,9 +77,9 @@ internal struct JsonLineCounter
 				// Every newline of the word at once: each LF, and each CR not followed by an LF (in the word,
 				// or the next byte). A word past `offset` (still in the window) counts only the bytes before it.
 				int count = Math.Min(offset - mPos, 8);
-				uint64 word = JsonChar.Load64(text + mPos);
-				uint64 lf = JsonChar.BytesEqual(word, (uint8)'\n');
-				uint64 cr = JsonChar.BytesEqual(word, (uint8)'\r');
+				uint64 word = Swar.Load64(text + mPos);
+				uint64 lf = Swar.BytesEqual(word, (uint8)'\n');
+				uint64 cr = Swar.BytesEqual(word, (uint8)'\r');
 				if ((lf | cr) != 0)
 				{
 					uint64 lfNext = lf >> 8;
@@ -88,19 +90,19 @@ internal struct JsonLineCounter
 						newlines &= (1UL << (count * 8)) - 1;
 					if (newlines != 0)
 					{
-						mLine += JsonChar.CountHighBits(newlines);
+						mLine += Swar.CountHighBits(newlines);
 						// The line starts after the last one: smeared down, its byte and those below
 						uint64 below = newlines | (newlines >> 8);
 						below |= below >> 16;
 						below |= below >> 32;
-						mLineStart = mPos + JsonChar.CountHighBits(below);
+						mLineStart = mPos + Swar.CountHighBits(below);
 						mLineColumn = 1;
 					}
 				}
 				mPos += count;
 				continue;
 			}
-			int newline = JsonChar.NewlineLength(text, mPos, end);
+			int newline = Utf8.AsciiNewlineLength(text, mPos, end);
 			// A CRLF across `offset` (an offset on its LF): its CR is not the newline, as in a word above
 			if (mPos + newline > offset)
 			{
@@ -125,7 +127,7 @@ internal struct JsonLineCounter
 	{
 		if (offset > mLineStart)
 		{
-			mLineColumn += JsonChar.CountCodePoints(text, mLineStart, offset);
+			mLineColumn += Utf8.CountCodePoints(text, mLineStart, offset);
 			mLineStart = offset;
 		}
 		return mLineColumn;
@@ -146,14 +148,14 @@ internal static class JsonInputStart
 	/// The offset of the first content byte of `data[0 ..< length]` (3 after a BOM), or the error.
 	public static Result<int, JsonParseError> Check(char8* data, int length, bool allowBom)
 	{
-		let wide = JsonChar.DetectWideEncoding(data, length);
+		let wide = InputStart.DetectWideEncoding(data, length);
 		if (!wide.IsEmpty)
 		{
 			let message = scope String();
 			message.AppendF("The input is {} (JSON must be UTF-8, RFC 8259 §8.1): transcode it first", wide);
 			return .Err(JsonParseError(.UnsupportedEncoding, message, 1, 1, 0, 0));
 		}
-		if (JsonChar.StartsWithBom(data, length))
+		if (Utf8.StartsWithBom(data, length))
 		{
 			if (!allowBom)
 				return .Err(JsonParseError(.UnexpectedChar, "A byte order mark (U+FEFF) is not allowed (JsonReadConfig.AllowBom is off)", 1, 1, 0, 3));
@@ -225,7 +227,7 @@ internal struct JsonByteCursor : IJsonCursor
 		if (target < mLines.mPos || target < mLines.mLineStart)
 		{
 			// Behind the counter (an error before the last position asked for): count from the start
-			JsonChar.LineAndColumn(mInput, target, out line, out column);
+			Utf8.LineAndColumn<JsonText>(mInput, target, out line, out column);
 			return true;
 		}
 		mLines.Locate(mInput.Ptr, target, mInput.Length, out line, out column);

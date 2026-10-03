@@ -1,4 +1,6 @@
 using System;
+using FormatCore;
+using internal FormatCore;
 using internal JsonBeef;
 
 namespace JsonBeef;
@@ -155,7 +157,7 @@ extension JsonReaderCore<TCursor> where TCursor : IJsonCursor
 					if (p + 4 > mEnd)
 						Grow(p, 4);
 					mStringBuffer.Append("\u{FFFD}");
-					p += JsonChar.MaximalSubpartLength(mData, p, mEnd);
+					p += Utf8.MaximalSubpartLength(mData, p, mEnd);
 					continue;
 				}
 				mStringBuffer.Append(mData + p, length);
@@ -190,13 +192,13 @@ extension JsonReaderCore<TCursor> where TCursor : IJsonCursor
 				int value = 0;
 				for (int i < 2)
 				{
-					uint8 digit = Avail(p + 2 + i) ? JsonChar.HexDigitValue(mData[p + 2 + i]) : 255;
+					uint8 digit = Avail(p + 2 + i) ? Hex.DigitValue(mData[p + 2 + i]) : 255;
 					if (digit == 255)
 						return .Err(Fail(.InvalidEscape, "The escape `\\x` needs two hex digits", p, 2 + i));
 					value = (value << 4) | digit;
 				}
 				char8[4] utf8 = ?;
-				mStringBuffer.Append(&utf8, JsonChar.EncodeUtf8(&utf8, (uint32)value));
+				mStringBuffer.Append(&utf8, Utf8.Encode(&utf8, (uint32)value));
 				p += 4;
 			case 'u':
 				char8[4] decoded = ?;
@@ -279,7 +281,7 @@ extension JsonReaderCore<TCursor> where TCursor : IJsonCursor
 				length = Utf8At(p);
 				if (length == 0)
 					return .Err(InvalidUtf8(p));
-				cp = (uint32)JsonChar.Decode(mData, p, ?);
+				cp = (uint32)Utf8.Decode(mData, p, ?);
 			}
 			if (!(first ? IsIdentifierStart(cp) : IsIdentifierPart(cp)))
 			{
@@ -296,7 +298,7 @@ extension JsonReaderCore<TCursor> where TCursor : IJsonCursor
 					escaped = true;
 				}
 				char8[4] utf8 = ?;
-				mStringBuffer.Append(&utf8, JsonChar.EncodeUtf8(&utf8, cp));
+				mStringBuffer.Append(&utf8, Utf8.Encode(&utf8, cp));
 			}
 			else if (escaped)
 				mStringBuffer.Append(mData + p, length);
@@ -381,11 +383,11 @@ extension JsonReaderCore<TCursor> where TCursor : IJsonCursor
 			int digitsStart = p;
 			uint64 magnitude = 0;
 			bool big = false;
-			while (Avail(p) && JsonChar.HexDigitValue(mData[p]) != 255)
+			while (Avail(p) && Hex.DigitValue(mData[p]) != 255)
 			{
 				if (magnitude >> 60 != 0)
 					big = true;
-				magnitude = (magnitude << 4) | JsonChar.HexDigitValue(mData[p]);
+				magnitude = (magnitude << 4) | Hex.DigitValue(mData[p]);
 				p++;
 			}
 			if (p == digitsStart)
@@ -498,7 +500,7 @@ extension JsonReaderCore<TCursor> where TCursor : IJsonCursor
 		{
 			let message = scope String();
 			message.Append("Unexpected ");
-			JsonChar.AppendCharDescription(message, mData, p, mEnd, let charLength);
+			Hex.AppendCharDescription(message, mData, p, mEnd, let charLength);
 			message.AppendF(" after the number `{}`", View(start, length));
 			return .Err(Fail(.InvalidNumber, message, p, charLength));
 		}

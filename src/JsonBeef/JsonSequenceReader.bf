@@ -1,6 +1,8 @@
 using System;
 using System.Collections;
 using System.IO;
+using FormatCore;
+using internal FormatCore;
 using internal JsonBeef;
 
 namespace JsonBeef;
@@ -385,8 +387,8 @@ public class JsonSequenceReader
 	{
 		int lastBreak = text.LastIndexOf('\n');
 		if (lastBreak < 0)
-			return mRecordColumnAfterSeparator + JsonChar.CountCodePoints(text.Ptr, 0, text.Length);
-		return 1 + JsonChar.CountCodePoints(text.Ptr, lastBreak + 1, text.Length);
+			return mRecordColumnAfterSeparator + Utf8.CountCodePoints(text.Ptr, 0, text.Length);
+		return 1 + Utf8.CountCodePoints(text.Ptr, lastBreak + 1, text.Length);
 	}
 
 	/// An error of the current record's reader, located in the whole input. `scalar`: an error made
@@ -396,7 +398,7 @@ public class JsonSequenceReader
 		var error;
 		if (scalar)
 		{
-			JsonChar.LineAndColumn(mRecord, (int)error.mOffset, let line, let column);
+			Utf8.LineAndColumn<JsonText>(mRecord, (int)error.mOffset, let line, let column);
 			error.mLine = (int32)line;
 			error.mColumn = (int32)column;
 		}

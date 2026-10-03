@@ -1,5 +1,7 @@
 using System;
 using System.Collections;
+using FormatCore;
+using internal FormatCore;
 using internal JsonBeef;
 
 namespace JsonBeef;
@@ -70,7 +72,7 @@ extension JsonDocument
 	{
 		if (mLineStarts.IsEmpty)
 		{
-			mLineStarts.Add(JsonChar.StartsWithBom(mSource, mSourceLength) ? 3 : 0);
+			mLineStarts.Add(Utf8.StartsWithBom(mSource, mSourceLength) ? 3 : 0);
 			int i = 0;
 			while (i < mSourceLength)
 			{
@@ -96,7 +98,7 @@ extension JsonDocument
 				high = mid - 1;
 		}
 		line = low + 1;
-		column = JsonChar.CountCodePoints(mSource, mLineStarts[low], Math.Max(offset, mLineStarts[low])) + 1;
+		column = Utf8.CountCodePoints(mSource, mLineStarts[low], Math.Max(offset, mLineStarts[low])) + 1;
 	}
 
 	/// The source range of node `id`'s value (`name` false) or member name.

@@ -1,6 +1,8 @@
 using System;
 using System.Collections;
 using System.IO;
+using FormatCore;
+using internal FormatCore;
 using internal JsonBeef;
 
 namespace JsonBeef;
@@ -255,8 +257,8 @@ extension JsonDocument
 				j++;
 				continue;
 			}
-			uint32 x = (uint32)JsonChar.Decode(a.Ptr, i, var lengthA);
-			uint32 y = (uint32)JsonChar.Decode(b.Ptr, j, var lengthB);
+			uint32 x = (uint32)Utf8.Decode(a.Ptr, i, var lengthA);
+			uint32 y = (uint32)Utf8.Decode(b.Ptr, j, var lengthB);
 			i += lengthA;
 			j += lengthB;
 			if (x == y)

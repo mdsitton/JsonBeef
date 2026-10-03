@@ -1,4 +1,6 @@
 using System;
+using FormatCore;
+using internal FormatCore;
 using internal JsonBeef;
 
 namespace JsonBeef;
@@ -141,7 +143,7 @@ public struct JsonParseError
 	/// An error at byte `offset` of `input`, with the line and column computed from it.
 	internal static JsonParseError At(JsonErrorKind kind, StringView message, StringView input, int offset, int length = 1)
 	{
-		JsonChar.LineAndColumn(input, offset, let line, let column);
+		Utf8.LineAndColumn<JsonText>(input, offset, let line, let column);
 		return JsonParseError(kind, message, line, column, offset, length);
 	}
 

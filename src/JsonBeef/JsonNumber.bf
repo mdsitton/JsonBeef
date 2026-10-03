@@ -1,4 +1,6 @@
 using System;
+using FormatCore;
+using internal FormatCore;
 using internal JsonBeef;
 
 namespace JsonBeef;
@@ -237,7 +239,7 @@ public static class JsonNumber
 		limbs.Add(0);
 		for (let c in hex)
 		{
-			uint64 carry = JsonChar.HexDigitValue(c);
+			uint64 carry = Hex.DigitValue(c);
 			for (int i < limbs.Count)
 			{
 				uint64 v = limbs[i] * 16 + carry;

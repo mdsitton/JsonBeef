@@ -1,4 +1,6 @@
 using System;
+using FormatCore;
+using internal FormatCore;
 using internal JsonBeef;
 
 namespace JsonBeef;
@@ -10,7 +12,7 @@ extension JsonDocument
 	public static bool IsValidText(StringView text)
 	{
 		let message = scope String();
-		return JsonChar.FindInvalid(text.Ptr, 0, text.Length, message, ?) < 0;
+		return Utf8.FindInvalid<JsonText>(text.Ptr, 0, text.Length, message, ?, ?) < 0;
 	}
 
 	/// @brief Replace the document's content with a single value, `null`, and return it (to set it:
