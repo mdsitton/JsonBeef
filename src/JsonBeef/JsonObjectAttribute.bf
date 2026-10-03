@@ -81,21 +81,12 @@ public struct JsonObjectAttribute : Attribute, IComptimeTypeApply
 	}
 }
 
-/// @brief How [JsonObject] turns declared names into member names. Words split at case changes, keeping
-/// acronyms together (`HTTPPort` is `http_port` in SnakeCase), and at underscores.
-public enum JsonNaming
-{
-	/// @brief The name as written: `poolSize`, `PoolSize`, `pool_size` (the default).
-	AsDeclared,
-	/// @brief `poolSize`.
-	CamelCase,
-	/// @brief `PoolSize`.
-	PascalCase,
-	/// @brief `pool_size`.
-	SnakeCase,
-	/// @brief `pool-size`.
-	KebabCase
-}
+/// @brief How [JsonObject] turns declared names into member names: FormatCore's NamingPolicy, shared by
+/// the four format libraries. `AsDeclared` (the default: the name as written), `CamelCase` (`poolSize`),
+/// `PascalCase` (`PoolSize`), `SnakeCase` (`pool_size`), `KebabCase` (`pool-size`), `Lower`
+/// (`poolsize`). Words split at case changes, keeping acronyms together (`HTTPPort` is `http_port` in
+/// SnakeCase), and at underscores.
+public typealias JsonNaming = FormatCore.Mapping.NamingPolicy;
 
 /// @brief Maps a field to the member `name` instead of its own name.
 [AttributeUsage(.Field)]

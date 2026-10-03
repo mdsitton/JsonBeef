@@ -1,6 +1,8 @@
 using System;
 using System.Collections;
 using System.Reflection;
+using FormatCore.Mapping;
+using internal FormatCore;
 
 namespace JsonBeef;
 
@@ -15,65 +17,22 @@ namespace JsonBeef;
 /// comparing the bytes (no hash-only matching). Enums are generated switches over their case names.
 ///
 /// The planning (value specs, member names, checks) is in JsonSerializerPlan.bf; this file is the entry
-/// point and the emission of code from the plans.
+/// point and the emission of code from the plans. The driver, the registry lookups, the value specs and
+/// the shared emitters (literals, integer bounds, ownership, enum tests, naming) are FormatCore.Mapping's.
 public static class JsonSerializerCodeGen
 {
-	/// A component of the path generated code prepends to an error leaving a nested value: a member name
-	/// (a literal or a String expression) or an array index (an int expression).
-	class PathPart
+	/// The entry FormatCore's MappingDriver puts into every [JsonObject] type: the bodies are mixed in
+	/// through it, so their planning runs with the user's project as "current".
+	const String cEntry = "JsonGen_";
+
+	/// Code being written (FormatCore's CodeWriter): an error leaving a nested value gets its JSON
+	/// Pointer through JsonBind.AtMember and AtIndex.
+	class Emitter : CodeWriter
 	{
-		public bool mIsIndex;
-		public String mExpr = new .() ~ delete _;
-
-		public this(bool isIndex, StringView expr)
-		{
-			mIsIndex = isIndex;
-			mExpr.Set(expr);
-		}
-	}
-
-	/// Code being written, with a counter for unique local names.
-	class Emitter
-	{
-		public String mCode = new .() ~ delete _;
-		public int mNext;
-		public String mOwner = new .() ~ delete _;
-		public String mField = new .() ~ delete _;
-		public List<PathPart> mPath = new .() ~ DeleteContainerAndItems!(_);
-		/// The naming of the field being emitted (enum case names follow it).
-		public JsonNaming mNaming;
-
 		public this()
 		{
-		}
-
-		/// A fresh local name: `_<prefix><n>`.
-		public String Local(StringView prefix, String name)
-		{
-			name.AppendF("_{}{}", prefix, mNext++);
-			return name;
-		}
-
-		/// `error` (an expression of type JsonParseError) with the current path prepended to its own.
-		public void Wrap(StringView error, String result)
-		{
-			let expr = scope String(error);
-			for (int i = mPath.Count - 1; i >= 0; i--)
-			{
-				let part = mPath[i];
-				let wrapped = scope String();
-				wrapped.AppendF("JsonBeef.JsonBind.{}({}, {})", part.mIsIndex ? "AtIndex" : "AtMember", expr, part.mExpr);
-				expr.Set(wrapped);
-			}
-			result.Append(expr);
-		}
-
-		/// `return .Err(<wrapped error>);`
-		public void Return(StringView indent, StringView error)
-		{
-			mCode.AppendF("{}return .Err(", indent);
-			Wrap(error, mCode);
-			mCode.Append(");\n");
+			mWrapMember.Set("JsonBeef.JsonBind.AtMember({0}, {1})");
+			mWrapIndex.Set("JsonBeef.JsonBind.AtIndex({0}, {1})");
 		}
 
 		/// `return .Err(<wrapped JsonBind.Error(_rd)>);`
@@ -91,35 +50,59 @@ public static class JsonSerializerCodeGen
 	[Comptime]
 	public static void Emit(Type type, JsonObjectAttribute attribute)
 	{
-		let ownerName = type.GetFullName(.. scope .());
 		bool baseIsObject = !type.IsValueType && type.BaseType != null && type.BaseType != typeof(Object) && type.BaseType.HasCustomAttribute<JsonObjectAttribute>();
 		StringView modifier = type.IsValueType ? "" : baseIsObject ? "override " : "virtual ";
 		StringView mutable = type.IsValueType ? " mut" : "";
-		let typeExpr = scope $"typeof({ownerName})";
+		// The unspecialized pass of a generic type: its comptime methods cannot be evaluated, so stub
+		// bodies and no entry (each specialization gets real ones)
+		bool open = MappingDriver.IsOpenType(type);
 
 		if (!baseIsObject)
 			Compiler.EmitAddInterface(type, typeof(IJsonSerializable));
+		if (!open)
+			MappingDriver.EmitEntry(type, cEntry, "JsonBeef.JsonSerializerCodeGen.Body", baseIsObject);
 		let code = scope String();
-		code.AppendF("public {}Result<void, JsonBeef.JsonParseError> JsonRead(JsonBeef.JsonReader _rd, System.ITypedAllocator _alloc = null){}\n{{\n\tSystem.Compiler.Mixin(JsonBeef.JsonSerializerCodeGen.Body({}, 0));\n}}\n", modifier, mutable, typeExpr);
-		code.AppendF("public {}void JsonWrite(JsonBeef.JsonWriter _w)\n{{\n\tSystem.Compiler.Mixin(JsonBeef.JsonSerializerCodeGen.Body({}, 1));\n}}\n", modifier, typeExpr);
-		code.AppendF("public {}Result<void, JsonBeef.JsonWriteError> JsonWrite(JsonBeef.JsonNode _node)\n{{\n\tSystem.Compiler.Mixin(JsonBeef.JsonSerializerCodeGen.Body({}, 2));\n}}\n", modifier, typeExpr);
+		code.AppendF("public {}Result<void, JsonBeef.JsonParseError> JsonRead(JsonBeef.JsonReader _rd, System.ITypedAllocator _alloc = null){}\n{{\n", modifier, mutable);
+		AppendBody(code, open, 0, "\treturn .Ok;\n");
+		code.AppendF("}}\npublic {}void JsonWrite(JsonBeef.JsonWriter _w)\n{{\n", modifier);
+		AppendBody(code, open, 1, "");
+		code.AppendF("}}\npublic {}Result<void, JsonBeef.JsonWriteError> JsonWrite(JsonBeef.JsonNode _node)\n{{\n", modifier);
+		AppendBody(code, open, 2, "\treturn .Ok;\n");
+		code.Append("}\n");
 		if (attribute.ShowGenerated)
 		{
 			bool hides = false;
 			if (baseIsObject && type.BaseType.GetCustomAttribute<JsonObjectAttribute>() case .Ok(let baseObject))
 				hides = baseObject.ShowGenerated;
-			code.AppendF("public {}static StringView JsonGeneratedSource\n{{\n\tget\n\t{{\n\t\tSystem.Compiler.Mixin(JsonBeef.JsonSerializerCodeGen.SourceReturn({}));\n\t}}\n}}\n", hides ? "new " : "", typeExpr);
+			code.AppendF("public {}static StringView JsonGeneratedSource\n{{\n\tget\n\t{{\n", hides ? "new " : "");
+			AppendBody(code, open, 3, "\t\treturn \"\";\n", "\t\t");
+			code.Append("\t}\n}\n");
 		}
 		Compiler.EmitTypeBody(type, code);
 	}
 
-	/// @brief The body of one generated method of `type`, mixed in when the method is compiled.
+	/// A generated method's body: the entry's part mixed in, or the stub of an open type.
+	[Comptime]
+	static void AppendBody(String code, bool open, int part, StringView stub, StringView indent = "\t")
+	{
+		if (open)
+			code.Append(stub);
+		else
+			MappingDriver.AppendBody(code, indent, cEntry, part);
+	}
+
+	/// @brief The body of one generated method of `type`, mixed in when the method is compiled, through
+	/// the entry in `type` (FormatCore's MappingDriver: lookups then see the user's project).
 	/// @param type The [JsonObject] type.
-	/// @param part 0: JsonRead(JsonReader), 1: JsonWrite(JsonWriter), 2: JsonWrite(JsonNode).
+	/// @param part 0: JsonRead(JsonReader), 1: JsonWrite(JsonWriter), 2: JsonWrite(JsonNode), 3: the
+	/// JsonGeneratedSource getter (`return "<the code of parts 0-2>";`).
+	/// @param args Unused (the driver's argument text).
 	/// @return The code.
 	[Comptime]
-	public static String Body(Type type, int part)
+	public static String Body(Type type, int part, String args = null)
 	{
+		if (part == 3)
+			return SourceReturn(type);
 		JsonObjectAttribute attribute = default;
 		if (type.GetCustomAttribute<JsonObjectAttribute>() case .Ok(let found))
 			attribute = found;
@@ -137,11 +120,9 @@ public static class JsonSerializerCodeGen
 		return new String(e.mCode);
 	}
 
-	/// @brief `return "<the generated code of type>";` (for [JsonObject(ShowGenerated = true)]).
-	/// @param type The [JsonObject] type.
-	/// @return The statement.
+	/// `return "<the generated code of type>";` (for [JsonObject(ShowGenerated = true)]).
 	[Comptime]
-	public static String SourceReturn(Type type)
+	static String SourceReturn(Type type)
 	{
 		let all = scope String();
 		for (int part < 3)
@@ -151,7 +132,7 @@ public static class JsonSerializerCodeGen
 			delete body;
 		}
 		let code = new String("return ");
-		AppendLiteral(code, all, true);
+		Literal.Append(code, all);
 		code.Append(';');
 		return code;
 	}
@@ -196,7 +177,7 @@ public static class JsonSerializerCodeGen
 			// The next slot's name first (members usually come in the declared order)
 			code.Append("\t\tswitch (_next)\n\t\t{\n");
 			for (int s < plan.mSlots)
-				code.AppendF("\t\tcase {}: if (_name == {}) _f = {};\n", s, AppendLiteral(.. scope .(), slotNames[s][0]), s);
+				code.AppendF("\t\tcase {}: if (_name == {}) _f = {};\n", s, Literal.Append(.. scope .(), slotNames[s][0]), s);
 			code.Append("\t\tdefault:\n\t\t}\n");
 			// Else by length, then the bytes
 			let byLength = scope Dictionary<int, String>();
@@ -212,7 +193,7 @@ public static class JsonSerializerCodeGen
 					}
 					else
 						tests.Append(" else ");
-					tests.AppendF("if (_name == {}) _f = {};", AppendLiteral(.. scope .(), name), s);
+					tests.AppendF("if (_name == {}) _f = {};", Literal.Append(.. scope .(), name), s);
 				}
 			}
 			let lengths = scope List<int>();
@@ -235,14 +216,14 @@ public static class JsonSerializerCodeGen
 		if (plan.mDiscriminatorSlot >= 0)
 		{
 			code.AppendF("\t\tcase {}:\n\t\t\tif (!JsonBeef.JsonBind.CheckTypeName(_rd, {}, {}))\n\t\t\t\treturn .Err(JsonBeef.JsonBind.AtMember(JsonBeef.JsonBind.Error(_rd), {}));\n",
-				plan.mDiscriminatorSlot, AppendLiteral(.. scope .(), plan.mDiscriminator), AppendLiteral(.. scope .(), plan.mTypeName), AppendLiteral(.. scope .(), plan.mDiscriminator));
+				plan.mDiscriminatorSlot, Literal.Append(.. scope .(), plan.mDiscriminator), Literal.Append(.. scope .(), plan.mTypeName), Literal.Append(.. scope .(), plan.mDiscriminator));
 		}
 		for (let field in plan.mFields)
 		{
 			code.AppendF("\t\tcase {}:\n", field.mSlot);
 			e.mField.Set(field.mField.Name);
 			e.mNaming = field.mNaming;
-			e.mPath.Add(new .(false, AppendLiteral(.. scope .(), field.mName)));
+			e.mPath.Add(new .(false, Literal.Append(.. scope .(), field.mName)));
 			let target = scope $"this.{field.mField.Name}";
 			EmitReadValue(e, "\t\t\t", field.mSpec, target, scope $"{target} = {{0}};");
 			delete e.mPath.PopBack();
@@ -254,7 +235,7 @@ public static class JsonSerializerCodeGen
 		{
 			if (!field.mRequired)
 				continue;
-			code.AppendF("\tif ((_seen[{}] & {}UL) == 0)\n\t\treturn .Err(JsonBeef.JsonBind.Missing(_rd, _start, {}));\n", field.mSlot >> 6, 1UL << (field.mSlot & 63), AppendLiteral(.. scope .(), field.mName));
+			code.AppendF("\tif ((_seen[{}] & {}UL) == 0)\n\t\treturn .Err(JsonBeef.JsonBind.Missing(_rd, _start, {}));\n", field.mSlot >> 6, 1UL << (field.mSlot & 63), Literal.Append(.. scope .(), field.mName));
 		}
 		code.Append("\treturn .Ok;\n");
 	}
@@ -278,13 +259,13 @@ public static class JsonSerializerCodeGen
 			code.AppendF("{}}}\n", indent);
 		case .Integer:
 			let local = e.Local("i", .. scope .());
-			if (IsUInt64(spec.mType))
+			if (TypeShapes.IsUInt64(spec.mType))
 				code.AppendF("{}{{\n{}uint64 {};\n{}if (!JsonBeef.JsonBind.ReadUInt64(_rd, out {}))\n", indent, inner, local, inner, local);
 			else
 			{
 				let min = scope String();
 				let max = scope String();
-				IntegerRange(spec.mType, min, max);
+				IntegerBounds.Range(spec.mType, min, max);
 				code.AppendF("{}{{\n{}int64 {};\n{}if (!JsonBeef.JsonBind.ReadInteger(_rd, {}, {}, out {}))\n", indent, inner, local, inner, min, max, local);
 			}
 			e.ReturnBind(scope $"{inner}\t");
@@ -367,9 +348,9 @@ public static class JsonSerializerCodeGen
 			code.AppendF("{}{{\n{}int64 {};\n{}if (!JsonBeef.JsonBind.ReadInteger(_rd, int64.MinValue, int64.MaxValue, out {}))\n", indent, inner, number, inner, number);
 			e.ReturnBind(scope $"{inner}\t");
 			code.AppendF("{}{} {} = ({}){};\n{}if (!(", inner, typeName, local, typeName, number, inner);
-			EmitIsCase(code, spec.mType, local);
+			EnumEmit.EmitIsCase(code, spec.mType, local);
 			code.Append("))\n");
-			e.Return(scope $"{inner}\t", scope $"JsonBeef.JsonBind.UnknownNumber(_rd, {AppendLiteral(.. scope .(), typeName)})");
+			e.Return(scope $"{inner}\t", scope $"JsonBeef.JsonBind.UnknownNumber(_rd, {Literal.Append(.. scope .(), typeName)})");
 		}
 		else
 		{
@@ -382,14 +363,14 @@ public static class JsonSerializerCodeGen
 			{
 				if (!field.IsEnumCase)
 					continue;
-				let name = ApplyNaming(field.Name, naming, .. scope .());
+				let name = Naming.Apply(field.Name, naming, .. scope .());
 				if (!cases.IsEmpty)
 					cases.Append(", ");
 				cases.Append(name);
-				code.AppendF("{}case {}: {} = .{};\n", inner, AppendLiteral(.. scope .(), name), local, field.Name);
+				code.AppendF("{}case {}: {} = .{};\n", inner, Literal.Append(.. scope .(), name), local, field.Name);
 			}
 			code.AppendF("{}default:\n", inner);
-			e.Return(scope $"{inner}\t", scope $"JsonBeef.JsonBind.UnknownCase(_rd, {AppendLiteral(.. scope .(), cases)})");
+			e.Return(scope $"{inner}\t", scope $"JsonBeef.JsonBind.UnknownCase(_rd, {Literal.Append(.. scope .(), cases)})");
 			code.AppendF("{}}}\n", inner);
 		}
 		Assign(code, inner, assign, local);
@@ -441,27 +422,29 @@ public static class JsonSerializerCodeGen
 			let discriminator = DiscriminatorOf(spec.mType, .. scope .());
 			code.AppendF("{}if (!JsonBeef.JsonBind.BeginObject(_rd))\n", inner);
 			e.ReturnBind(scope $"{inner}\t");
-			code.AppendF("{}let {} = scope String();\n{}bool {};\n{}if (!JsonBeef.JsonBind.ReadDiscriminator(_rd, {}, {}, out {}))\n", inner, name, inner, found, inner, AppendLiteral(.. scope .(), discriminator), name, found);
+			code.AppendF("{}let {} = scope String();\n{}bool {};\n{}if (!JsonBeef.JsonBind.ReadDiscriminator(_rd, {}, {}, out {}))\n", inner, name, inner, found, inner, Literal.Append(.. scope .(), discriminator), name, found);
 			e.ReturnBind(scope $"{inner}\t");
 			if (!existing.IsEmpty)
 				code.AppendF("{0}if (_alloc == null)\n{0}\tdelete {1};\n{0}{1} = null;\n", inner, existing);
-			// The subtypes are found when this method is compiled, not now: they derive from the type,
-			// which may be the one being generated and not complete yet
+			// The subtypes, found now: bodies are planned when their method is compiled (every type is
+			// complete), and through the user's entry, so the user's subclasses are visible. (A nested
+			// mixin of a JsonBeef method here would make JsonBeef "current" again: bug 1 for subtypes.)
 			let wrapped = e.Wrap("{1}", .. scope .());
-			code.AppendF("{}System.Compiler.Mixin(JsonBeef.JsonSerializerCodeGen.TypeDispatch(typeof({}), {}, {}, {}, {}, {}, {}));\n", inner, typeName,
-				AppendLiteral(.. scope .(), e.mOwner), AppendLiteral(.. scope .(), e.mField), AppendLiteral(.. scope .(), name), AppendLiteral(.. scope .(), found),
-				AppendLiteral(.. scope .(), assign), AppendLiteral(.. scope .(), wrapped));
+			let dispatch = TypeDispatch(spec.mType, e.mOwner, e.mField, name, found, scope String(assign), wrapped);
+			defer delete dispatch;
+			for (let line in dispatch.Split('\n', .RemoveEmptyEntries))
+				code.AppendF("{}{}\n", inner, line);
 		}
 		else if (!existing.IsEmpty)
 		{
-			code.AppendF("{0}if ({1} == null)\n{0}\t{1} = {2};\n{0}if ({1}.JsonRead(_rd, _alloc) case .Err(let _oe))\n", inner, existing, NewExpr(typeName, .. scope .()));
+			code.AppendF("{0}if ({1} == null)\n{0}\t{1} = {2};\n{0}if ({1}.JsonRead(_rd, _alloc) case .Err(let _oe))\n", inner, existing, Ownership.NewExpr(.. scope .(), typeName));
 			e.Return(scope $"{inner}\t", "_oe");
 		}
 		else
 		{
 			// Handed over before it is read, so it is owned even if reading fails
 			let local = e.Local("o", .. scope .());
-			code.AppendF("{}let {} = {};\n", inner, local, NewExpr(typeName, .. scope .()));
+			code.AppendF("{}let {} = {};\n", inner, local, Ownership.NewExpr(.. scope .(), typeName));
 			Assign(code, inner, assign, local);
 			code.AppendF("{}if ({}.JsonRead(_rd, _alloc) case .Err(let _oe))\n", inner, local);
 			e.Return(scope $"{inner}\t", "_oe");
@@ -470,8 +453,8 @@ public static class JsonSerializerCodeGen
 	}
 
 	/// @brief The `switch` that creates and reads the object the current StartObject starts as the type
-	/// its discriminator names, among `baseType` and its [JsonObject] subclasses. Mixed into the generated
-	/// JsonRead when it is compiled.
+	/// its discriminator names, among `baseType` and its [JsonObject] subclasses the user's project can
+	/// see. Written inline into the generated JsonRead (whose body is planned in the mixin stage).
 	/// @param baseType The field's (or item's) class.
 	/// @param ownerName The type holding the field, for errors.
 	/// @param fieldName The field, for errors.
@@ -481,7 +464,7 @@ public static class JsonSerializerCodeGen
 	/// @param wrap The expression that adds the path to an error (`{1}` for the error).
 	/// @return The code.
 	[Comptime]
-	public static String TypeDispatch(Type baseType, String ownerName, String fieldName, String nameLocal, String foundLocal, String assign, String wrap)
+	static String TypeDispatch(Type baseType, String ownerName, String fieldName, String nameLocal, String foundLocal, String assign, String wrap)
 	{
 		let types = scope List<Type>();
 		SubTypes(baseType, types);
@@ -517,7 +500,7 @@ public static class JsonSerializerCodeGen
 		for (int i < types.Count)
 		{
 			let typeName = types[i].GetFullName(.. scope .());
-			code.AppendF("case {}:\n", AppendLiteral(.. scope .(), seen[i]));
+			code.AppendF("case {}:\n", Literal.Append(.. scope .(), seen[i]));
 			EmitDispatchCase(code, typeName, assign, wrap);
 		}
 		code.Append("default:\n");
@@ -529,7 +512,7 @@ public static class JsonSerializerCodeGen
 			code.Append("\t\tbreak;\n\t}\n");
 		}
 		code.Append("\treturn .Err(");
-		code.Append(scope String(wrap)..Replace("{1}", scope $"JsonBeef.JsonBind.UnknownType(_rd, {AppendLiteral(.. scope .(), discriminator)}, {nameLocal}, {AppendLiteral(.. scope .(), expected)})"));
+		code.Append(scope String(wrap)..Replace("{1}", scope $"JsonBeef.JsonBind.UnknownType(_rd, {Literal.Append(.. scope .(), discriminator)}, {nameLocal}, {Literal.Append(.. scope .(), expected)})"));
 		code.Append(");\n}\n");
 		return code;
 	}
@@ -538,7 +521,7 @@ public static class JsonSerializerCodeGen
 	static void EmitDispatchCase(String code, StringView typeName, StringView assign, StringView wrap, StringView extra = "")
 	{
 		code.AppendF("{0}\t{{\n{0}\t\tlet _po = {1};\n{0}\t\t{2}\n{0}\t\tif (_po.JsonRead(_rd, _alloc) case .Err(let _pe))\n{0}\t\t\treturn .Err({3});\n{0}\t}}\n",
-			extra, NewExpr(typeName, .. scope .()), scope String(assign)..Replace("{0}", "_po"), scope String(wrap)..Replace("{1}", "_pe"));
+			extra, Ownership.NewExpr(.. scope .(), typeName), scope String(assign)..Replace("{0}", "_po"), scope String(wrap)..Replace("{1}", "_pe"));
 	}
 
 	[Comptime]
@@ -549,20 +532,20 @@ public static class JsonSerializerCodeGen
 		let typeName = spec.mType.GetFullName(.. scope .());
 		code.AppendF("{}if (_rd.TokenType == .Null)\n{}{{\n", indent, indent);
 		if (!existing.IsEmpty)
-			EmitDeleteOwned(code, inner, spec, existing);
+			Ownership.EmitDeleteOwned(code, inner, spec, existing);
 		Assign(code, inner, assign, "null");
 		code.AppendF("{}}}\n{}else\n{}{{\n{}if (!JsonBeef.JsonBind.BeginArray(_rd))\n", indent, indent, indent, inner);
 		e.ReturnBind(scope $"{inner}\t");
 		let list = e.Local("l", .. scope .());
 		if (!existing.IsEmpty)
 		{
-			code.AppendF("{0}if ({1} == null)\n{0}\t{1} = {2};\n{0}else\n{0}{{\n", inner, existing, NewExpr(typeName, .. scope .()));
-			EmitClearItems(code, scope $"{inner}\t", spec, existing);
+			code.AppendF("{0}if ({1} == null)\n{0}\t{1} = {2};\n{0}else\n{0}{{\n", inner, existing, Ownership.NewExpr(.. scope .(), typeName));
+			Ownership.EmitClearItems(code, scope $"{inner}\t", spec, existing);
 			code.AppendF("{0}\t{1}.Clear();\n{0}}}\n{0}let {2} = {1};\n", inner, existing, list);
 		}
 		else
 		{
-			code.AppendF("{}let {} = {};\n", inner, list, NewExpr(typeName, .. scope .()));
+			code.AppendF("{}let {} = {};\n", inner, list, Ownership.NewExpr(.. scope .(), typeName));
 			Assign(code, inner, assign, list);
 		}
 		let index = e.Local("n", .. scope .());
@@ -586,20 +569,20 @@ public static class JsonSerializerCodeGen
 		let keyName = spec.mKeyType.GetFullName(.. scope .());
 		code.AppendF("{}if (_rd.TokenType == .Null)\n{}{{\n", indent, indent);
 		if (!existing.IsEmpty)
-			EmitDeleteOwned(code, inner, spec, existing);
+			Ownership.EmitDeleteOwned(code, inner, spec, existing);
 		Assign(code, inner, assign, "null");
 		code.AppendF("{}}}\n{}else\n{}{{\n{}if (!JsonBeef.JsonBind.BeginObject(_rd))\n", indent, indent, indent, inner);
 		e.ReturnBind(scope $"{inner}\t");
 		let map = e.Local("m", .. scope .());
 		if (!existing.IsEmpty)
 		{
-			code.AppendF("{0}if ({1} == null)\n{0}\t{1} = {2};\n{0}else\n{0}{{\n", inner, existing, NewExpr(typeName, .. scope .()));
-			EmitClearItems(code, scope $"{inner}\t", spec, existing);
+			code.AppendF("{0}if ({1} == null)\n{0}\t{1} = {2};\n{0}else\n{0}{{\n", inner, existing, Ownership.NewExpr(.. scope .(), typeName));
+			Ownership.EmitClearItems(code, scope $"{inner}\t", spec, existing);
 			code.AppendF("{0}\t{1}.Clear();\n{0}}}\n{0}let {2} = {1};\n", inner, existing, map);
 		}
 		else
 		{
-			code.AppendF("{}let {} = {};\n", inner, map, NewExpr(typeName, .. scope .()));
+			code.AppendF("{}let {} = {};\n", inner, map, Ownership.NewExpr(.. scope .(), typeName));
 			Assign(code, inner, assign, map);
 		}
 		let step = e.Local("st", .. scope .());
@@ -611,14 +594,14 @@ public static class JsonSerializerCodeGen
 		code.AppendF("{0}\tbreak;\n{0}}}\n", body);
 		let valueName = spec.mItem.mType.GetFullName(.. scope .());
 		code.AppendF("{}{}* {} = null;\n", body, valueName, valuePtr);
-		bool ownsValues = NeedsDelete(spec.mItem);
+		bool ownsValues = spec.mItem.NeedsDelete;
 		let addedKey = e.Local("kp", .. scope .());
 		let addedValue = e.Local("ap", .. scope .());
 		if (spec.mKeyKind == .String)
 		{
 			// The key, added before its value is read (the dictionary owns it if reading fails)
 			code.AppendF("{0}String {1};\n{0}if ({2}.TryAddAlt(_rd.StringValue, let {5}, let {6}))\n{0}{{\n{0}\t*{5} = {3};\n{0}\t{1} = *{5};\n{0}\t{4} = {6};\n{0}}}\n{0}else\n{0}{{\n{0}\t{1} = *{5};\n{0}\t{4} = {6};\n",
-				body, keyText, map, NewExpr("String", .. scope .(), "_rd.StringValue"), valuePtr, addedKey, addedValue);
+				body, keyText, map, Ownership.NewExpr(.. scope .(), "String", "_rd.StringValue"), valuePtr, addedKey, addedValue);
 		}
 		else
 		{
@@ -627,13 +610,13 @@ public static class JsonSerializerCodeGen
 			if (spec.mKeyKind == .Integer)
 			{
 				let number = e.Local("i", .. scope .());
-				if (IsUInt64(spec.mKeyType))
+				if (TypeShapes.IsUInt64(spec.mKeyType))
 					code.AppendF("{}uint64 {};\n{}if (!JsonBeef.JsonBind.KeyUInt64(_rd, out {}))\n", body, number, body, number);
 				else
 				{
 					let min = scope String();
 					let max = scope String();
-					IntegerRange(spec.mKeyType, min, max);
+					IntegerBounds.Range(spec.mKeyType, min, max);
 					code.AppendF("{}int64 {};\n{}if (!JsonBeef.JsonBind.KeyInteger(_rd, {}, {}, out {}))\n", body, number, body, min, max, number);
 				}
 				e.ReturnBind(scope $"{body}\t");
@@ -647,14 +630,14 @@ public static class JsonSerializerCodeGen
 				{
 					if (!field.IsEnumCase)
 						continue;
-					let name = ApplyNaming(field.Name, CaseNaming(e), .. scope .());
+					let name = Naming.Apply(field.Name, CaseNaming(e), .. scope .());
 					if (!cases.IsEmpty)
 						cases.Append(", ");
 					cases.Append(name);
-					code.AppendF("{}case {}: {} = .{};\n", body, AppendLiteral(.. scope .(), name), key, field.Name);
+					code.AppendF("{}case {}: {} = .{};\n", body, Literal.Append(.. scope .(), name), key, field.Name);
 				}
 				code.AppendF("{}default:\n", body);
-				e.Return(scope $"{body}\t", scope $"JsonBeef.JsonBind.BadKey(_rd, {AppendLiteral(.. scope .(), scope $"one of: {cases}")})");
+				e.Return(scope $"{body}\t", scope $"JsonBeef.JsonBind.BadKey(_rd, {Literal.Append(.. scope .(), scope $"one of: {cases}")})");
 				code.AppendF("{}}}\n", body);
 			}
 			// The key's text, for the path of an error in its value
@@ -669,7 +652,7 @@ public static class JsonSerializerCodeGen
 		if (ownsValues)
 		{
 			code.AppendF("{0}\t\tif (_alloc == null)\n{0}\t\t{{\n", body);
-			EmitDelete(code, scope $"{body}\t\t\t", spec.mItem, scope $"(*{valuePtr})");
+			Ownership.EmitDelete(code, scope $"{body}\t\t\t", spec.mItem, scope $"(*{valuePtr})");
 			code.AppendF("{0}\t\t}}\n", body);
 		}
 		code.AppendF("{0}\t}}\n{0}}}\n{0}*{1} = default;\n{0}if (!JsonBeef.JsonBind.Value(_rd))\n", body, valuePtr);
@@ -680,79 +663,6 @@ public static class JsonSerializerCodeGen
 		code.AppendF("{}}}\n{}}}\n", inner, indent);
 	}
 
-	/// `new T(args)` from the read's allocator when there is one, else the heap.
-	[Comptime]
-	static void NewExpr(StringView typeName, String code, StringView args = "")
-	{
-		code.AppendF("((_alloc != null) ? new:_alloc {0}({1}) : new {0}({1}))", typeName, args);
-	}
-
-	/// Whether a value of `spec` owns heap objects to delete when it is replaced (a String, a class, a
-	/// List, a Dictionary).
-	[Comptime]
-	static bool NeedsDelete(ValueSpec spec)
-	{
-		switch (spec.mKind)
-		{
-		case .String, .List, .Dictionary:
-			return true;
-		case .Object, .Converter:
-			return !spec.mType.IsValueType;
-		default:
-			return false;
-		}
-	}
-
-	/// Deletes the value `expr` (when the object owns it: no allocator) and sets it to null.
-	[Comptime]
-	static void EmitDeleteOwned(String code, StringView indent, ValueSpec spec, StringView expr)
-	{
-		code.AppendF("{}if (_alloc == null && {} != null)\n{}{{\n", indent, expr, indent);
-		EmitDelete(code, scope $"{indent}\t", spec, expr);
-		code.AppendF("{}}}\n", indent);
-	}
-
-	/// Deletes `expr` and everything it owns (a List's or Dictionary's items, keys, nested containers).
-	[Comptime]
-	static void EmitDelete(String code, StringView indent, ValueSpec spec, StringView expr)
-	{
-		if (!NeedsDelete(spec))
-			return;
-		if (spec.mKind == .List || spec.mKind == .Dictionary)
-			EmitClearItems(code, indent, spec, expr);
-		code.AppendF("{}delete {};\n", indent, expr);
-	}
-
-	/// Deletes what a List's or Dictionary's items own (not the container itself).
-	[Comptime]
-	static void EmitClearItems(String code, StringView indent, ValueSpec spec, StringView expr)
-	{
-		bool ownsKeys = spec.mKind == .Dictionary && spec.mKeyKind == .String;
-		bool ownsItems = NeedsDelete(spec.mItem);
-		if (!ownsKeys && !ownsItems)
-			return;
-		let item = scope $"_x{indent.Length}";
-		code.AppendF("{}if (_alloc == null)\n{}{{\n{}\tfor (let {} in {})\n{}\t{{\n", indent, indent, indent, item, expr, indent);
-		if (spec.mKind == .Dictionary)
-		{
-			if (ownsKeys)
-				code.AppendF("{}\t\tdelete {}.key;\n", indent, item);
-			if (ownsItems)
-			{
-				code.AppendF("{}\t\tif ({}.value != null)\n{}\t\t{{\n", indent, item, indent);
-				EmitDelete(code, scope $"{indent}\t\t\t", spec.mItem, scope $"{item}.value");
-				code.AppendF("{}\t\t}}\n", indent);
-			}
-		}
-		else
-		{
-			code.AppendF("{}\t\tif ({} != null)\n{}\t\t{{\n", indent, item, indent);
-			EmitDelete(code, scope $"{indent}\t\t\t", spec.mItem, item);
-			code.AppendF("{}\t\t}}\n", indent);
-		}
-		code.AppendF("{}\t}}\n{}}}\n", indent, indent);
-	}
-
 	// Writing to a JsonWriter
 
 	[Comptime]
@@ -761,13 +671,13 @@ public static class JsonSerializerCodeGen
 		let code = e.mCode;
 		code.Append("\t_w.WriteStartObject();\n");
 		if (!plan.mDiscriminator.IsEmpty)
-			code.AppendF("\t_w.WritePropertyName({});\n\t_w.WriteString({});\n", AppendLiteral(.. scope .(), plan.mDiscriminator), AppendLiteral(.. scope .(), plan.mTypeName));
+			code.AppendF("\t_w.WritePropertyName({});\n\t_w.WriteString({});\n", Literal.Append(.. scope .(), plan.mDiscriminator), Literal.Append(.. scope .(), plan.mTypeName));
 		for (let field in plan.mFields)
 		{
 			let value = scope $"this.{field.mField.Name}";
-			let name = AppendLiteral(.. scope .(), field.mName);
+			let name = Literal.Append(.. scope .(), field.mName);
 			e.mNaming = field.mNaming;
-			if (attribute.OmitNulls && CanBeNull(field.mSpec))
+			if (attribute.OmitNulls && field.mSpec.CanBeNull)
 			{
 				code.AppendF("\tif ({})\n\t{{\n\t\t_w.WritePropertyName({});\n", NotNullExpr(field.mSpec, value, .. scope .()), name);
 				EmitWriteValue(e, "\t\t", field.mSpec, value);
@@ -780,12 +690,6 @@ public static class JsonSerializerCodeGen
 			}
 		}
 		code.Append("\t_w.WriteEndObject();\n");
-	}
-
-	[Comptime]
-	static bool CanBeNull(ValueSpec spec)
-	{
-		return spec.mKind == .Nullable || (!spec.mType.IsValueType && spec.mKind != .Converter);
 	}
 
 	[Comptime]
@@ -808,7 +712,7 @@ public static class JsonSerializerCodeGen
 		case .Bool:
 			code.AppendF("{}_w.WriteBool({});\n", indent, value);
 		case .Integer:
-			code.AppendF("{}_w.WriteNumber(({}){});\n", indent, IsUInt64(spec.mType) ? "uint64" : (spec.mType.IsSigned || spec.mType.Size < 8) ? "int64" : "uint64", value);
+			code.AppendF("{}_w.WriteNumber(({}){});\n", indent, TypeShapes.IsUInt64(spec.mType) ? "uint64" : (spec.mType.IsSigned || spec.mType.Size < 8) ? "int64" : "uint64", value);
 		case .Float:
 			if (spec.mType == typeof(float))
 				code.AppendF("{}_w.WriteFloat({});\n", indent, value);
@@ -821,8 +725,8 @@ public static class JsonSerializerCodeGen
 			if (spec.mEnumNumbers)
 			{
 				code.AppendF("{}if (", indent);
-				EmitIsCase(code, spec.mType, value);
-				code.AppendF(")\n{}\t_w.WriteNumber((int64){});\n{}else\n{}\tJsonBeef.JsonBind.InvalidEnum(_w, {}, (int64){});\n", indent, value, indent, indent, AppendLiteral(.. scope .(), typeName), value);
+				EnumEmit.EmitIsCase(code, spec.mType, value);
+				code.AppendF(")\n{}\t_w.WriteNumber((int64){});\n{}else\n{}\tJsonBeef.JsonBind.InvalidEnum(_w, {}, (int64){});\n", indent, value, indent, indent, Literal.Append(.. scope .(), typeName), value);
 			}
 			else
 			{
@@ -830,9 +734,9 @@ public static class JsonSerializerCodeGen
 				for (let field in spec.mType.GetFields())
 				{
 					if (field.IsEnumCase)
-						code.AppendF("{}case .{}: _w.WriteString({});\n", indent, field.Name, AppendLiteral(.. scope .(), ApplyNaming(field.Name, CaseNaming(e), .. scope .())));
+						code.AppendF("{}case .{}: _w.WriteString({});\n", indent, field.Name, Literal.Append(.. scope .(), Naming.Apply(field.Name, CaseNaming(e), .. scope .())));
 				}
-				code.AppendF("{}default: JsonBeef.JsonBind.InvalidEnum(_w, {}, (int64){});\n{}}}\n", indent, AppendLiteral(.. scope .(), typeName), value, indent);
+				code.AppendF("{}default: JsonBeef.JsonBind.InvalidEnum(_w, {}, (int64){});\n{}}}\n", indent, Literal.Append(.. scope .(), typeName), value, indent);
 			}
 		case .Converter:
 			code.AppendF("{}{}.Write({}, _w);\n", indent, spec.mConverter.GetFullName(.. scope .()), value);
@@ -875,37 +779,20 @@ public static class JsonSerializerCodeGen
 		case .String:
 			code.AppendF("{0}if ({1} == null)\n{0}\tcontinue;\n{0}StringView {2} = {1};\n", indent, key, local);
 		case .Integer:
-			code.AppendF("{}let {} = scope String();\n{}(({}){}).ToString({});\n", indent, local, indent, IsUInt64(spec.mKeyType) ? "uint64" : "int64", key, local);
+			code.AppendF("{}let {} = scope String();\n{}(({}){}).ToString({});\n", indent, local, indent, TypeShapes.IsUInt64(spec.mKeyType) ? "uint64" : "int64", key, local);
 		default:
 			let typeName = spec.mKeyType.GetFullName(.. scope .());
 			code.AppendF("{}StringView {};\n{}switch ({})\n{}{{\n", indent, local, indent, key, indent);
 			for (let field in spec.mKeyType.GetFields())
 			{
 				if (field.IsEnumCase)
-					code.AppendF("{}case .{}: {} = {};\n", indent, field.Name, local, AppendLiteral(.. scope .(), ApplyNaming(field.Name, CaseNaming(e), .. scope .())));
+					code.AppendF("{}case .{}: {} = {};\n", indent, field.Name, local, Literal.Append(.. scope .(), Naming.Apply(field.Name, CaseNaming(e), .. scope .())));
 			}
 			if (writer)
-				code.AppendF("{0}default:\n{0}\tJsonBeef.JsonBind.InvalidEnum(_w, {1}, (int64){2});\n{0}\tcontinue;\n{0}}}\n", indent, AppendLiteral(.. scope .(), typeName), key);
+				code.AppendF("{0}default:\n{0}\tJsonBeef.JsonBind.InvalidEnum(_w, {1}, (int64){2});\n{0}\tcontinue;\n{0}}}\n", indent, Literal.Append(.. scope .(), typeName), key);
 			else
-				code.AppendF("{0}default:\n{0}\treturn .Err(JsonBeef.JsonBind.InvalidEnumError({1}, (int64){2}));\n{0}}}\n", indent, AppendLiteral(.. scope .(), typeName), key);
+				code.AppendF("{0}default:\n{0}\treturn .Err(JsonBeef.JsonBind.InvalidEnumError({1}, (int64){2}));\n{0}}}\n", indent, Literal.Append(.. scope .(), typeName), key);
 		}
-	}
-
-	/// `value == .A || value == .B …`: whether an enum value is one of its cases.
-	[Comptime]
-	static void EmitIsCase(String code, Type enumType, StringView value)
-	{
-		int count = 0;
-		for (let field in enumType.GetFields())
-		{
-			if (!field.IsEnumCase)
-				continue;
-			if (count++ > 0)
-				code.Append(" || ");
-			code.AppendF("{} == .{}", value, field.Name);
-		}
-		if (count == 0)
-			code.Append("false");
 	}
 
 	// Writing into a JsonNode, in place
@@ -916,15 +803,15 @@ public static class JsonSerializerCodeGen
 		let code = e.mCode;
 		code.Append("\tJsonBeef.JsonBind.MakeObject(_node);\n");
 		if (!plan.mDiscriminator.IsEmpty)
-			code.AppendF("\tJsonBeef.JsonBind.SetText(_node.Set({}), {});\n", AppendLiteral(.. scope .(), plan.mDiscriminator), AppendLiteral(.. scope .(), plan.mTypeName));
+			code.AppendF("\tJsonBeef.JsonBind.SetText(_node.Set({}), {});\n", Literal.Append(.. scope .(), plan.mDiscriminator), Literal.Append(.. scope .(), plan.mTypeName));
 		for (let field in plan.mFields)
 		{
 			let value = scope $"this.{field.mField.Name}";
-			let name = AppendLiteral(.. scope .(), field.mName);
+			let name = Literal.Append(.. scope .(), field.mName);
 			e.mNaming = field.mNaming;
 			for (let alias in field.mAliases)
-				code.AppendF("\tJsonBeef.JsonBind.RenameAlias(_node, {}, {});\n", name, AppendLiteral(.. scope .(), alias));
-			if (attribute.OmitNulls && CanBeNull(field.mSpec))
+				code.AppendF("\tJsonBeef.JsonBind.RenameAlias(_node, {}, {});\n", name, Literal.Append(.. scope .(), alias));
+			if (attribute.OmitNulls && field.mSpec.CanBeNull)
 			{
 				code.AppendF("\tif (!({}))\n\t\t_node.RemoveMember({});\n\telse\n\t{{\n", NotNullExpr(field.mSpec, value, .. scope .()), name);
 				code.AppendF("\t\tlet _c = _node.Set({});\n", name);
@@ -953,7 +840,7 @@ public static class JsonSerializerCodeGen
 		case .Bool:
 			code.AppendF("{}JsonBeef.JsonBind.SetBool({}, {});\n", indent, node, value);
 		case .Integer:
-			if (IsUInt64(spec.mType) || (!spec.mType.IsSigned && spec.mType.Size == 8))
+			if (TypeShapes.IsUInt64(spec.mType) || (!spec.mType.IsSigned && spec.mType.Size == 8))
 				code.AppendF("{}JsonBeef.JsonBind.SetUInt64({}, (uint64){});\n", indent, node, value);
 			else
 				code.AppendF("{}JsonBeef.JsonBind.SetInteger({}, (int64){});\n", indent, node, value);
@@ -969,8 +856,8 @@ public static class JsonSerializerCodeGen
 			if (spec.mEnumNumbers)
 			{
 				code.AppendF("{}if (!(", indent);
-				EmitIsCase(code, spec.mType, value);
-				code.AppendF("))\n{}\treturn .Err(JsonBeef.JsonBind.InvalidEnumError({}, (int64){}));\n{}JsonBeef.JsonBind.SetInteger({}, (int64){});\n", indent, AppendLiteral(.. scope .(), typeName), value, indent, node, value);
+				EnumEmit.EmitIsCase(code, spec.mType, value);
+				code.AppendF("))\n{}\treturn .Err(JsonBeef.JsonBind.InvalidEnumError({}, (int64){}));\n{}JsonBeef.JsonBind.SetInteger({}, (int64){});\n", indent, Literal.Append(.. scope .(), typeName), value, indent, node, value);
 			}
 			else
 			{
@@ -978,9 +865,9 @@ public static class JsonSerializerCodeGen
 				for (let field in spec.mType.GetFields())
 				{
 					if (field.IsEnumCase)
-						code.AppendF("{}case .{}: JsonBeef.JsonBind.SetText({}, {});\n", indent, field.Name, node, AppendLiteral(.. scope .(), ApplyNaming(field.Name, CaseNaming(e), .. scope .())));
+						code.AppendF("{}case .{}: JsonBeef.JsonBind.SetText({}, {});\n", indent, field.Name, node, Literal.Append(.. scope .(), Naming.Apply(field.Name, CaseNaming(e), .. scope .())));
 				}
-				code.AppendF("{}default: return .Err(JsonBeef.JsonBind.InvalidEnumError({}, (int64){}));\n{}}}\n", indent, AppendLiteral(.. scope .(), typeName), value, indent);
+				code.AppendF("{}default: return .Err(JsonBeef.JsonBind.InvalidEnumError({}, (int64){}));\n{}}}\n", indent, Literal.Append(.. scope .(), typeName), value, indent);
 			}
 		case .Converter:
 			let text = e.Local("ct", .. scope .());
@@ -1021,58 +908,4 @@ public static class JsonSerializerCodeGen
 		}
 	}
 
-	// Helpers
-
-	/// Appends `text` as a Beef string literal (control characters as escapes only with `escapeAll`, for
-	/// the generated source itself; names cannot hold them).
-	[Comptime]
-	static void AppendLiteral(String code, StringView text, bool escapeAll = false)
-	{
-		code.Append('"');
-		for (let c in text.RawChars)
-		{
-			switch (c)
-			{
-			case '"': code.Append("\\\"");
-			case '\\': code.Append("\\\\");
-			case '\n': code.Append("\\n");
-			case '\t': code.Append("\\t");
-			case '\r': code.Append("\\r");
-			default:
-				if ((uint8)c < 0x20 && !escapeAll)
-					Runtime.FatalError(scope $"[JsonObject] \"{text}\" contains a control character");
-				code.Append(c);
-			}
-		}
-		code.Append('"');
-	}
-
-	/// The smallest and largest value of an integer type below 64 unsigned bits, as int64 source
-	/// expressions.
-	[Comptime]
-	static void IntegerRange(Type type, String min, String max)
-	{
-		int bits = type.Size * 8;
-		if (bits == 64)
-		{
-			min.Append("int64.MinValue");
-			max.Append("int64.MaxValue");
-		}
-		else if (type.IsSigned)
-		{
-			min.AppendF("{}", -(1L << (bits - 1)));
-			max.AppendF("{}", (1L << (bits - 1)) - 1);
-		}
-		else
-		{
-			min.Append("0");
-			max.AppendF("{}", (1L << bits) - 1);
-		}
-	}
-
-	[Comptime]
-	static bool IsUInt64(Type type)
-	{
-		return type.IsInteger && type.Size == 8 && !type.IsSigned;
-	}
 }

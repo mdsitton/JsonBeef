@@ -1,55 +1,18 @@
 using System;
 using System.Collections;
 using System.Reflection;
+using FormatCore.Mapping;
+using internal FormatCore;
 
 namespace JsonBeef;
 
-/// The planning half of the generator: what each value is (ValueSpec, recursively through Lists,
-/// Dictionaries and `T?`), the members a type's [JsonObject] chain maps and the conflicts between them,
-/// all checked before JsonSerializerCodeGen.bf writes any code. Naming and type helpers both halves use
-/// are here too. (XmlBeef's XmlSerializerPlan, with JSON's shapes: no roles, any nesting.)
+/// The planning half of the generator: what each value is (FormatCore's ValueSpec, recursively through
+/// Lists, Dictionaries and `T?`), the members a type's [JsonObject] chain maps and the conflicts between
+/// them, all checked before JsonSerializerCodeGen.bf writes any code. Runs in the mixin stage (bodies
+/// through FormatCore's MappingDriver), so converter and subtype lookups (FormatCore's Registry) see the
+/// user's project and what it depends on, however many projects depend on JsonBeef.
 extension JsonSerializerCodeGen
 {
-	enum Kind
-	{
-		Unsupported,
-		Bool,
-		Integer,
-		Float,
-		String,
-		Enum,
-		/// A [JsonObject] type, or one implementing IJsonSerializable by hand
-		Object,
-		List,
-		/// Dictionary<K, V>
-		Dictionary,
-		/// Nullable<T>
-		Nullable,
-		/// An IJsonConverter<T>: from [JsonUseConverter] on the field, or registered with [JsonConverter]
-		Converter
-	}
-
-	/// What a value of one type is, and how its parts are (a List's items, a Dictionary's values and
-	/// keys, a Nullable's value).
-	class ValueSpec
-	{
-		public Type mType;
-		public Kind mKind;
-		public Type mConverter;
-		/// List item, Dictionary value, Nullable value.
-		public ValueSpec mItem ~ delete _;
-		public Type mKeyType;
-		public Kind mKeyKind;
-		/// Object: a class whose chain has a Discriminator (subtypes dispatched on reading).
-		public bool mPolymorphic;
-		/// Enums: as their integer values ([JsonObject] EnumsAsNumbers of the owning type).
-		public bool mEnumNumbers;
-
-		public this()
-		{
-		}
-	}
-
 	/// One member a field maps: its names (raw text), its value, its slot (the bit that notes it was read).
 	class FieldPlan
 	{
@@ -160,7 +123,7 @@ extension JsonSerializerCodeGen
 		if (field.GetCustomAttribute<JsonNameAttribute>() case .Ok(let named))
 			plan.mName.Set(named.mName);
 		else
-			ApplyNaming(field.Name, attribute.Naming, plan.mName);
+			Naming.Apply(field.Name, attribute.Naming, plan.mName);
 		for (let alias in field.GetCustomAttributes<JsonAliasAttribute>())
 			plan.mAliases.Add(new .(alias.mName));
 		plan.mRequired = field.HasCustomAttribute<JsonRequiredAttribute>();
@@ -179,23 +142,23 @@ extension JsonSerializerCodeGen
 		spec.mType = type;
 		spec.mEnumNumbers = attribute.EnumsAsNumbers;
 		Type item = null;
-		if ((item = ListElement(type)) != null)
+		if ((item = TypeShapes.ListElement(type)) != null)
 		{
 			spec.mKind = .List;
 			spec.mItem = Spec(item, useConverter, attribute, ownerName, fieldName);
 			return spec;
 		}
-		if ((item = DictionaryValue(type)) != null)
+		if ((item = TypeShapes.DictionaryValue(type)) != null)
 		{
 			spec.mKind = .Dictionary;
-			spec.mKeyType = DictionaryKey(type);
-			spec.mKeyKind = KeyKind(spec.mKeyType);
+			spec.mKeyType = TypeShapes.DictionaryKey(type);
+			spec.mKeyKind = TypeShapes.KeyKind(spec.mKeyType);
 			if (spec.mKeyKind == .Unsupported)
 				Fail(ownerName, fieldName, scope $"dictionary keys must be String, integers or enums (JSON member names are text), not {spec.mKeyType.GetFullName(.. scope .())}");
 			spec.mItem = Spec(item, useConverter, attribute, ownerName, fieldName);
 			return spec;
 		}
-		if ((item = NullableValue(type)) != null)
+		if ((item = TypeShapes.NullableValue(type)) != null)
 		{
 			spec.mKind = .Nullable;
 			spec.mItem = Spec(item, useConverter, attribute, ownerName, fieldName);
@@ -236,14 +199,14 @@ extension JsonSerializerCodeGen
 	[Comptime]
 	static void Fail(StringView ownerName, StringView fieldName, StringView message)
 	{
-		Runtime.FatalError(scope $"[JsonObject] {ownerName}.{fieldName}: {message}");
+		MappingError.Fail("[JsonObject]", ownerName, fieldName, message);
 	}
 
 	/// A mapping error about the type as a whole: `message` names the fields (with their declaring types).
 	[Comptime]
 	static void FailType(StringView ownerName, StringView message)
 	{
-		Runtime.FatalError(scope $"[JsonObject] {ownerName}: {message}");
+		MappingError.FailType("[JsonObject]", ownerName, message);
 	}
 
 	/// Member names may be any text but control characters (a Beef string literal holds them).
@@ -259,19 +222,14 @@ extension JsonSerializerCodeGen
 
 	/// How a value of `type` is handled (not a List, Dictionary or Nullable: Spec takes those first).
 	[Comptime]
-	static Kind Classify(Type type, out Type converter)
+	static ValueKind Classify(Type type, out Type converter)
 	{
 		converter = null;
-		if (type == typeof(bool))
-			return .Bool;
+		let scalar = TypeShapes.ScalarKind(type);
+		if (scalar != .Unsupported)
+			return scalar;
 		if (type == typeof(char8) || type == typeof(char16) || type == typeof(char32))
 			return .Unsupported;
-		if (type.IsInteger)
-			return .Integer;
-		if (type == typeof(float) || type == typeof(double))
-			return .Float;
-		if (type == typeof(String))
-			return .String;
 		converter = FindRegisteredConverter(type);
 		if (converter != null)
 			return .Converter;
@@ -318,14 +276,15 @@ extension JsonSerializerCodeGen
 			if (attribute.TypeName != null)
 				name.Append(attribute.TypeName);
 			else
-				ApplyNaming(type.GetName(.. scope .()), attribute.Naming, name);
+				Naming.Apply(type.GetName(.. scope .()), attribute.Naming, name);
 		}
 		else
 			name.Append(type.GetName(.. scope .()));
 	}
 
 	/// The [JsonObject] classes a field of class `type` with a discriminator can hold: `type` itself
-	/// unless abstract, and every visible, concrete [JsonObject] class deriving from it.
+	/// unless abstract, and every concrete [JsonObject] class deriving from it that the user's project
+	/// can see (Registry.IsVisible: only valid in the mixin stage, which is where bodies are planned).
 	[Comptime]
 	static void SubTypes(Type type, List<Type> types)
 	{
@@ -333,7 +292,7 @@ extension JsonSerializerCodeGen
 			types.Add(type);
 		for (let declaration in Type.TypeDeclarations)
 		{
-			if (!(declaration.DeclaredInCurrent || declaration.DeclaredInDependency || declaration.AlwaysVisible))
+			if (!Registry.IsVisible(declaration))
 				continue;
 			if (!declaration.HasCustomAttribute<JsonObjectAttribute>())
 				continue;
@@ -345,123 +304,30 @@ extension JsonSerializerCodeGen
 		}
 	}
 
-	/// The T of a List<T>, or null.
-	[Comptime]
-	static Type ListElement(Type type)
-	{
-		if (let specialized = type as SpecializedGenericType)
-		{
-			if (specialized.UnspecializedType == typeof(List<>))
-				return specialized.GetGenericArg(0);
-		}
-		return null;
-	}
-
-	/// The V of a Dictionary<K, V>, or null.
-	[Comptime]
-	static Type DictionaryValue(Type type)
-	{
-		if (let specialized = type as SpecializedGenericType)
-		{
-			if (specialized.UnspecializedType == typeof(Dictionary<,>))
-				return specialized.GetGenericArg(1);
-		}
-		return null;
-	}
-
-	/// The K of a Dictionary<K, V>, or null.
-	[Comptime]
-	static Type DictionaryKey(Type type)
-	{
-		if (let specialized = type as SpecializedGenericType)
-		{
-			if (specialized.UnspecializedType == typeof(Dictionary<,>))
-				return specialized.GetGenericArg(0);
-		}
-		return null;
-	}
-
-	/// The T of a Nullable<T> (`T?`), or null.
-	[Comptime]
-	static Type NullableValue(Type type)
-	{
-		if (let specialized = type as SpecializedGenericType)
-		{
-			if (specialized.UnspecializedType == typeof(Nullable<>))
-				return specialized.GetGenericArg(0);
-		}
-		return null;
-	}
-
-	/// The kind of a dictionary key type, or Unsupported: String, integers (decimal text) and simple enums
-	/// (their case names).
-	[Comptime]
-	static Kind KeyKind(Type type)
-	{
-		if (type == typeof(String))
-			return .String;
-		if (type == typeof(char8) || type == typeof(char16) || type == typeof(char32) || type == typeof(bool))
-			return .Unsupported;
-		if (type.IsInteger)
-			return .Integer;
-		if (type.IsEnum && !type.IsUnion)
-			return .Enum;
-		return .Unsupported;
-	}
-
-	/// The converter registered with [JsonConverter(typeof(target))] that the type being compiled can
-	/// see, or null. Two such registrations stop the build.
+	/// The converter registered with [JsonConverter(typeof(target))] that the user's project can see, or
+	/// null (Registry.IsVisible, in the mixin stage: the AlwaysVisible test it replaces lost the user's
+	/// converters once a second project depended on JsonBeef). Two such registrations stop the build.
 	[Comptime]
 	static Type FindRegisteredConverter(Type target)
 	{
 		Type found = null;
 		for (let declaration in Type.TypeDeclarations)
 		{
-			if (!(declaration.DeclaredInCurrent || declaration.DeclaredInDependency || declaration.AlwaysVisible))
+			if (!Registry.IsVisible(declaration))
 				continue;
 			if (!(declaration.GetCustomAttribute<JsonConverterAttribute>() case .Ok(let registration)) || registration.mTarget != target)
 				continue;
 			let converter = declaration.ResolvedType;
 			if (found != null && found != converter)
-				Runtime.FatalError(scope $"[JsonConverter] Both {found.GetFullName(.. scope .())} and {converter.GetFullName(.. scope .())} are registered for {target.GetFullName(.. scope .())}. Keep one, or pick one per field with [JsonUseConverter].");
+			{
+				// Named in a stable order (declarations come in no fixed order)
+				let a = found.GetFullName(.. scope .());
+				let b = converter.GetFullName(.. scope .());
+				bool inOrder = String.Compare(a, b, false) <= 0;
+				Runtime.FatalError(scope $"[JsonConverter] Both {inOrder ? a : b} and {inOrder ? b : a} are registered for {target.GetFullName(.. scope .())}. Keep one, or pick one per field with [JsonUseConverter].");
+			}
 			found = converter;
 		}
 		return found;
-	}
-
-	/// Appends the member name for `name`. Words start at an upper-case letter that follows a lower-case
-	/// letter or digit, or that ends an acronym (the last capital before a lower-case letter), so
-	/// `HTTPPort` splits as HTTP, Port; underscores also split.
-	[Comptime]
-	static void ApplyNaming(StringView name, JsonNaming naming, String result)
-	{
-		if (naming == .AsDeclared)
-		{
-			result.Append(name);
-			return;
-		}
-		int words = 0;
-		int i = 0;
-		while (i < name.Length)
-		{
-			if (name[i] == '_')
-			{
-				i++;
-				continue;
-			}
-			int start = i++;
-			while (i < name.Length && name[i] != '_' && !(name[i].IsUpper && (name[i - 1].IsLower || name[i - 1].IsDigit ||
-				(name[i - 1].IsUpper && i + 1 < name.Length && name[i + 1].IsLower))))
-				i++;
-
-			if (words > 0 && (naming == .KebabCase || naming == .SnakeCase))
-				result.Append(naming == .KebabCase ? '-' : '_');
-			for (int j = start; j < i; j++)
-			{
-				bool upper = (j == start) && (naming == .PascalCase || (naming == .CamelCase && words > 0));
-				result.Append(upper ? name[j].ToUpper : name[j].ToLower);
-			}
-			words++;
-		}
 	}
 }
