@@ -349,7 +349,7 @@ fit a finite binary64; JCS mode implies it.
    `10^|q|` are exact doubles and one IEEE multiply or divide is correctly rounded. Extension: if `q` > 22
    but `w · 10^(q−22)` is still ≤ 2^53 (few digits, e.g. `1e30`), multiply the integer first. Requires
    real binary64 arithmetic (SSE2), not x87 extended precision, which double-rounds. TomlBeef already
-   has this path: `TryParsePlainFloat` in `~/development/TomlBeef/src/TomlBeef/TomlParser.Values.bf`
+   has this path: `TryParsePlainFloat` in TomlBeef's `src/TomlBeef/TomlParser.Values.bf`
    (≤ 19 digits, mantissa ≤ 2^53, exponent within ±22, else falls through), next to `TryParsePlainInteger`
    (1–18 digits into `int64`). Both port directly; JSON's grammar is simpler (no `_`, no `+`, no
    leading zeros) and the scanner already knows the token's digit count and exponent.
@@ -372,7 +372,7 @@ fit a finite binary64; JCS mode implies it.
    <https://github.com/fastfloat/fast_float>.
 4. **What the Beef runtime already provides**: `Double.Parse(StringView)` in corlib calls BeefRT's
    bundled **fast_float** (`BeefRT/rt/fast_float.h`, upstream Beef commit `90ccf552`, 2026-08-25;
-   present in the installed `/opt/BeefLang/bin/libBeefRT.a`): correctly rounded, overflow → ±∞ and
+   present in the released BeefBuild 0.43.6's `libBeefRT.a`): correctly rounded, overflow → ±∞ and
    underflow → ±0 count as success. Caveats: corlib's wrapper accepts `+`, `Infinity`/`NaN` (culture
    symbols, case-insensitive), leading `.` and other non-JSON forms, so JsonBeef must validate the JSON
    grammar itself and only hand over a validated token; it looks up `NumberFormatInfo.CurrentInfo` on

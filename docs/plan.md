@@ -3,7 +3,8 @@
 JsonBeef is a JSON (RFC 8259) parser and writer for the Beef programming language: fully correct by
 default, fast, with located errors, and with the opt-in extensions config files need (JSONC comments
 and trailing commas, JSON5, JSON Lines). It is the fourth sibling of TomlBeef
-(`~/development/TomlBeef`), KdlBeef (`~/development/KdlBeef`) and XmlBeef (`~/development/XmlBeef`)
+(https://github.com/mdsitton/TomlBeef), KdlBeef (https://github.com/mdsitton/KdlBeef) and XmlBeef
+(https://github.com/mdsitton/XmlBeef)
 and reuses their design, tooling and, where it fits, their code: a pull reader under an ID-based
 document, compile-time typed mapping, a Positions/PreserveStyle sidecar, resource limits and streams.
 

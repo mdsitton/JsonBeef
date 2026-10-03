@@ -3,10 +3,10 @@
 ## Notes for coding agents
 
 - This repository is a Beef language project: a JSON (RFC 8259) parser and writer, the sibling of
-  TomlBeef (`~/development/TomlBeef`, TOML), KdlBeef (`~/development/KdlBeef`, KDL) and XmlBeef
-  (`~/development/XmlBeef`, XML) by the same author. Much of its design and some of its code come from
-  there; `docs/plan.md` lists what to port.
-- **FormatCore** (`~/development/FormatCore`, `https://github.com/mdsitton/FormatCore.git`) is the
+  TomlBeef (https://github.com/mdsitton/TomlBeef, TOML), KdlBeef (https://github.com/mdsitton/KdlBeef,
+  KDL) and XmlBeef (https://github.com/mdsitton/XmlBeef, XML) by the same author. Much of its design and
+  some of its code come from there; `docs/plan.md` lists what to port.
+- **FormatCore** (https://github.com/mdsitton/FormatCore) is the
   shared core of the four: input cursors, UTF-8 and SWAR scanning, errors, arenas and node tables,
   numbers, the typed-mapping driver, test and benchmark tooling. JsonBeef depends on it (the library's
   `BeefProj.toml` by Git, `Version = "0.1"`: BeefBuild fetches the highest matching tag and pins it in
@@ -16,8 +16,8 @@
   AGENTS.md), never by copying it back here; `docs/architecture.md` says which parts moved.
 - Beef `String` stores UTF-8 data and is mutable. Prefer `StringView` for borrowed string inputs.
 - Beef uses manual and scope-based memory management. There is no tracing garbage collector.
-- This project currently targets Linux64 first; Windows is verified with the Proton-hosted Beef
-  (`~/development/beef-proton/bin/beefbuild-win`, `bash ./win-test.sh`).
+- This project currently targets Linux64 first; Windows is verified with the Windows BeefBuild under
+  Proton (a `beefbuild-win` wrapper on the PATH, `bash ./win-test.sh`).
 - Preferred CLI tool: `beefbuild` on Linux, `BeefBuild` on Windows. Use from `PATH`.
 - `tests/suites/` (JSON test suites and corpora, fetched by `tests/fetch-suites.sh`) and
   `bench/compare/deps/` (other implementations, fetched by `bench/compare/fetch.sh`) are external,
@@ -53,7 +53,7 @@ This block is FormatCore's `docs/agents-common.md`, written into each repository
 - **Use US English spellings** in code, comments and documentation (neighbor, color, behavior).
 - **Commit as Matthew Sitton <matthewsitton@gmail.com>**: `git -c user.name="Matthew Sitton" -c user.email="matthewsitton@gmail.com" commit ...` (the global git identity can differ).
 - **Windows is verified**, not deferred: the `[Test]`s run under the Proton-hosted Windows Beef
-  (`~/development/beef-proton/bin/beefbuild-win`) in Test and TestRelease (`bash ./win-test.sh`)
+  (a `beefbuild-win` wrapper on the PATH, or `BEEFBUILD_WIN`) in Test and TestRelease (`bash ./win-test.sh`)
   before committing.
 - **Benchmarks do not wait for a quiet machine** (this machine never is): a benchmark's `run.sh` samples until each run converges and repeats processes until enough agree within ±10% (`bench/compare/measure.sh`, from FormatCore's bench-kit), marking a cell that never settles `~`. Run it as it is, whatever the load; report the load average and the `~` cells with the figures, and rerun (`ONLY=...`) cells that did not settle before drawing conclusions from them. A cell past its time limit is DNF, not waited out. Small changes are compared with `bench/instructions.sh` (user-space instructions per input byte), which the load does not disturb.
 - **Run shell scripts with bash** (`bash ./script.sh`): the interactive shell is not bash, and unquoted variables do not word-split.
@@ -208,9 +208,11 @@ Frame #0 is the crash point. Mangled names map to files (`bf::JsonBeef::JsonRead
 
 - JSON: RFC 8259 (https://www.rfc-editor.org/rfc/rfc8259), ECMA-404; I-JSON (RFC 7493); summarized
   with extensions (JSONC, JSON5, JSON Lines) and edge cases in `docs/spec-reference.md`
-- FormatCore (the shared core): `~/development/FormatCore`, its `docs/architecture.md` and
-  `docs/migration.md`
+- FormatCore (the shared core): https://github.com/mdsitton/FormatCore, its `docs/architecture.md`
+  and `docs/migration.md`
 - KdlBeef and XmlBeef (pull reader under a document, ID-based nodes, comptime typed mapping):
-  `~/development/KdlBeef`, `~/development/XmlBeef`; TomlBeef: `~/development/TomlBeef`
-- Official Beef documentation: `https://www.beeflang.org/docs/`; docs source `~/development/Beef_website`
-- Beef language and tool source: `~/development/Beef`
+  https://github.com/mdsitton/KdlBeef, https://github.com/mdsitton/XmlBeef; TomlBeef:
+  https://github.com/mdsitton/TomlBeef
+- Official Beef documentation: https://www.beeflang.org/docs/; docs source
+  https://github.com/beefytech/Beef_website
+- Beef language and tool source: https://github.com/beefytech/Beef

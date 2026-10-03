@@ -23,7 +23,7 @@ the suites in [test-suites.md](test-suites.md). Code conventions and Beef gotcha
   conversion to double reports `NumberOutOfRange`.
 - **Few allocations.** Token strings are views of the input; only strings with escapes are decoded,
   into one reusable buffer.
-- **Built on FormatCore** (`~/development/FormatCore`, the shared core of the author's four format
+- **Built on FormatCore** (https://github.com/mdsitton/FormatCore, the shared core of the author's four format
   libraries; most of its input, number and mapping designs came from here). JsonBeef uses its cursors
   (`ByteCursor`/`BufferedStreamCursor<JsonText>`, `LineCounter`, `InputStart`), SWAR, UTF-8 and hex
   helpers, the error carrier (`JsonParseError` and `JsonDiagnostic` are typealiases of

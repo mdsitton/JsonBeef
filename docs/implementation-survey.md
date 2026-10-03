@@ -2,7 +2,7 @@
 
 This survey covers what the Beef JSON libraries and about forty JSON libraries in other languages do, how they do it, and what JsonBeef should take or avoid. The sources were read from shallow clones made on 2026-10-01 (last-commit dates are in the tables). The clones were scratch copies under `/tmp`, not pinned; the pinned copies for benchmarking live in `bench/compare/`. File references are relative to each clone.
 
-The Beef libraries were built with BeefBuild 0.43.6 (the installed `/opt/BeefLang`, matching `~/development/Beef` at 226397fc, 2026-09-27) and run against a set of tricky inputs, in Debug and Release (the results were the same). The Rust libraries were also run against the same inputs. Everything else is from reading the code and docs. "Speed" figures are the published numbers from the cited sources unless marked as measured here. The KdlBeef, TomlBeef and XmlBeef techniques this survey refers to are described in their `docs/architecture.md`.
+The Beef libraries were built with BeefBuild 0.43.6 (the Beef source of 2026-09-27, `226397fc`) and run against a set of tricky inputs, in Debug and Release (the results were the same). The Rust libraries were also run against the same inputs. Everything else is from reading the code and docs. "Speed" figures are the published numbers from the cited sources unless marked as measured here. The KdlBeef, TomlBeef and XmlBeef techniques this survey refers to are described in their `docs/architecture.md`.
 
 ## At a glance
 
