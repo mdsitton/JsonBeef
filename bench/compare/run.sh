@@ -56,6 +56,8 @@ shift || true
 REPEATS="${REPEATS:-3}"
 MAX_RUNS="${MAX_RUNS:-9}"
 if [ "$MAX_RUNS" -lt "$REPEATS" ]; then MAX_RUNS=$REPEATS; fi
+# settle and harness_result (step 3), with REPEATS and MAX_RUNS above and a ±10% tolerance
+source "$C/measure.sh"
 # Cells that never settled (step 3), counted as the tables are printed
 unsettled=0
 LIMIT="${LIMIT:-60}"
@@ -206,68 +208,23 @@ reference_line() { # track name
 	echo "${reference[$key]}"
 }
 
-median() {
-	sort -g | awk '{a[NR] = $1} END {print (NR % 2) ? a[(NR + 1) / 2] : (a[NR / 2] + a[NR / 2 + 1]) / 2}'
-}
-
-# Step 3's verdict on the runs so far, given one "<MB/s> <converged 0|1>" line per run: "settled" and
-# the (1-based) runs in the ±10% band around the converged runs' median when at least `need` converged
-# runs lie in it; otherwise "unsettled" and the runs to report (the converged ones, or all of them)
-settle() { # need
-	awk -v need="$1" '
-		{ v[NR] = $1; c[NR] = $2 }
-		END {
-			n = 0
-			for (i = 1; i <= NR; i++) if (c[i]) s[++n] = v[i]
-			if (n == 0) {
-				for (i = 1; i <= NR; i++) list = list " " i
-				print "unsettled" list
-				exit
-			}
-			for (i = 2; i <= n; i++) {
-				x = s[i]
-				for (j = i - 1; j >= 1 && s[j] > x; j--) s[j + 1] = s[j]
-				s[j + 1] = x
-			}
-			m = (n % 2) ? s[(n + 1) / 2] : (s[n / 2] + s[n / 2 + 1]) / 2
-			k = 0
-			for (i = 1; i <= NR; i++) {
-				if (!c[i]) continue
-				converged = converged " " i
-				if (v[i] >= m * 0.9 && v[i] <= m * 1.1) { k++; band = band " " i }
-			}
-			print (k >= need) ? "settled" band : "unsettled" converged
-		}'
-}
-
-# One cell: "<MB/s> <ms/op> <peak RSS KiB> [~]", each the median over the runs step 3 keeps (`~`: the
-# cell never settled), or FAIL / DNF / n/a
-cell() { # reference-line path command...
-	local ref="$1" path="$2" mbps=() ms=() rss=() converged=() out status verdict i
+# One run of a cell in a fresh process, checked against the reference line: settle's
+# "<MB/s> <converged 0|1> <ms/op> <peak RSS KiB>", or FAIL / DNF / n/a
+run_once() { # reference-line path command...
+	local ref="$1" path="$2" out status
 	shift 2
-	for ((r = 0; r < MAX_RUNS; r++)); do
-		out=$("$B/maxrss" timeout "$LIMIT" "$@" "$path" "$N" 2>&1)
-		status=$?
-		if [ $status -eq 124 ]; then echo DNF; return; fi
-		if [ $status -eq 3 ]; then echo "n/a"; return; fi
-		if [ $status -ne 0 ] || [ "$(grep -m1 '^check:' <<< "$out")" != "$ref" ]; then echo FAIL; return; fi
-		mbps+=("$(grep -oE '[0-9.]+ MB/s' <<< "$out" | head -1 | awk '{print $1}')")
-		ms+=("$(grep -oE '[0-9.]+ ms/op' <<< "$out" | head -1 | awk '{print $1}')")
-		rss+=("$(grep -oE '^maxrss: [0-9]+' <<< "$out" | tail -1 | awk '{print $2}')")
-		if grep -q ', converged)' <<< "$out"; then converged+=(1); else converged+=(0); fi
-		if [ $((r + 1)) -ge "$REPEATS" ]; then
-			verdict=$(for ((i = 0; i <= r; i++)); do echo "${mbps[i]} ${converged[i]}"; done | settle "$REPEATS")
-			if [[ "$verdict" == settled* ]]; then break; fi
-		fi
-	done
-	local kept_mbps=() kept_ms=() kept_rss=() mark=""
-	for i in ${verdict#* }; do
-		kept_mbps+=("${mbps[i - 1]}")
-		kept_ms+=("${ms[i - 1]}")
-		kept_rss+=("${rss[i - 1]}")
-	done
-	if [[ "$verdict" == unsettled* ]]; then mark="~"; fi
-	echo "$(printf '%s\n' "${kept_mbps[@]}" | median) $(printf '%s\n' "${kept_ms[@]}" | median) $(printf '%s\n' "${kept_rss[@]}" | median) $mark"
+	out=$("$B/maxrss" timeout "$LIMIT" "$@" "$path" "$N" 2>&1)
+	status=$?
+	if [ $status -eq 124 ]; then echo DNF; return; fi
+	if [ $status -eq 3 ]; then echo "n/a"; return; fi
+	if [ $status -ne 0 ] || [ "$(grep -m1 '^check:' <<< "$out")" != "$ref" ]; then echo FAIL; return; fi
+	harness_result "$out"
+}
+
+# One cell (step 3, measure.sh's settle): "<MB/s> <ms/op> <peak RSS KiB> [~]", each the median over
+# the runs that settled (`~`: the cell never settled), or FAIL / DNF / n/a
+cell() { # reference-line path command...
+	settle run_once "$@"
 }
 
 # Documents in an input (lines of a batch)
@@ -323,7 +280,7 @@ track_tables() { # track title implementations...
 				IFS='|' read -r name lib _ <<< "$impl"
 				local key="$input|$name"
 				if [ -z "${results[$key]+set}" ]; then
-					line+=" $(saved_cell "$heading" "$input" "$name") |"
+					line+=" $(saved_table_cell "### $heading" "$input" "$name") |"
 					continue
 				fi
 				local v="${results[$key]}"

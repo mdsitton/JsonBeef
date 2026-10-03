@@ -1,7 +1,9 @@
+// Vendored from FormatCore bench-kit/maxrss.c by tools/sync.sh: edit it there, then sync.
 // maxrss <command...>: runs the command and writes "maxrss: <KiB>" to stderr when it exits: the peak
 // resident set size of the process and of every descendant it waited for (getrusage's ru_maxrss as
 // wait4 reports it for the child, the figure /usr/bin/time -f %M prints). Exits with the command's
-// status (128 + the signal if it was killed). run.sh wraps every cell's process in it.
+// status (128 + the signal if it was killed). A benchmark's run.sh wraps every cell's process in it.
+// (JsonBeef's bench/compare/c/maxrss.c.)
 #include <signal.h>
 #include <stdio.h>
 #include <sys/resource.h>
